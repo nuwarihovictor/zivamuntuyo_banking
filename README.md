@@ -4,7 +4,7 @@ This is an initial responsive interface and Supabase email/password authenticati
 
 ## Deploy
 1. In Supabase Project Settings → API / API Keys, copy the Project URL and the public publishable key (or legacy anon key).
-2. Replace `PASTE_YOUR_SUPABASE_PROJECT_URL_HERE` and `PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE` in `app.js`.
+2. Replace const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co"; and const SUPABASE_ANON_KEY = "PASTE_YOUR_NEW_PUBLISHABLE_KEY_HERE"; in `app.js`.
 3. Never use a service_role or secret key in browser code.
 4. Upload `index.html`, `styles.css`, `app.js`, and `README.md` to the private GitHub repository, then import that repository into Vercel.
 
