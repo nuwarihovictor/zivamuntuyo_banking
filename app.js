@@ -1,7 +1,7 @@
 // Initial secure UI shell. Use only the Supabase project URL and PUBLIC publishable/anon key.
 // NEVER place a service_role or secret key in this browser file.
 const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ACTUAL_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
 
 const ready = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("PASTE_") && !SUPABASE_ANON_KEY.includes("PASTE_") && SUPABASE_ANON_KEY.length > 20;
 const db = ready ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
