@@ -1,693 +1,494 @@
-"use strict";
+// ZIVAMUNTUYO FINANCIAL SERVICES LTD
+// Secure staff login and customer-management module.
+// Never place a Supabase service_role or secret key in browser code.
 
-/*
- * ZIVAMUNTUYO FINANCIAL SERVICES LTD
- * Banking Management System
- *
- * This version provides:
- * - Supabase authentication
- * - Staff profile verification
- * - Staff role and branch display
- * - Working sidebar navigation
- * - Dashboard and placeholder screens
- * - Session restoration
- * - Sign-out
- *
- * IMPORTANT:
- * Banking transactions remain disabled until the required
- * database tables, RLS policies, accounting controls,
- * and secure backend functions are implemented and tested.
- *
- * Never put a Supabase service_role key or other secret
- * in this browser-side file.
- */
-
-// ======================================================
-// 1. SUPABASE CONFIGURATION
-// ======================================================
-
-const SUPABASE_URL =
-  "https://hwghiezvghdqxnhcnpwk.supabase.co";
-
-const SUPABASE_ANON_KEY =
-  "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
-
-const $ = (id) => document.getElementById(id);
+const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
 
 const ready =
-  typeof window.supabase !== "undefined" &&
   SUPABASE_URL.startsWith("https://") &&
-  SUPABASE_ANON_KEY.length > 20 &&
-  !SUPABASE_URL.includes("PASTE_") &&
-  !SUPABASE_ANON_KEY.includes("PASTE_");
+  SUPABASE_ANON_KEY.length > 20;
 
 const db = ready
-  ? window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    )
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-
-// ======================================================
-// 2. APPLICATION STATE
-// ======================================================
+const $ = id => document.getElementById(id);
 
 let currentUser = null;
 let currentProfile = null;
 let currentPage = "Overview";
-let authRequestInProgress = false;
 
-
-// ======================================================
-// 3. SAFE MESSAGE DISPLAY
-// ======================================================
+const escapeHTML = value =>
+  String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 
 function message(text, good = false) {
-  const element = $("message");
+  const el = $("message");
+  if (!el) return;
 
-  if (!element) return;
-
-  element.textContent = text || "";
-
-  element.style.color = good
-    ? "#216543"
-    : "#a13c30";
+  el.textContent = text;
+  el.style.color = good ? "#216543" : "#a13c30";
 }
 
+function setPageMessage(text, good = false) {
+  const el = $("module-message");
+  if (!el) return;
 
-// ======================================================
-// 4. APPLICATION INITIALIZATION
-// ======================================================
-
-function initializeInterface() {
-  if (!ready) {
-    const setup = $("setup");
-
-    if (setup) {
-      setup.classList.remove("hidden");
-    }
-  } else {
-    const setup = $("setup");
-
-    if (setup) {
-      setup.classList.add("hidden");
-    }
-  }
-
-  const dashboard = $("dashboard");
-  const login = $("login");
-  const signout = $("signout");
-  const placeholder = $("placeholder");
-
-  if (dashboard) dashboard.classList.add("hidden");
-  if (login) login.classList.remove("hidden");
-  if (signout) signout.classList.add("hidden");
-  if (placeholder) placeholder.classList.add("hidden");
-
-  initializeNavigation();
-  initializeAuthentication();
+  el.textContent = text;
+  el.style.color = good ? "#216543" : "#a13c30";
 }
 
-
-// ======================================================
-// 5. STAFF PROFILE VERIFICATION
-// ======================================================
+function showDashboard() {
+  $("login").classList.add("hidden");
+  $("dashboard").classList.remove("hidden");
+  $("signout").classList.remove("hidden");
+}
 
 async function loadProfile(user) {
-  if (!db || !user || !user.id) {
-    throw new Error(
-      "Unable to verify the signed-in staff member."
-    );
-  }
-
   const { data, error } = await db
     .from("employee_profiles")
     .select(
-      [
-        "full_name",
-        "employee_number",
-        "is_active",
-        "staff_roles(role_code,role_name)",
-        "branches:home_branch_id(branch_name)"
-      ].join(",")
+      "full_name,employee_number,is_active,role_id,home_branch_id,staff_roles(role_code,role_name),branches:home_branch_id(branch_name)"
     )
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
-    console.error(
-      "Staff profile verification failed:",
-      error
-    );
-
     throw new Error(
-      "Your account was authenticated, but your staff profile could not be verified. Please contact the administrator."
+      "Your staff profile could not be verified. Ask the administrator to check the profile relationships and database permissions."
     );
   }
 
-  if (!data || data.is_active !== true) {
-    throw new Error(
-      "Your staff profile is missing or inactive. Access has not been granted."
-    );
+  if (!data || !data.is_active) {
+    throw new Error("Your staff profile is missing or inactive.");
   }
 
   currentUser = user;
   currentProfile = data;
 
-  showDashboard(data);
+  showDashboard();
+
+  $("welcome").textContent =
+    "Welcome, " + (data.full_name || "Staff member");
+
+  $("role").textContent =
+    data.staff_roles?.role_name ||
+    data.staff_roles?.role_code ||
+    "Authenticated staff";
+
+  $("branch").textContent =
+    data.branches?.branch_name || "Assigned branch";
+
+  renderModule(currentPage);
 }
 
-
-// ======================================================
-// 6. DISPLAY DASHBOARD
-// ======================================================
-
-function showDashboard(profile) {
-  const login = $("login");
-  const dashboard = $("dashboard");
-  const signout = $("signout");
-
-  if (login) login.classList.add("hidden");
-  if (dashboard) dashboard.classList.remove("hidden");
-  if (signout) signout.classList.remove("hidden");
-
-  const welcome = $("welcome");
-  const role = $("role");
-  const branch = $("branch");
-
-  if (welcome) {
-    welcome.textContent =
-      "Welcome, " +
-      (profile.full_name || "Staff member");
-  }
-
-  if (role) {
-    role.textContent =
-      profile.staff_roles?.role_name ||
-      profile.staff_roles?.role_code ||
-      "Authenticated staff";
-  }
-
-  if (branch) {
-    branch.textContent =
-      profile.branches?.branch_name ||
-      "Assigned branch";
-  }
-
-  showPage("Overview");
+function canApproveCustomers() {
+  const role = currentProfile?.staff_roles?.role_code;
+  return role === "system_admin" ||
+         role === "bank_admin" ||
+         role === "branch_manager";
 }
 
-
-// ======================================================
-// 7. NAVIGATION
-// ======================================================
-
-function initializeNavigation() {
-  /*
-   * IMPORTANT FIX:
-   * The existing HTML uses <nav> rather than
-   * an element with class="nav".
-   *
-   * Therefore, use "nav button".
-   */
-
-  const buttons = document.querySelectorAll(
-    "nav button[data-page]"
-  );
-
-  buttons.forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!currentUser || !currentProfile) {
-        message(
-          "Please sign in with an authorized staff account."
-        );
-
-        return;
-      }
-
-      const page = button.dataset.page;
-
-      if (!page) return;
-
-      showPage(page);
-    });
-  });
-}
-
-
-// ======================================================
-// 8. DISPLAY SELECTED PAGE
-// ======================================================
-
-function showPage(page) {
-  const allowedPages = [
-    "Overview",
-    "Customers",
-    "Accounts",
-    "Transactions",
-    "Loans",
-    "Accounting",
-    "Reports"
-  ];
-
-  if (!allowedPages.includes(page)) {
-    console.warn("Unknown page requested:", page);
-    return;
-  }
-
+function renderModule(page) {
   currentPage = page;
 
-  // Update navigation highlighting.
+  const area = $("module-area");
+  if (!area) return;
 
-  document
-    .querySelectorAll("nav button[data-page]")
-    .forEach((button) => {
-      const selected =
-        button.dataset.page === page;
-
-      button.classList.toggle(
-        "active",
-        selected
-      );
-
-      button.setAttribute(
-        "aria-current",
-        selected ? "page" : "false"
-      );
-    });
-
-  // Update page heading.
-
-  const title = $("title");
-
-  if (title) {
-    title.textContent = page;
-  }
-
-  const dashboard = $("dashboard");
-  const placeholder = $("placeholder");
-  const placeholderTitle = $("placeholder-title");
+  $("title").textContent = page;
 
   if (page === "Overview") {
-    if (dashboard) {
-      dashboard.classList.remove("hidden");
-    }
-
-    if (placeholder) {
-      placeholder.classList.add("hidden");
-    }
-
+    $("dashboard-content").classList.remove("hidden");
+    area.classList.add("hidden");
     return;
   }
 
-  // Banking modules are placeholders for now.
-  // No financial transactions are executed here.
+  $("dashboard-content").classList.add("hidden");
+  area.classList.remove("hidden");
 
-  if (dashboard) {
-    dashboard.classList.add("hidden");
+  if (page === "Customers") {
+    renderCustomers();
+    return;
   }
 
-  if (placeholder) {
-    placeholder.classList.remove("hidden");
-  }
-
-  if (placeholderTitle) {
-    placeholderTitle.textContent =
-      page + " module";
-  }
+  area.innerHTML = `
+    <div class="card">
+      <small class="eyebrow">MODULE NOT ENABLED</small>
+      <h2>${escapeHTML(page)}</h2>
+      <p class="muted">
+        This module has not yet been connected to the database.
+        Financial operations remain disabled.
+      </p>
+    </div>`;
 }
 
+function renderCustomers() {
+  const area = $("module-area");
 
-// ======================================================
-// 9. SIGN IN
-// ======================================================
+  area.innerHTML = `
+    <div class="card">
+      <small class="eyebrow">CUSTOMER MANAGEMENT</small>
+      <h2>Register a customer</h2>
+      <p class="muted">
+        New customers are submitted for review. Registration does not
+        open an account or authorize financial transactions.
+      </p>
 
-function initializeAuthentication() {
-  const signin = $("signin");
+      <form id="customer-form">
+        <label>
+          Customer number *
+          <input name="customer_number" required maxlength="50"
+                 placeholder="Enter a unique customer number">
+        </label>
 
-  if (signin) {
-    signin.addEventListener(
-      "click",
-      signIn
-    );
-  }
+        <label>
+          Customer type *
+          <select name="customer_type" required>
+            <option value="individual">Individual</option>
+            <option value="business">Business</option>
+            <option value="organization">Organization / Group / Institution</option>
+          </select>
+        </label>
 
-  const password = $("password");
+        <label>
+          Full name / responsible person's name *
+          <input name="full_name" required maxlength="150">
+        </label>
 
-  if (password) {
-    password.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        signIn();
-      }
-    });
-  }
+        <label>
+          Organization name
+          <input name="organization_name" maxlength="200">
+        </label>
 
-  const email = $("email");
+        <label>
+          Date of birth (individual customers)
+          <input name="date_of_birth" type="date">
+        </label>
 
-  if (email) {
-    email.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        const passwordField = $("password");
+        <label>
+          Phone number
+          <input name="phone_number" type="tel" maxlength="40">
+        </label>
 
-        if (passwordField) {
-          passwordField.focus();
-        }
-      }
-    });
-  }
+        <label>
+          Email
+          <input name="email" type="email" maxlength="254">
+        </label>
 
-  const signout = $("signout");
+        <label>
+          Identification type
+          <input name="identification_type" maxlength="60"
+                 placeholder="For example, National ID">
+        </label>
 
-  if (signout) {
-    signout.addEventListener(
-      "click",
-      signOut
-    );
-  }
+        <label>
+          Identification number
+          <input name="identification_number" maxlength="100">
+        </label>
+
+        <label>
+          Residential address
+          <textarea name="residential_address" rows="2"
+                    maxlength="500"></textarea>
+        </label>
+
+        <label>
+          Physical / organization address
+          <textarea name="physical_address" rows="2"
+                    maxlength="500"></textarea>
+        </label>
+
+        <button type="submit" class="primary-button">
+          Submit for review
+        </button>
+      </form>
+
+      <p id="module-message" aria-live="polite"></p>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <small class="eyebrow">CUSTOMER DIRECTORY</small>
+      <h2>Search customers</h2>
+
+      <form id="customer-search-form">
+        <label>
+          Search by customer number, name, phone, or organization
+          <input id="customer-search" maxlength="150"
+                 placeholder="Enter a search term">
+        </label>
+        <button type="submit" class="primary-button">Search</button>
+        <button type="button" id="customer-show-all"
+                class="secondary">Show recent customers</button>
+      </form>
+
+      <div id="customer-results" aria-live="polite"></div>
+    </div>`;
+
+  $("customer-form").addEventListener("submit", submitCustomer);
+  $("customer-search-form").addEventListener("submit", searchCustomers);
+  $("customer-show-all").addEventListener("click", () => searchCustomers(null));
 }
 
+async function submitCustomer(event) {
+  event.preventDefault();
 
-async function signIn() {
-  if (authRequestInProgress) return;
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const values = new FormData(form);
 
-  if (!db) {
-    message(
-      "Supabase configuration is incomplete. Check the project URL and public key."
-    );
+  const customerNumber = String(values.get("customer_number") || "").trim();
+  const fullName = String(values.get("full_name") || "").trim();
+  const customerType = String(values.get("customer_type") || "").trim();
 
-    return;
+  if (!customerNumber || !fullName) {
+    return setPageMessage("Enter the customer number and full name.");
   }
 
-  const email = $("email")?.value.trim() || "";
-  const password = $("password")?.value || "";
-  const signin = $("signin");
-
-  if (!email || !password) {
-    message(
-      "Enter your work email and password."
-    );
-
-    return;
+  if (!["individual", "business", "organization"].includes(customerType)) {
+    return setPageMessage("Choose a valid customer type.");
   }
 
-  authRequestInProgress = true;
-
-  if (signin) {
-    signin.disabled = true;
-    signin.textContent = "Signing in...";
+  if (customerType !== "individual" &&
+      !String(values.get("organization_name") || "").trim()) {
+    return setPageMessage("Enter the organization name for this customer.");
   }
 
-  message("");
+  const record = {
+    customer_number: customerNumber,
+    customer_type: customerType,
+    full_name: fullName,
+    organization_name:
+      String(values.get("organization_name") || "").trim() || null,
+    date_of_birth: values.get("date_of_birth") || null,
+    phone_number: String(values.get("phone_number") || "").trim() || null,
+    email: String(values.get("email") || "").trim() || null,
+    identification_type:
+      String(values.get("identification_type") || "").trim() || null,
+    identification_number:
+      String(values.get("identification_number") || "").trim() || null,
+    residential_address:
+      String(values.get("residential_address") || "").trim() || null,
+    physical_address:
+      String(values.get("physical_address") || "").trim() || null,
+    status: "pending_review",
+    created_by: currentUser.id
+  };
+
+  // Do not silently assign a branch: it must be authorized by the database.
+  // The existing schema allows branch_id to be null, but your SELECT policy
+  // will not expose a null-branch record to ordinary branch-scoped employees.
+
+  button.disabled = true;
+  button.textContent = "Submitting...";
 
   try {
-    const { data, error } =
-      await db.auth.signInWithPassword({
-        email,
-        password
-      });
+    const { data, error } = await db
+      .from("customers")
+      .insert(record)
+      .select("id,customer_number,status")
+      .single();
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    if (!data.user) {
-      throw new Error(
-        "Authentication did not return a user account."
-      );
-    }
-
-    await loadProfile(data.user);
-
-    message(
-      "Signed in successfully.",
+    setPageMessage(
+      `Customer ${data.customer_number} was submitted successfully. Status: ${data.status}.`,
       true
     );
 
+    form.reset();
+    await searchCustomers(null);
   } catch (error) {
-    console.error("Sign-in error:", error);
+    console.error("Customer registration error:", error);
 
-    currentUser = null;
-    currentProfile = null;
-
-    if (db) {
-      await db.auth.signOut();
-    }
-
-    const dashboard = $("dashboard");
-    const login = $("login");
-    const signout = $("signout");
-
-    if (dashboard) {
-      dashboard.classList.add("hidden");
-    }
-
-    if (login) {
-      login.classList.remove("hidden");
-    }
-
-    if (signout) {
-      signout.classList.add("hidden");
-    }
-
-    message(
-      error.message ||
-      "Sign-in failed. Please try again."
-    );
-
-  } finally {
-    authRequestInProgress = false;
-
-    if (signin) {
-      signin.disabled = false;
-      signin.textContent =
-        "Sign in securely →";
-    }
-  }
-}
-
-
-// ======================================================
-// 10. SIGN OUT
-// ======================================================
-
-async function signOut() {
-  if (!db) {
-    resetApplication();
-    return;
-  }
-
-  const signout = $("signout");
-
-  if (signout) {
-    signout.disabled = true;
-  }
-
-  try {
-    const { error } = await db.auth.signOut();
-
-    if (error) {
-      throw error;
-    }
-
-    resetApplication();
-
-    message(
-      "Signed out successfully.",
-      true
-    );
-
-  } catch (error) {
-    console.error("Sign-out error:", error);
-
-    message(
-      "Sign-out could not be confirmed. Please check your connection and try again."
-    );
-
-  } finally {
-    if (signout) {
-      signout.disabled = false;
-    }
-  }
-}
-
-
-// ======================================================
-// 11. RESET APPLICATION AFTER SIGN OUT
-// ======================================================
-
-function resetApplication() {
-  currentUser = null;
-  currentProfile = null;
-  currentPage = "Overview";
-
-  const dashboard = $("dashboard");
-  const login = $("login");
-  const signout = $("signout");
-  const placeholder = $("placeholder");
-  const password = $("password");
-  const email = $("email");
-
-  if (dashboard) {
-    dashboard.classList.add("hidden");
-  }
-
-  if (placeholder) {
-    placeholder.classList.add("hidden");
-  }
-
-  if (login) {
-    login.classList.remove("hidden");
-  }
-
-  if (signout) {
-    signout.classList.add("hidden");
-  }
-
-  if (password) {
-    password.value = "";
-  }
-
-  if (email) {
-    email.value = "";
-  }
-
-  const title = $("title");
-
-  if (title) {
-    title.textContent = "Overview";
-  }
-
-  document
-    .querySelectorAll("nav button[data-page]")
-    .forEach((button) => {
-      const selected =
-        button.dataset.page === "Overview";
-
-      button.classList.toggle(
-        "active",
-        selected
+    if (error.code === "23505") {
+      setPageMessage("That customer number already exists. Use a unique number.");
+    } else if (error.code === "42501" || error.code === "PGRST301") {
+      setPageMessage(
+        "The database denied this operation. Check your role, branch assignment, and RLS policies."
       );
-    });
+    } else {
+      setPageMessage(
+        error.message || "Customer registration failed. Check the database configuration."
+      );
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = "Submit for review";
+  }
 }
 
+async function searchCustomers(event) {
+  if (event) event.preventDefault();
 
-// ======================================================
-// 12. RESTORE EXISTING SESSION
-// ======================================================
+  const results = $("customer-results");
+  if (!results) return;
 
-async function restoreSession() {
-  if (!db) return;
+  results.textContent = "Loading customer records...";
 
   try {
-    const { data, error } =
-      await db.auth.getSession();
+    let query = db
+      .from("customers")
+      .select(
+        "id,customer_number,customer_type,full_name,organization_name,phone_number,email,status,created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(50);
 
-    if (error) {
-      throw error;
+    const term = String($("customer-search")?.value || "").trim();
+
+    if (term) {
+      const safeTerm = term.replace(/[,%()]/g, " ");
+      query = query.or(
+        `customer_number.ilike.%${safeTerm}%,full_name.ilike.%${safeTerm}%,organization_name.ilike.%${safeTerm}%,phone_number.ilike.%${safeTerm}%`
+      );
     }
 
-    const session = data?.session;
+    const { data, error } = await query;
+    if (error) throw error;
 
-    if (!session?.user) {
+    if (!data?.length) {
+      results.textContent = "No customer records were found for your access level.";
       return;
     }
 
-    await loadProfile(session.user);
-
-    message(
-      "Your existing session was restored.",
-      true
-    );
-
+    results.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;margin-top:15px">
+          <thead>
+            <tr>
+              <th align="left">Customer number</th>
+              <th align="left">Name</th>
+              <th align="left">Type</th>
+              <th align="left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(customer => `
+              <tr>
+                <td>${escapeHTML(customer.customer_number)}</td>
+                <td>${escapeHTML(customer.full_name)}</td>
+                <td>${escapeHTML(customer.customer_type)}</td>
+                <td>${escapeHTML(customer.status)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Showing up to 50 records permitted by database policies.</p>`;
   } catch (error) {
-    console.error(
-      "Session restoration failed:",
-      error
-    );
-
-    currentUser = null;
-    currentProfile = null;
-
-    const dashboard = $("dashboard");
-
-    if (dashboard) {
-      dashboard.classList.add("hidden");
-    }
-
-    const login = $("login");
-
-    if (login) {
-      login.classList.remove("hidden");
-    }
-
-    if (db) {
-      await db.auth.signOut();
-    }
-
-    message(
-      error.message ||
-      "Your session could not be verified. Please sign in again."
-    );
+    console.error("Customer search error:", error);
+    results.textContent =
+      "Unable to load customers. Check your branch permissions and database policies.";
   }
 }
 
+async function signIn() {
+  if (!db) return message("Supabase configuration is incomplete.");
 
-// ======================================================
-// 13. MONITOR AUTHENTICATION CHANGES
-// ======================================================
+  const email = $("email").value.trim();
+  const password = $("password").value;
 
-if (ready && db) {
-  db.auth.onAuthStateChange(
-    (event, session) => {
-      /*
-       * Do not perform additional database queries
-       * inside this callback. Profile loading is handled
-       * separately to avoid authentication deadlocks.
-       */
+  if (!email || !password) {
+    return message("Enter your work email and password.");
+  }
 
-      if (event === "SIGNED_OUT" || !session) {
-        currentUser = null;
-        currentProfile = null;
+  const button = $("signin");
+  button.disabled = true;
+  button.textContent = "Signing in...";
 
-        const dashboard = $("dashboard");
-        const placeholder = $("placeholder");
-        const login = $("login");
-        const signout = $("signout");
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) throw error;
 
-        if (dashboard) {
-          dashboard.classList.add("hidden");
-        }
-
-        if (placeholder) {
-          placeholder.classList.add("hidden");
-        }
-
-        if (login) {
-          login.classList.remove("hidden");
-        }
-
-        if (signout) {
-          signout.classList.add("hidden");
-        }
-      }
-    }
-  );
+    await loadProfile(data.user);
+    message("", true);
+  } catch (error) {
+    console.error("Sign-in error:", error);
+    message(error.message || "Sign-in failed.");
+    await db.auth.signOut();
+  } finally {
+    button.disabled = false;
+    button.textContent = "Sign in securely →";
+  }
 }
 
+async function signOut() {
+  if (db) await db.auth.signOut();
 
-// ======================================================
-// 14. START APPLICATION
-// ======================================================
+  currentUser = null;
+  currentProfile = null;
 
-initializeInterface();
+  $("dashboard").classList.add("hidden");
+  $("module-area").classList.add("hidden");
+  $("dashboard-content").classList.remove("hidden");
+  $("login").classList.remove("hidden");
+  $("signout").classList.add("hidden");
+  $("password").value = "";
 
-restoreSession();
+  message("Signed out.", true);
+}
 
-console.info(
-  "Zivamuntuyo Banking System initialized."
-);
+function installModuleArea() {
+  const dashboard = $("dashboard");
 
-console.info(
-  "Financial operations remain disabled until the required security and accounting controls are implemented."
-);
+  const content = document.createElement("div");
+  content.id = "dashboard-content";
+
+  while (dashboard.firstChild) {
+    content.appendChild(dashboard.firstChild);
+  }
+
+  dashboard.appendChild(content);
+
+  const area = document.createElement("section");
+  area.id = "module-area";
+  area.className = "hidden";
+  dashboard.appendChild(area);
+}
+
+function start() {
+  if (!db) {
+    $("setup").classList.remove("hidden");
+    return;
+  }
+
+  $("setup").classList.add("hidden");
+  installModuleArea();
+
+  $("signin").addEventListener("click", signIn);
+  $("signout").addEventListener("click", signOut);
+
+  document.querySelectorAll("nav button, .nav button").forEach(button => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("nav button, .nav button")
+        .forEach(item => item.classList.remove("active"));
+
+      button.classList.add("active");
+      renderModule(button.dataset.page || "Overview");
+    });
+  });
+
+  db.auth.getSession().then(async ({ data, error }) => {
+    if (error) {
+      message("Unable to restore your session. Please sign in again.");
+      return;
+    }
+
+    if (data.session) {
+      try {
+        await loadProfile(data.session.user);
+      } catch (error) {
+        message(error.message || "Staff verification failed.");
+        await db.auth.signOut();
+      }
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", start);
