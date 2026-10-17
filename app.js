@@ -46,8 +46,7 @@ $("signin").addEventListener("click", async () => {
   } catch(e) {
     message(e.message || "Sign-in failed.");
     await db.auth.signOut();
-  } catch(()) {}
-  finally {
+  } finally {
     $("signin").disabled = false;
     $("signin").textContent = "Sign in securely →";
   }
