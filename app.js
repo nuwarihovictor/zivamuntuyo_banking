@@ -92,39 +92,42 @@ window.switchPage = function(pageName) {
   } 
   else if (pageName === "Branches") {
     c.innerHTML = `
-      <span class="category-tag">Phase 3: Branch & Country Hierarchy</span>
+      <span class="category-tag">Operational regional network</span>
       <h2 class="page-heading">Branches & Regions</h2>
       ${panel(
-        "OPERATIONAL REGIONAL NETWORK",
-        "Branch Directory & Currency Mapping",
-        "Manage regional branches operating under the central core banking system.",
-        `<div id="branch-list"><p class="muted">Loading regional branches...</p></div>`
+        "ZIVAMUNTUYO BRANCH DIRECTORY",
+        "Main branch and outreach locations",
+        "The directory shows active branches only. Superseded branch records are inactive and kept for historical references.",
+        `<div id="branch-list"><p class="muted">Loading active branches…</p></div>`
       )}
     `;
 
     if (db) {
-      db.from("branches").select("*").then(({ data: branches, error }) => {
-        const listEl = document.getElementById("branch-list");
-        if (!listEl) return;
-        if (error || !branches || branches.length === 0) {
-          listEl.innerHTML = `<div class="list-item"><div><strong>Kampala Central Branch</strong> (UG-001)<br><span class="muted">Country: Uganda | Currency: UGX</span></div><span class="badge-role">Headquarters</span></div>`;
-          return;
-        }
-        listEl.innerHTML = branches.map(b => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(b.branch_name || b.name)} (${esc(b.branch_code || b.code)})</strong><br>
-              <span class="muted">Currency: ${esc(b.currency_code || "UGX")}</span>
+      db.from("branches").select("id,branch_code,branch_name,address,timezone,is_head_office,is_active")
+        .eq("is_active",true)
+        .order("is_head_office",{ascending:false})
+        .order("branch_name",{ascending:true})
+        .then(({data:branches,error})=>{
+          const listEl=document.getElementById("branch-list");
+          if(!listEl)return;
+          if(error){listEl.innerHTML='<p class="muted">Branch directory could not be loaded: '+esc(error.message)+'</p>';return;}
+          if(!branches||!branches.length){listEl.innerHTML='<p class="muted">No active branches are available to your account.</p>';return;}
+          listEl.innerHTML=branches.map(b=>`
+            <div class="list-item">
+              <div>
+                <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
+                <span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span>
+              </div>
+              <span class="badge-role">${b.is_head_office?"Main Branch":"Outreach"}</span>
             </div>
-            <span class="badge-role">Operational</span>
-          </div>
-        `).join("");
-      }).catch(() => {
-        const listEl = document.getElementById("branch-list");
-        if (listEl) {
-          listEl.innerHTML = `<div class="list-item"><div><strong>Kampala Central Branch</strong> (UG-001)<br><span class="muted">Country: Uganda | Currency: UGX</span></div><span class="badge-role">Headquarters</span></div>`;
-        }
-      });
+          `).join("");
+        }).catch(()=>{
+          const listEl=document.getElementById("branch-list");
+          if(listEl)listEl.innerHTML='<p class="muted">Could not connect to the branch directory.</p>';
+        });
+    } else {
+      const listEl=document.getElementById("branch-list");
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No sample branches are displayed.</p>';
     }
   }
   else if (pageName === "Staff") {
