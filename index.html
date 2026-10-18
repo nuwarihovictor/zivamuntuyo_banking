@@ -11,23 +11,24 @@
     <header class="header">
         <div class="logo-container">
             <div class="logo-icon">Z</div>
-            <div>
+            <div class="logo-text">
                 <h1>ZIVAMUNTUYO</h1>
                 <p>FINANCIAL SERVICES LTD</p>
             </div>
         </div>
-        <div id="status" class="status-badge">Signed out</div>
-        <button id="signout" class="secondary hidden">Sign out</button>
+        <div id="auth-actions">
+            <button id="signout" class="secondary hidden">Sign out</button>
+        </div>
     </header>
 
     <nav id="nav" class="nav-bar"></nav>
 
     <main class="main-container">
         <!-- LOGIN SECTION -->
-        <section id="login" class="panel">
-            <small>SECURE ACCESS</small>
+        <section id="login" class="panel" style="margin-top: 20px;">
+            <span class="category-tag">SECURE ACCESS</span>
             <h2>Welcome back</h2>
-            <p class="muted">Sign in with your authorized staff account.</p>
+            <p class="panel-desc">Sign in with your authorized staff account.</p>
             
             <form id="login-form">
                 <label>Work email
@@ -39,24 +40,24 @@
                 <button type="submit" class="primary">Sign in securely →</button>
                 <p id="login-message" class="error"></p>
             </form>
-            <p class="muted" style="margin-top: 16px; font-size: 12px;">Access depends on assigned role and branch permissions.</p>
+            <p class="muted" style="margin-top: 16px;">Access depends on assigned role and branch permissions.</p>
         </section>
 
         <!-- WORKSPACE SECTION -->
         <div id="workspace" class="hidden">
-            <h1 id="title">Overview</h1>
+            <span class="category-tag">BANKING MANAGEMENT SYSTEM</span>
+            <h1 id="title" class="page-heading">Overview</h1>
             <div id="content"></div>
         </div>
     </main>
 
-    <div id="toast" class="toast"></div>
+    <div id="toast" class="toast" style="display:none; position:fixed; bottom:20px; right:20px; background:#063c2c; color:white; padding:12px 20px; border-radius:6px; font-size:13px; z-index:999;"></div>
 
     <footer class="footer">
         <p>© <span id="year"></span> Zivamuntuyo Financial Services Ltd</p>
-        <p><small class="muted">Secure banking workspace · Active Build</small></p>
+        <p><span style="color:#9e7a44;">Secure banking workspace</span> · Initial build</p>
     </footer>
 
     <script src="app.js"></script>
 </body>
-  </html>
-  
+</html>
