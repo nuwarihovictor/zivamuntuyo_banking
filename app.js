@@ -421,7 +421,7 @@ window.switchPage = function(pageName) {
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           const listEl = document.getElementById("acc-list");
           if (!listEl) return;
           if (error) {
@@ -2782,4 +2782,87 @@ window.attachInstitutionPayrollEvidence = async function(){
   if(error)throw error;
   if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
  }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
+
+
+// Excel-style customer and account registers. Data comes only from the signed-in user's authorized database queries.
+window.customerRegisterRows = window.customerRegisterRows || [];
+window.accountRegisterRows = window.accountRegisterRows || [];
+window.accountRegisterCustomers = window.accountRegisterCustomers || [];
+window.accountRegisterBranches = window.accountRegisterBranches || [];
+
+window.registerCsvCell = function(value) {
+  let textValue = value === null || value === undefined ? "" : String(value);
+  // Prevent spreadsheet formula execution when exporting user-controlled values.
+  if (/^[\\s]*[=+@-]/.test(textValue)) textValue = "'" + textValue;
+  return '"' + textValue.replace(/"/g, '""') + '"';
+};
+window.downloadRegisterCsv = function(filename, headers, rows) {
+  const csv = [headers, ...rows].map(row => row.map(window.registerCsvCell).join(",")).join("\\r\\n");
+  const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; link.style.display = "none";
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+window.customerRegisterView = function() {
+  const q=(document.getElementById("customer-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("customer-register-status")?.value||"").toLowerCase();
+  return (window.customerRegisterRows||[]).filter(c=>{
+    const active=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"inactive":"active";
+    const fields=[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status].join(" ").toLowerCase();
+    return (!q||fields.includes(q))&&(!status||active===status);
+  });
+};
+window.filterCustomerRegister = function() {
+  const target=document.getElementById("cust-list");if(!target)return;
+  const rows=window.customerRegisterView();
+  const count=document.getElementById("customer-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.customerRegisterRows||[]).length+" member record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No member records match the current search or filter.</p>';return;}
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Member / legal name</th><th>CIF number</th><th>NIN / Passport</th><th>Phone</th><th>Email</th><th>Address</th><th>Status</th><th>Registered</th></tr></thead><tbody>'+rows.map(c=>{
+    const status=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"Inactive":esc(c.status||"Active / registered");
+    return '<tr><td>'+esc(c.full_name||"—")+'</td><td>'+esc(c.customer_number||"—")+'</td><td>'+esc(c.nin_or_passport||"—")+'</td><td>'+esc(c.phone_number||"—")+'</td><td>'+esc(c.email||"—")+'</td><td>'+esc(c.address||"—")+'</td><td><span class="badge-role">'+status+'</span></td><td>'+esc(c.created_at?new Date(c.created_at).toLocaleDateString():"—")+'</td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportCustomerRegister = function() {
+  const rows=window.customerRegisterView();
+  if(!rows.length){alert("There are no member rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" member record(s), including confidential identification and contact information, to a CSV file that opens in Excel? Store it securely."))return;
+  window.downloadRegisterCsv("zivamuntuyo-members-"+new Date().toISOString().slice(0,10)+".csv",["Member name","CIF number","NIN or passport","Phone","Email","Address","Status","Registered"],rows.map(c=>[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status||(c.is_active===false?"Inactive":"Active / registered"),c.created_at]));
+};
+window.accountRegisterView = function() {
+  const q=(document.getElementById("account-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("account-register-status")?.value||"").toLowerCase();
+  const customers=window.accountRegisterCustomers||[],branches=window.accountRegisterBranches||[];
+  return (window.accountRegisterRows||[]).map(a=>{
+    const customer=customers.find(c=>String(c.id)===String(a.customer_id||a.customer_uuid))||null;
+    const branch=branches.find(b=>String(b.id)===String(a.branch_id))||null;
+    return {...a,_member:customer?.full_name||a.customer_name||a.full_name||"Not linked in register",_cif:customer?.customer_number||a.customer_number||"",_phone:customer?.phone_number||a.phone_number||"",_email:customer?.email||a.email||"",_address:customer?.address||a.address||"",_branch:branch?.branch_name||a.branch_name||a.branch_id||"Not assigned"};
+  }).filter(a=>{
+    const st=String(a.account_status||a.status||"unknown").toLowerCase();
+    const search=[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.account_type,a.product_type,a.currency_code,a.account_status].join(" ").toLowerCase();
+    return (!q||search.includes(q))&&(!status||st===status||((status==="active")&&st==="open"));
+  });
+};
+window.filterAccountRegister = function() {
+  const target=document.getElementById("acc-list");if(!target)return;
+  const rows=window.accountRegisterView();
+  const count=document.getElementById("account-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.accountRegisterRows||[]).length+" account record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No accounts match this search/filter, or no accounts are visible under your permissions.</p>';return;}
+  const fmt=v=>v===null||v===undefined||v===""?"Unavailable":Number.isFinite(Number(v))?Number(v).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2}):"Unavailable";
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Account number</th><th>Member</th><th>CIF</th><th>Phone</th><th>Address</th><th>Branch</th><th>Product</th><th>Currency</th><th>Stored balance</th><th>Posted-ledger balance</th><th>Reconciliation difference</th><th>Status</th></tr></thead><tbody>'+rows.map(a=>{
+    const stored=Number(a.stored_balance),ledger=a.ledger_balance===null||a.ledger_balance===undefined?null:Number(a.ledger_balance);
+    const diff=(!a.ledger_configured||ledger===null||!Number.isFinite(ledger)||!Number.isFinite(stored))?"Not configured":fmt(stored-ledger);
+    return '<tr><td>'+esc(a.account_number||"Unavailable")+'</td><td>'+esc(a._member)+'</td><td>'+esc(a._cif||"—")+'</td><td>'+esc(a._phone||"—")+'</td><td>'+esc(a._address||"—")+'</td><td>'+esc(a._branch)+'</td><td>'+esc(a.product_type||a.account_type||a.account_type_name||"—")+'</td><td>'+esc(a.currency_code||"UGX")+'</td><td>'+fmt(a.stored_balance)+'</td><td>'+fmt(a.ledger_balance)+'</td><td>'+diff+'</td><td><span class="badge-role">'+esc(a.account_status||a.status||"unknown")+'</span></td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportAccountRegister = function() {
+  const rows=window.accountRegisterView();
+  if(!rows.length){alert("There are no account rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" account record(s), including customer contact/address details and balances, to an Excel-compatible CSV? Store it securely."))return;
+  const fmt=v=>v===null||v===undefined?"":v;
+  window.downloadRegisterCsv("zivamuntuyo-accounts-"+new Date().toISOString().slice(0,10)+".csv",["Account number","Member name","CIF number","Phone","Email","Address","Branch","Product","Currency","Stored balance","Posted-ledger balance","Account status","Account UUID","Branch UUID"],rows.map(a=>[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.product_type||a.account_type||a.account_type_name,a.currency_code,fmt(a.stored_balance),fmt(a.ledger_balance),a.account_status||a.status,a.account_id,a.branch_id]));
 };
