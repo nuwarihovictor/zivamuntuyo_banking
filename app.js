@@ -114,29 +114,29 @@ window.switchPage = function(pageName) {
       <h2 class="page-heading">Branches & Regions</h2>
       ${panel(
         "ZIVAMUNTUYO BRANCH DIRECTORY",
-        "Main branch and outreach locations",
-        "The directory shows active branches only. Superseded branch records are inactive and kept for historical references.",
+        "Current and archived branch locations",
+        "Active branches appear first. Inactive historical records remain visible for audit and reporting; their status is clearly marked.",
         `<div id="branch-list"><p class="muted">Loading active branches…</p></div>`
       )}
     `;
 
     if (db) {
       db.from("branches").select("id,branch_code,branch_name,address,timezone,is_head_office,is_active")
-        .eq("is_active",true)
+        .order("is_active",{ascending:false})
         .order("is_head_office",{ascending:false})
         .order("branch_name",{ascending:true})
         .then(({data:branches,error})=>{
           const listEl=document.getElementById("branch-list");
           if(!listEl)return;
           if(error){listEl.innerHTML='<p class="muted">Branch directory could not be loaded: '+esc(error.message)+'</p>';return;}
-          if(!branches||!branches.length){listEl.innerHTML='<p class="muted">No active branches are available to your account.</p>';return;}
+          if(!branches||!branches.length){listEl.innerHTML='<p class="muted">No branches are visible to your account. Check your staff role and branch access.</p>';return;}
           listEl.innerHTML=branches.map(b=>`
             <div class="list-item">
               <div>
                 <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
                 <span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span>
               </div>
-              <span class="badge-role">${b.is_head_office?"Main Branch":"Outreach"}</span>
+              <div class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Main Branch":"Outreach"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span></div>
             </div>
           `).join("");
         }).catch(()=>{
