@@ -234,8 +234,8 @@ window.switchPage = function(pageName) {
       <h2 class="page-heading">Transactions</h2>
       ${panel(
         "TRANSACTION PROCESSING",
-        "Double-Entry Ledger Posting",
-        "Execute deposits and withdrawals.",
+        "Cash transaction request",
+        "Submit deposits and withdrawals for approval. Requests are not treated as posted transactions until an authorized approver completes the ledger workflow.",
         `<form onsubmit="handleTransaction(event)">
            <label>Account UUID * 
              <input type="text" name="account_id" required placeholder="Enter Account UUID">
@@ -247,9 +247,9 @@ window.switchPage = function(pageName) {
              </select>
            </label>
            <label>Amount (UGX) * 
-             <input type="number" name="amount" required step="1000" placeholder="50000">
+             <input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="50000.00">
            </label>
-           <button type="submit" class="primary">Post to Ledger</button>
+           <button type="submit" class="primary">Submit for Approval</button>
            <p id="tx-feedback" class="muted"></p>
          </form>`
       )}
@@ -412,25 +412,58 @@ window.handleTransaction = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("tx-feedback");
-  if (feedback) feedback.textContent = "Posting to ledger...";
-
   const formData = new FormData(form);
-  const payload = {
-    transaction_reference: "TRX-" + Math.floor(10000000 + Math.random() * 90000000),
-    account_id: formData.get("account_id"),
-    transaction_type: formData.get("tx_type"),
-    amount: parseFloat(formData.get("amount")),
-    currency_code: "UGX",
-    narration: "Teller posting",
-    status: "posted"
-  };
+  const accountId = String(formData.get("account_id") || "").trim();
+  const transactionType = String(formData.get("tx_type") || "").toLowerCase();
+  const amount = Number(formData.get("amount"));
 
-  const { error } = await db.from("transactions").insert([payload]);
-  if (error) {
-    if (feedback) feedback.textContent = "Transaction failed: " + error.message;
-  } else {
-    if (feedback) feedback.textContent = "Transaction successfully posted!";
-    form.reset();
+  if (!db) {
+    if (feedback) feedback.textContent = "Database connection is unavailable. No transaction request was submitted.";
+    return;
+  }
+  if (!accountId) {
+    if (feedback) feedback.textContent = "Enter the bank account UUID.";
+    return;
+  }
+  if (!["deposit", "withdrawal"].includes(transactionType)) {
+    if (feedback) feedback.textContent = "Choose deposit or withdrawal.";
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    if (feedback) feedback.textContent = "Enter an amount greater than zero.";
+    return;
+  }
+
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  if (feedback) feedback.textContent = "Submitting request for authorization…";
+
+  try {
+    // The database RPC validates staff role, branch access, active account status,
+    // and amount; it creates a pending-approval journal request, not a posted transaction.
+    const { data, error } = await db.rpc("create_cash_transaction_request", {
+      p_account_id: accountId,
+      p_transaction_type: transactionType,
+      p_amount: amount,
+      p_description: "Teller " + transactionType + " request"
+    });
+
+    if (error) {
+      if (feedback) feedback.textContent = "Request rejected: " + error.message;
+      return;
+    }
+
+    const request = Array.isArray(data) ? data[0] : data;
+    if (feedback) {
+      feedback.textContent = request
+        ? "Request submitted for approval. Reference: " + request.journal_number + ". Status: " + request.journal_status + ". No balance was changed by this request."
+        : "Request submitted, but no reference was returned. Check the pending approvals list before retrying.";
+    }
+    if (request) form.reset();
+  } catch (err) {
+    if (feedback) feedback.textContent = "Could not submit request. Check your connection and pending approvals before retrying.";
+  } finally {
+    if (button) button.disabled = false;
   }
 };
 
