@@ -319,8 +319,37 @@ window.switchPage = function(pageName) {
               <option value="CDF">CDF — Congolese franc</option>
             </select>
           </label>
+          <fieldset class="document-upload-fieldset">
+            <legend>Attach account-opening documents (optional)</legend>
+            <p class="muted">Scanned national ID/passport, proof of address, chairperson letter, or supporting documents. PDF, JPG or PNG; maximum 10 MB each.</p>
+            <label>Document category
+              <select name="account_document_category">
+                <option value="national-id">National ID</option><option value="passport">Passport</option><option value="proof-of-address">Proof of address</option><option value="chairperson-letter">Chairperson letter</option><option value="other">Other supporting document</option>
+              </select>
+            </label>
+            <label>Scanned files
+              <input type="file" name="account_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple>
+            </label>
+          </fieldset>
           <button type="submit" class="primary">Submit Account Request</button>
           <p id="acc-feedback" class="muted" aria-live="polite"></p>
+        </form>`
+      )}
+      ${panel(
+        "LOAN APPLICATION DOCUMENTS",
+        "Attach borrower and collateral evidence",
+        "Upload documents to an existing loan record. Examples: scanned IDs, land titles, chairperson letters, guarantor IDs, proof of income and valuation reports. Files are private and access is limited by staff branch permissions.",
+        `<form id="loan-document-form" onsubmit="handleLoanDocumentUpload(event)">
+          <label>Loan record UUID *<input type="text" name="loan_id" required placeholder="Paste the existing loan UUID"></label>
+          <label>Document category *
+            <select name="document_category" required>
+              <option value="national-id">Borrower national ID</option><option value="passport">Passport</option><option value="land-title">Land title / collateral ownership</option><option value="chairperson-letter">LC / chairperson letter</option><option value="guarantor-id">Guarantor identification</option><option value="income-proof">Proof of income / business</option><option value="valuation-report">Collateral valuation report</option><option value="other">Other supporting document</option>
+            </select>
+          </label>
+          <label>Scanned documents *<input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required></label>
+          <p class="muted">PDF, JPG or PNG; maximum 10 MB per file. Use an existing loan UUID and only upload documents you are authorized to handle.</p>
+          <button type="submit" class="primary">Upload loan documents</button>
+          <p id="loan-document-feedback" class="muted" aria-live="polite"></p>
         </form>`
       )}
       ${panel(
@@ -1027,12 +1056,54 @@ window.handleAccountSubmit = async function(e) {
     });
     if(error){if(feedback)feedback.textContent="Account request not submitted: "+error.message;return;}
     const result=Array.isArray(data)?data[0]:data;
-    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval");
+    const files=Array.from(form.querySelector('input[name="account_documents"]')?.files||[]);
+    let documentStatus="";
+    if(files.length){
+      const uploaded=await window.uploadApplicationDocuments("account-opening",customerId,files,String(formData.get("account_document_category")||"other"));
+      documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
+    }
+    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+documentStatus;
     form.reset();
     setTimeout(()=>window.switchPage("Accounts"),1200);
   }catch(err){
     if(feedback)feedback.textContent="Account request failed: "+(err?.message||"Unexpected error");
   }finally{if(button)button.disabled=false;}
+};
+
+window.uploadApplicationDocuments = async function(kind,recordId,files,category) {
+  if(!db)return {ok:false,error:"Database connection unavailable."};
+  if(!["loans","account-opening"].includes(kind))return {ok:false,error:"Unsupported document destination."};
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId))return {ok:false,error:"Invalid record UUID."};
+  const allowed=["application/pdf","image/jpeg","image/png"];
+  for(const file of files){
+    if(!allowed.includes(file.type)||file.size>10485760)return {ok:false,error:"Each file must be PDF, JPG or PNG and no larger than 10 MB."};
+  }
+  let count=0;
+  for(const file of files){
+    const safeName=String(file.name||"document").normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(-90)||"document";
+    const path=kind+"/"+recordId+"/"+String(category||"other").replace(/[^a-z0-9-]/gi,"-")+"-"+Date.now()+"-"+count+"-"+safeName;
+    const {error}=await db.storage.from("bank-application-documents").upload(path,file,{upsert:false,contentType:file.type});
+    if(error)return {ok:false,error:error.message,count};
+    count++;
+  }
+  return {ok:true,count};
+};
+
+window.handleLoanDocumentUpload = async function(e) {
+  e.preventDefault();
+  const form=e.target,feedback=document.getElementById("loan-document-feedback");
+  const loanId=String(new FormData(form).get("loan_id")||"").trim();
+  const category=String(new FormData(form).get("document_category")||"other");
+  const files=Array.from(form.querySelector('input[name="loan_documents"]')?.files||[]);
+  if(!files.length){if(feedback)feedback.textContent="Choose at least one scanned document.";return;}
+  const button=form.querySelector('button[type="submit"]');if(button)button.disabled=true;
+  if(feedback)feedback.textContent="Uploading private loan documents…";
+  try{
+    const result=await window.uploadApplicationDocuments("loans",loanId,files,category);
+    if(feedback)feedback.textContent=result.ok?"Uploaded "+result.count+" document(s) to the loan file.":"Upload incomplete after "+(result.count||0)+" file(s): "+result.error;
+    if(result.ok)form.reset();
+  }catch(err){if(feedback)feedback.textContent="Upload failed: "+(err?.message||"Unexpected error");}
+  finally{if(button)button.disabled=false;}
 };
 
 window.handleTransaction = async function(e) {
