@@ -233,3 +233,11 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .document-upload-fieldset input[type=file],#loan-document-form input[type=file] { width:100%; min-width:0; padding:11px; border:1px dashed var(--border-color); border-radius:10px; background:var(--input-bg); color:var(--text-main); }
 #loan-document-form { display:grid; gap:14px; max-width:760px; }
 #loan-document-form input[type=text],#loan-document-form select { width:100%; }
+
+/* Searchable customer/account selectors */
+.account-search-results { display:grid; gap:7px; margin-top:7px; max-height:320px; overflow:auto; }
+.account-search-option { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; padding:12px; border:1px solid var(--border-color); border-radius:10px; text-align:left; color:var(--text-main); background:var(--panel-bg); cursor:pointer; }
+.account-search-option:hover,.account-search-option:focus-visible { border-color:var(--accent-color,var(--g2,#0e5a40)); outline:2px solid transparent; }
+.account-search-option strong { font-size:14px; }
+.account-search-option span,.account-search-option small,.account-selected-summary { color:var(--text-muted); font-size:12px; line-height:1.5; }
+.account-selected-summary { margin:4px 0 0; }
