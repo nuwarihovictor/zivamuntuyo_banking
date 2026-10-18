@@ -31,7 +31,8 @@ function transactionModuleTabs(active){
   const tabs=[["Transactions","Overview","📋"],["Deposits","Deposits","⬇️"],["Withdrawals","Withdrawals","⬆️"]];
   return '<div class="transaction-module-tabs" role="navigation" aria-label="Transaction sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="transaction-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
-\nfunction staffModuleTabs(active){
+
+function staffModuleTabs(active){
   const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","Team Chat","💬"]];
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
@@ -150,7 +151,8 @@ window.switchPage = function(pageName) {
   else if (pageName === "Staff") {
     c.innerHTML = `
       <span class="category-tag">People, accountability & access</span>
-      <h2 class="page-heading">Staff & People</h2>\n      ${staffModuleTabs("Staff")}
+      <h2 class="page-heading">Staff & People</h2>
+      ${staffModuleTabs("Staff")}
       ${panel("AUTHORIZED PERSONNEL DIRECTORY","Staff profile register","Personal information is shown only as available in the employee record and according to database permissions.",`<div id="staff-list"><p class="muted">Loading staff profiles…</p></div><div id="staff-editor-panel" hidden class="panel"><h2>Edit Staff Profile</h2><p class="panel-desc">System administrator only. Enter an HTTPS photo URL. Leave National ID blank to preserve the current value.</p><form id="staff-editor-form" class="staff-editor-form"><label>Select employee<select id="staff-edit-person" required><option value="">Choose employee</option></select></label><div class="grid-2"><label>Full name<input id="staff-edit-name" required maxlength="160"></label><label>Employee ID<input id="staff-edit-number" required maxlength="80"></label></div><div class="grid-2"><label>Sex<select id="staff-edit-sex"><option value="">Not recorded</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label>Date of birth<input id="staff-edit-dob" type="date"></label></div><div class="grid-2"><label>Phone<input id="staff-edit-phone" type="tel" maxlength="60"></label><label>Work email<input id="staff-edit-email" type="email" maxlength="254"></label></div><div class="grid-2"><label>Branch<select id="staff-edit-branch"><option value="">Not assigned</option></select></label><label>Role<select id="staff-edit-role"><option value="">Not assigned</option></select></label></div><div class="grid-2"><label>Job title<input id="staff-edit-title" maxlength="120"></label><label>Employment status<select id="staff-edit-status"><option value="active">Active</option><option value="probation">Probation</option><option value="on_leave">On leave</option><option value="suspended">Suspended</option><option value="terminated">Terminated</option><option value="inactive">Inactive</option></select></label></div><div class="grid-2"><label>Start date<input id="staff-edit-start" type="date"></label><label>Photo HTTPS URL<input id="staff-edit-photo" type="url" placeholder="https://..."></label></div><label>National ID (optional)<input id="staff-edit-national-id" maxlength="120" autocomplete="off"></label><p id="staff-edit-feedback" class="muted" aria-live="polite"></p><button type="submit" class="primary" id="staff-edit-save">Save staff profile</button></form></div>`)}
       ${panel("ROLE RESPONSIBILITIES","Who is responsible for what","Use this directory to understand each job title's expected duties. Actual permissions remain controlled by assigned system roles.",`
         <div class="responsibility-grid">
@@ -443,7 +445,8 @@ window.switchPage = function(pageName) {
   else if (pageName === "Attendance") {
     c.innerHTML = `
       <span class="category-tag">Staff Operations</span>
-      <h2 class="page-heading">Staff Attendance</h2>\n      ${staffModuleTabs("Attendance")}
+      <h2 class="page-heading">Staff Attendance</h2>
+      ${staffModuleTabs("Attendance")}
       ${panel(
         "DEVICE-COMPATIBLE ATTENDANCE",
         "Windows 10 / Windows 11",
@@ -542,7 +545,8 @@ window.loadAttendancePolicy();
   else if (pageName === "StaffChat") {
     c.innerHTML = `
       <span class="category-tag">Internal Communications</span>
-      <h2 class="page-heading">Team Chat</h2>\n      ${staffModuleTabs("StaffChat")}
+      <h2 class="page-heading">Team Chat</h2>
+      ${staffModuleTabs("StaffChat")}
       ${panel(
         "TEAM MESSAGES",
         "Internal staff communication",
