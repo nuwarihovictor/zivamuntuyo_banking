@@ -224,3 +224,12 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .transaction-submit { min-height:46px; }
 .transaction-filters { align-items:end; }
 @media(max-width:600px) { .transaction-module-tabs { display:grid; grid-template-columns:1fr; } .transaction-module-tab { width:100%; } .transaction-workflow-banner { padding:13px; } }
+
+/* Private scanned-document upload areas */
+.document-upload-fieldset { min-width:0; display:grid; gap:12px; margin:18px 0; padding:16px; border:1px solid var(--border-color); border-radius:14px; }
+.document-upload-fieldset legend { padding:0 7px; font-weight:750; }
+.document-upload-fieldset p { margin:0; font-size:12px; line-height:1.6; }
+.document-upload-fieldset label,#loan-document-form>label { display:grid; gap:7px; font-weight:600; }
+.document-upload-fieldset input[type=file],#loan-document-form input[type=file] { width:100%; min-width:0; padding:11px; border:1px dashed var(--border-color); border-radius:10px; background:var(--input-bg); color:var(--text-main); }
+#loan-document-form { display:grid; gap:14px; max-width:760px; }
+#loan-document-form input[type=text],#loan-document-form select { width:100%; }
