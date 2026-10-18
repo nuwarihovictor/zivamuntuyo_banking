@@ -1978,6 +1978,15 @@ window.printAccountOpeningReceipt = function(){
 };
 
 
+
+window.printDormantReactivationReceipt = function(){
+ const r=window.lastDormantReceipt;
+ if(!r){alert("Reactivate an account first to print its receipt.");return;}
+ const body="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nDORMANT ACCOUNT REACTIVATION RECEIPT\nDate: "+r.date+"\nAccount: "+r.account_number+"\nReceipt/reference: "+r.receipt_reference+"\nTransaction reference: "+r.transaction_reference+"\nPayment method: "+(r.payment_method==="cash"?"Cash paid to teller":"Deducted from account balance")+"\n\nREACTIVATION FEE RECEIVED: UGX "+Number(r.fee_amount).toLocaleString("en-UG")+"\n\nAccounting: fee credited to bank income.\nStatus: PAID · ACCOUNT REACTIVATED\nKeep this receipt for your records.";
+ const w=window.open("","_blank","width=600,height=600");if(!w){alert("Allow pop-ups to print the receipt.");return;}
+ w.document.write("<!doctype html><html><head><title>Dormant Account Reactivation Receipt</title><style>body{font:13px monospace;padding:18px;color:#111}pre{white-space:pre-wrap;line-height:1.55}.stamp{border:2px solid #16764a;padding:7px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · UGX 22,000</div><pre>"+body.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");w.document.close();
+};
+
 window.loadDormantBranchOptions = async function(){
   if(!db)return;
   const select=document.getElementById("dormant-branch"); if(!select)return;
@@ -2019,7 +2028,7 @@ window.reactivateDormantAccount = async function(accountId){
   try{
     const {data,error}=await db.rpc("reactivate_dormant_account",{p_account_id:accountId,p_payment_method:method,p_receipt_reference:receipt});
     if(error)throw error;
-    if(feedback)feedback.textContent="Account "+(data?.account_number||"")+" reactivated. UGX 22,000 fee posted to bank income. Receipt reference: "+data.receipt_reference+".";
+    window.lastDormantReceipt={account_number:data?.account_number||"",fee_amount:22000,payment_method:method,receipt_reference:data?.receipt_reference||receipt,transaction_reference:data?.transaction_reference||"",date:new Date().toLocaleString("en-UG")}; if(feedback)feedback.innerHTML="Account "+esc(data?.account_number||"")+" reactivated. UGX 22,000 fee posted to bank income. Receipt reference: "+esc(data?.receipt_reference||receipt)+". <button type=\"button\" class=\"secondary\" onclick=\"printDormantReactivationReceipt()\">Print receipt</button>";
     await window.loadDormantAccountList();
   }catch(err){if(feedback)feedback.textContent="Reactivation failed: "+(err?.message||"Unexpected error");}
 };
