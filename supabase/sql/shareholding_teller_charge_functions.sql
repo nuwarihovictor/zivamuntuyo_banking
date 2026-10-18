@@ -8,7 +8,7 @@ returns jsonb language plpgsql security definer set search_path=public,pg_temp a
 declare
  u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); b uuid; st text; c uuid;
  receipt text:='AOP-'||to_char(clock_timestamp() at time zone 'Africa/Kampala','YYYYMMDDHH24MISS')||'-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
- sec_receipt text:='SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)));
+ sec_receipt text:='SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
  share_receipt text:='SHR-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
 begin
  if u is null then raise exception 'Sign-in required'; end if;
@@ -42,7 +42,7 @@ end; $$;
 
 create or replace function public.record_account_security_top_up(p_account_id uuid,p_amount numeric,p_receipt_number text default null)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); c uuid;b uuid; receipt text:=coalesce(nullif(trim(p_receipt_number),''),'SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
+declare u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); c uuid;b uuid; receipt text:=coalesce(nullif(trim(p_receipt_number),''),'SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)));
 begin
  if u is null then raise exception 'Sign-in required'; end if;
  if role_code is null or role_code not in ('system_admin','bank_admin','branch_manager','accountant','teller') then raise exception 'Only teller or authorized supervisory staff can record security top-ups'; end if;
