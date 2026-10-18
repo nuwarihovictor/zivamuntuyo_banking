@@ -448,7 +448,12 @@ window.switchPage = function(pageName) {
       ${(!isWithdrawal ? panel("DEPOSIT ENTRY", "Receive customer funds", "The request is submitted for approval. Do not hand the customer a final receipt until ledger posting succeeds.", `
         <form id="deposit-transaction-form" class="transaction-entry-form" onsubmit="handleTransaction(event)">
           <input type="hidden" name="tx_type" value="deposit">
-          <label>Customer account UUID <span class="required-mark">*</span><input type="text" name="account_id" required maxlength="80" autocomplete="off" placeholder="Enter or scan account UUID"></label>
+          <label>Find customer or account <span class="required-mark">*</span>
+            <input type="search" class="account-search-input" autocomplete="off" placeholder="Type account number or customer name" oninput="searchTransactionAccounts(this)">
+            <input type="hidden" name="account_id" required>
+            <div class="account-search-results" role="listbox"></div>
+            <p class="account-selected-summary muted">Choose an account from the search results.</p>
+          </label>
           <label>Deposit amount <span class="required-mark">*</span><div class="amount-input-wrap"><input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"><span>Currency is taken from the account</span></div></label>
           <div class="transaction-checklist"><strong>Before submitting</strong><label><input type="checkbox" required> I verified the customer account and the amount to be deposited.</label><label><input type="checkbox" required> I understand this request is not a completed transaction until posted.</label></div>
           <button type="submit" class="primary transaction-submit">Submit deposit for approval</button>
@@ -457,7 +462,12 @@ window.switchPage = function(pageName) {
       ${(!isDeposit ? panel("WITHDRAWAL ENTRY", "Pay customer funds", "Verify customer identity and the account's available balance. The secure backend must enforce balance and approval rules before any payout.", `
         <form id="withdrawal-transaction-form" class="transaction-entry-form" onsubmit="handleTransaction(event)">
           <input type="hidden" name="tx_type" value="withdrawal">
-          <label>Customer account UUID <span class="required-mark">*</span><input type="text" name="account_id" required maxlength="80" autocomplete="off" placeholder="Enter or scan account UUID"></label>
+          <label>Find customer or account <span class="required-mark">*</span>
+            <input type="search" class="account-search-input" autocomplete="off" placeholder="Type account number or customer name" oninput="searchTransactionAccounts(this)">
+            <input type="hidden" name="account_id" required>
+            <div class="account-search-results" role="listbox"></div>
+            <p class="account-selected-summary muted">Choose an account from the search results.</p>
+          </label>
           <label>Withdrawal amount <span class="required-mark">*</span><div class="amount-input-wrap"><input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"><span>Currency is taken from the account</span></div></label>
           <div class="transaction-checklist"><strong>Before submitting</strong><label><input type="checkbox" required> I verified the customer's identity and account details.</label><label><input type="checkbox" required> I checked the amount and understand approval is required before payout.</label></div>
           <button type="submit" class="primary transaction-submit">Submit withdrawal for approval</button>
@@ -1132,6 +1142,35 @@ window.handleLoanDocumentUpload = async function(e) {
     if(result.ok)form.reset();
   }catch(err){if(feedback)feedback.textContent="Upload failed: "+(err?.message||"Unexpected error");}
   finally{if(button)button.disabled=false;}
+};
+
+window.searchTransactionAccounts = async function(input) {
+  const form=input.closest("form"),results=form?.querySelector(".account-search-results"),hidden=form?.querySelector('input[name="account_id"]'),summary=form?.querySelector(".account-selected-summary");
+  if(!form||!results||!hidden)return;
+  hidden.value="";
+  if(summary)summary.textContent="Choose an account from the search results.";
+  const term=String(input.value||"").trim().toLowerCase();
+  if(term.length<2){results.textContent=term?"Type at least 2 characters.":"";return;}
+  if(!db){results.textContent="Database connection unavailable.";return;}
+  results.textContent="Searching active accounts in your authorized branches…";
+  try{
+    const {data,error}=await db.from("bank_accounts").select("id,account_number,currency_code,balance,status,account_holders(customer_id,customers(full_name,customer_number))").eq("status","active").limit(200);
+    if(error){results.textContent="Account search unavailable: "+error.message;return;}
+    const rows=(data||[]).filter(ac=>{
+      const people=(ac.account_holders||[]).map(h=>h.customers||{});
+      return [ac.account_number,...people.flatMap(p=>[p.full_name,p.customer_number])].join(" ").toLowerCase().includes(term);
+    }).slice(0,10);
+    if(!rows.length){results.textContent="No matching active account found in records you can access.";return;}
+    results.innerHTML=rows.map((ac,i)=>{
+      const people=(ac.account_holders||[]).map(h=>h.customers?.full_name).filter(Boolean);
+      return '<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(ac.account_number||"Account")+'</strong><span>'+esc([...new Set(people)].join(", ")||"Customer name unavailable")+'</span><small>'+esc(ac.currency_code||"")+' · displayed balance '+Number(ac.balance||0).toLocaleString()+'</small></button>';
+    }).join("");
+    results.querySelectorAll(".account-search-option").forEach((button,i)=>button.addEventListener("click",()=>{
+      const ac=rows[i];hidden.value=ac.id;input.value=ac.account_number||"";
+      results.innerHTML="";
+      if(summary)summary.textContent="Selected "+(ac.account_number||"account")+" · "+(ac.currency_code||"")+"; displayed balance is informational. Server-side rules still apply.";
+    }));
+  }catch(err){results.textContent="Account search failed. Check the connection and try again.";}
 };
 
 window.handleTransaction = async function(e) {
