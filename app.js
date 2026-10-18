@@ -175,7 +175,7 @@ window.switchPage = function(pageName) {
         const safePhoto=url=>url&&/^https:\/\//i.test(url)?'<img class="staff-photo" loading="lazy" alt="Staff profile photo" src="'+esc(url)+'">':'<div class="staff-photo-placeholder" aria-label="No profile photo"><span>👤</span></div>';
         listEl.innerHTML=people.map(s=>{
           const role=roles.get(s.role_id)||{name:"Role not assigned",code:""};
-          const status=s.employment_status|| (s.is_active?"Active":"Inactive");
+          const status=!s.is_active?"inactive":(s.employment_status||"active");
           const details=[
             ["Sex",s.sex||"Not recorded"],["Age",ageOf(s.date_of_birth)],["Employee ID",s.employee_number||"Not assigned"],
             ["National ID","Stored separately; restricted access"],
