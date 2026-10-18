@@ -366,7 +366,7 @@ window.switchPage = function(pageName) {
          <form id="attendance-policy-form" onsubmit="previewAttendancePolicy(event)">
            <div class="grid-2">
              <label>Branch UUID (leave blank for global policy; branch managers must select an authorized branch)<input id="attendance-branch-id" type="text" placeholder="Optional branch UUID"></label>
-             <label>Policy effective from<input id="attendance-effective-from" type="date" required></label>
+             <label>Policy effective from<input id="attendance-effective-from" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>
            </div>
            <div class="grid-2">
              <label>Standard clock-in time<input id="attendance-start" type="time" value="08:30" required></label>
@@ -408,6 +408,7 @@ window.switchPage = function(pageName) {
       )}
     `;
     window.showAttendanceDeviceHelp();
+    window.loadAttendancePolicy();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
