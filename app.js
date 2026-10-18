@@ -142,17 +142,37 @@ window.switchPage = function(pageName) {
         "AUTHORIZED PERSONNEL DIRECTORY",
         "Role-Based Access Control (RBAC)",
         "Assigned employee profiles, system roles, and home branch access restrictions.",
-        `<div id="staff-list">
-           <div class="list-item">
-             <div>
-               <strong>Nuwariho Victor</strong> (victor@zivamuntuyo.com)<br>
-               <span class="muted">Branch: Central Headquarters</span>
-             </div>
-             <span class="badge-role">System Administrator</span>
-           </div>
-         </div>`
+        `<div id="staff-list"><p class="muted">Loading active staff by branch…</p></div>`
       )}
     `;
+    if(db){
+      Promise.all([
+        db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active").eq("is_active",true).order("full_name"),
+        db.from("branches").select("id,branch_name").eq("is_active",true),
+        db.from("staff_roles").select("id,role_code,role_name")
+      ]).then(([staffResult,branchResult,roleResult])=>{
+        const listEl=document.getElementById("staff-list");
+        if(!listEl)return;
+        const failed=[staffResult,branchResult,roleResult].find(x=>x.error);
+        if(failed){listEl.innerHTML='<p class="muted">Staff directory could not be loaded: '+esc(failed.error.message)+'</p>';return;}
+        const branches=new Map((branchResult.data||[]).map(b=>[b.id,b.branch_name]));
+        const roles=new Map((roleResult.data||[]).map(r=>[r.id,r.role_name||r.role_code]));
+        const staff=staffResult.data||[];
+        if(!staff.length){listEl.innerHTML='<p class="muted">No active employee profiles have been registered.</p>';return;}
+        const grouped={};
+        staff.forEach(s=>{const branch=branches.get(s.home_branch_id)||"Branch not assigned";(grouped[branch] ||= []).push(s);});
+        listEl.innerHTML=Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([branch,people])=>
+          '<h3>'+esc(branch)+' · '+people.length+' active staff</h3>'+
+          people.map(s=>'<div class="list-item"><div><strong>'+esc(s.full_name||"Name not provided")+'</strong> ('+esc(s.employee_number||"No employee number")+')<br><span class="muted">'+esc(s.work_email||"No email")+' · '+esc(s.phone_number||"No phone")+'</span></div><span class="badge-role">'+esc(roles.get(s.role_id)||"Role not assigned")+'</span></div>').join("")
+        ).join("");
+      }).catch(()=>{
+        const listEl=document.getElementById("staff-list");
+        if(listEl)listEl.innerHTML='<p class="muted">A connection error prevented the staff directory from loading.</p>';
+      });
+    }else{
+      const listEl=document.getElementById("staff-list");
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No sample staff are displayed.</p>';
+    }
   }
   else if (pageName === "Customers") {
     c.innerHTML = `
