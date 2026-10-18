@@ -347,3 +347,22 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
   .page-heading { font-size:25px; }
   .grid-2 { grid-template-columns:1fr; }
 }
+
+/* Shareholding, teller charges and security reserve controls */
+.pricing-policy-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+.pricing-policy-card{padding:16px;border:1px solid var(--border-color);border-radius:13px;background:var(--panel-bg);box-shadow:0 2px 8px rgba(20,40,28,.025);min-width:0}
+.pricing-policy-card span{display:block;color:var(--text-muted);font-size:12px;line-height:1.5}
+.pricing-policy-card strong{display:block;margin:8px 0;color:var(--text-main);font-size:clamp(16px,1.8vw,22px);letter-spacing:-.3px}
+.pricing-policy-card p{margin:0;color:var(--text-muted);font-size:12px;line-height:1.55}
+.account-opening-pricing{margin:18px 0;padding:17px;border:1px solid var(--border-color);border-left:4px solid var(--accent-gold);border-radius:12px;background:var(--input-bg)}
+.account-opening-pricing h3{margin:0 0 10px;font-size:16px}
+.account-opening-pricing ul{margin:0 0 12px;padding-left:20px;line-height:1.8;font-size:13px}
+.account-opening-pricing p{font-size:12px;color:var(--text-muted);line-height:1.6}
+.account-opening-pricing .fs-check-row{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color)}
+.account-opening-pricing input{margin-top:3px;flex:0 0 auto}
+.loan-share-guidance{margin:10px 0 18px;padding:13px 15px;border:1px solid var(--border-color);border-radius:10px;background:var(--input-bg);font-size:13px;line-height:1.65;color:var(--text-main)}
+.share-total-preview{padding:12px 14px;background:var(--input-bg);border:1px solid var(--border-color);border-radius:9px;font-weight:700}
+#share-purchase-form,#security-fee-form,#security-topup-form,#loan-fee-form{display:grid;gap:12px;align-content:start}
+#security-fee-form,#security-topup-form{padding:15px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}
+@media(max-width:1050px){.pricing-policy-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.pricing-policy-grid{grid-template-columns:1fr}.pricing-policy-card{padding:14px}}
