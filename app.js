@@ -1230,7 +1230,13 @@ window.handleAccountSubmit = async function(e) {
       const uploaded=await window.uploadApplicationDocuments("account-opening",customerId,files,String(formData.get("account_document_category")||"other"));
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
-    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+" · Teller receipt: "+String(packageResult?.receipt_number||"recorded")+" · 1 share issued · UGX 8,500 security reserve recorded"+documentStatus;
+    window.lastAccountOpeningReceipt = {
+      receipt_number:String(packageResult?.receipt_number||"recorded"),
+      account_number:String(result?.account_number||"created"),
+      date:new Date().toLocaleString("en-UG"),
+      amount:30000,share_amount:10000,security_reserve:8500,bundled_opening_costs:11500
+    };
+    if(feedback)feedback.innerHTML="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+" · UGX 30,000 received and allocated automatically"+documentStatus+' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print UGX 30,000 receipt</button>';
     form.reset();
     setTimeout(()=>window.switchPage("Accounts"),1200);
   }catch(err){
@@ -1951,6 +1957,16 @@ window.printInstitutionPayrollReceipt = function(){
   const win=window.open("","_blank","width=800,height=700");
   if(!win){alert("Allow pop-ups to print the payroll receipt.");return;}
   win.document.write("<!doctype html><html><head><title>Institutional Payroll Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>POSTED · UGX</div><pre>"+summary.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><p>Keep this receipt with the institution payroll records.</p><script>window.onload=function(){window.print();};<\/script></body></html>");
+  win.document.close();
+};
+
+window.printAccountOpeningReceipt = function(){
+  const r=window.lastAccountOpeningReceipt;
+  if(!r){alert("No account-opening receipt is available in this session.");return;}
+  const text="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nACCOUNT OPENING PACKAGE RECEIPT\nReceipt No: "+r.receipt_number+"\nAccount No: "+r.account_number+"\nDate: "+r.date+"\n\nTOTAL RECEIVED: UGX 30,000\n\nAUTOMATIC ALLOCATION\nNon-withdrawable share capital: UGX 10,000 (1 share)\nRestricted security reserve: UGX 8,500 (not withdrawable)\nBundled opening fees: UGX 11,500 (opening form + initial cheque book + initial transaction log book)\n\nTOTAL ALLOCATED: UGX 30,000\n\nNo manual allocation by the teller. Each component is recorded to its designated account.\nThank you.";
+  const win=window.open("","_blank","width=700,height=650");
+  if(!win){alert("Allow pop-ups to print the account-opening receipt.");return;}
+  win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · UGX 30,000</div><pre>"+text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
   win.document.close();
 };
 
