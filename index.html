@@ -10,7 +10,6 @@
       --bg-dark: #0a1f18;
       --card-bg: #112d23;
       --primary: #15803d;
-      --primary-hover: #166534;
       --gold: #d97706;
       --text: #f3f4f6;
       --muted: #9ca3af;
@@ -21,45 +20,24 @@
     body { background-color: var(--bg-dark); color: var(--text); min-height: 100vh; padding: 16px; }
     #app { width: 100%; max-width: 1200px; margin: 0 auto; }
     
-    /* TOP NAVIGATION */
     .topbar { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 12px 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
     .brand-sm { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #fff; }
     .logo-sm { background: linear-gradient(135deg, var(--gold), #b45309); color: #fff; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     .user-info { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
     
-    /* LAYOUT & SIDEBAR */
     .layout { display: flex; gap: 20px; flex-direction: column; }
     @media(min-width: 768px) { .layout { flex-direction: row; } }
     .sidebar { width: 100%; max-width: 240px; display: flex; flex-direction: column; gap: 8px; }
     .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 12px; text-align: left; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px; transition: 0.2s; }
     .nav-btn:hover, .nav-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
     
-    /* CONTENT AREA */
     .content { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-height: 400px; }
     .panel { margin-bottom: 24px; }
-    .panel h2 { font-size: 18px; margin-bottom: 6px; color: #fff; }
-    .panel p { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-    
-    /* FORMS & TABLES */
-    form { display: flex; flex-direction: column; gap: 12px; max-width: 450px; }
-    label { font-size: 12px; font-weight: 600; color: #d1d5db; display: flex; flex-direction: column; gap: 4px; }
-    select, input { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px; padding: 10px; color: #fff; font-size: 13px; outline: none; }
-    select:focus, input:focus { border-color: var(--gold); }
-    button.primary { background: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
     button.secondary { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
-    button.secondary:hover { color: #fff; border-color: var(--gold); }
-    
-    .scroll { overflow-x: auto; margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th, td { padding: 10px; border-bottom: 1px solid var(--border); }
-    th { color: var(--gold); font-weight: 600; }
-    .badge-role { background: rgba(21, 128, 61, 0.2); color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .error { color: var(--error); font-size: 12px; }
   </style>
 </head>
 <body>
   <div id="app">
-    <!-- WORKSPACE (Loads Immediately via Bypass) -->
     <div id="workspace" style="display: block;">
       <header class="topbar">
         <div class="brand-sm">
@@ -74,32 +52,22 @@
 
       <div class="layout">
         <nav class="sidebar">
-          <button class="nav-btn active" data-page="Dashboard" onclick="switchPage('Dashboard')">📊 Dashboard</button>
-          <button class="nav-btn" data-page="Customers" onclick="switchPage('Customers')">👥 Customers</button>
-          <button class="nav-btn" data-page="Accounts" onclick="switchPage('Accounts')">🏦 Accounts</button>
-          <button class="nav-btn" data-page="Transactions" onclick="switchPage('Transactions')">💰 Transactions</button>
-          <button class="nav-btn" data-page="Approvals" onclick="switchPage('Approvals')">✅ Approvals</button>
-          <button class="nav-btn" data-page="Reports" onclick="switchPage('Reports')">📈 Reports</button>
-          <button class="nav-btn" data-page="Settings" onclick="switchPage('Settings')">⚙️ Settings</button>
+          <button class="nav-btn active" data-page="Dashboard">📊 Dashboard</button>
+          <button class="nav-btn" data-page="Customers">👥 Customers</button>
+          <button class="nav-btn" data-page="Accounts">🏦 Accounts</button>
+          <button class="nav-btn" data-page="Transactions">💰 Transactions</button>
+          <button class="nav-btn" data-page="Approvals">✅ Approvals</button>
+          <button class="nav-btn" data-page="Reports">📈 Reports</button>
+          <button class="nav-btn" data-page="Settings">⚙️ Settings</button>
         </nav>
 
         <main id="main-content" class="content">
-          <!-- Dynamic content loaded below -->
+          <p style="color:#9ca3af;">Initializing workspace...</p>
         </main>
       </div>
     </div>
   </div>
 
   <script src="app.js"></script>
-  <script>
-    // Simple helper to switch tabs when clicked
-    function switchPage(pageName) {
-      document.querySelectorAll('.nav-btn').forEach(btn => {
-        if(btn.dataset.page === pageName) btn.classList.add('active');
-        else btn.classList.remove('active');
-      });
-      if(window.renderPage) window.renderPage(pageName);
-    }
-  </script>
 </body>
 </html>
