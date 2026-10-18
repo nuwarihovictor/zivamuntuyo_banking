@@ -1,6 +1,6 @@
 # Loan schedule and repayment schema design (draft only)
 
-Do not apply this file as SQL. It describes the entities and constraints to implement only after inspecting the actual Supabase schema and accounting procedures.
+Do not apply this file as SQL. The live Supabase schema was inspected on 2026-10-18: public.loans and public.loan_applications exist, but no authoritative repayment schedule, installment, repayment/allocation or due-alert tables were found. supabase/sql/loan_servicing_schema_draft.sql is a first SQL design draft, not a migration and not applied to the live database. It intentionally has RLS enabled without client policies until trusted RPCs and branch-aware access rules are reviewed.
 
 ## Suggested entities
 - loan_accounts: id, application_id, customer_id, branch_id, product_id, currency, approved_principal, disbursed_principal, disbursement_date, first_due_date, maturity_date, interest_method, rate_basis, annual_rate, day_count_convention, frequency, status, schedule_version, approved_by, created_at.
@@ -22,3 +22,11 @@ Do not apply this file as SQL. It describes the entities and constraints to impl
 - Derive days past due and arrears as of a supplied business date from outstanding contractual instalments. Avoid a stored counter that becomes stale.
 - Define whether interest accrues daily, monthly or by schedule and what happens during non-performing status only after policy/compliance approval.
 - Do not create duplicate parallel loan tables if an equivalent schema already exists. Inspect the actual schema and extend it safely.
+
+
+## Findings from live-schema inspection (2026-10-18)
+- Existing public.loans currently stores a minimal loan record (loan account number, customer, branch, principal, annual rate, tenure and status).
+- Existing public.loan_applications stores application/review data, but the inspected public functions include application submission, review and processing-fee collection—not a full disbursement/repayment servicing lifecycle.
+- The existing account-opening function public.create_bank_account_request is the authoritative request entry point used by the opening-package wrapper. The development SQL draft now checks account_types.type_code = IND, locks the customer row during account opening, and blocks a second qualifying individual account while leaving JNT requests eligible.
+- These are design and repository changes only. No production SQL, cron job, notification delivery or schema migration has been applied.
+- The first due-alert implementation must wait until the institution confirms schedule generation, repayment allocation waterfall, business-date/holiday policy, branch notification recipients and the accounting journal procedure. Alert state must be derived from posted repayment allocations, not an editable UI field.
