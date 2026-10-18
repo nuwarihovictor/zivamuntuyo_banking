@@ -17,7 +17,7 @@ function esc(str) {
 
 function panel(title, subtitle, desc, contentHtml) {
   return `
-    <div class="panel" style="background:#112d23; border:1px solid #1e4637; border-radius:8px; padding:20px; margin-bottom:20px;">
+    <div class="panel">
       <h2 style="color:#fff; font-size:18px; margin-bottom:4px;">${esc(title)}</h2>
       <p style="color:#9ca3af; font-size:13px; margin-bottom:12px;"><strong>${esc(subtitle)}</strong> — ${esc(desc)}</p>
       <hr style="border:0; border-top:1px solid #1e4637; margin-bottom:16px;">
@@ -347,4 +347,7 @@ window.handleAccountSubmit = async function(e) {
     account_type_id: formData.get("account_type_id"),
     branch_id: formData.get("branch_id"),
     currency_code: "UGX",
-    account_number: "ACC-" + M
+    account_number: "ACC-" + Math.floor(10000000 + Math.random() * 90000000),
+    status: "active",
+    balance: 0.00,
+    metadata: Obje
