@@ -413,3 +413,31 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .login-security-note{border-top:1px solid var(--border-color,#dfe7e0);padding-top:14px;margin:12px 0 0;font-size:11px}
 .sign-out-button{padding:7px 11px;font-size:12px}
 @media(max-width:560px){.login-screen{padding:18px 12px}.login-card{border-radius:17px}.header-tools{gap:8px;flex-wrap:wrap;justify-content:flex-end}}
+
+
+/* Secure staff chat */
+.staff-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--line, #e3eae4);
+  border-radius: 12px;
+  background: var(--bg, #f4f7f4);
+}
+.staff-chat-message {
+  margin: 0;
+  background: #fff;
+  border-radius: 10px;
+}
+#staff-chat-form textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+}
+@media (max-width: 640px) {
+  .staff-chat-messages { max-height: 60vh; padding: 8px; }
+  .staff-chat-message { padding: 10px; }
+}
