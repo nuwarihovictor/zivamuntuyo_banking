@@ -33,7 +33,7 @@ function transactionModuleTabs(active){
 }
 
 function staffModuleTabs(active){
-  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","Team Chat","💬"]];
+  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","VIC LINE platform 2026","✦"]];
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
 
@@ -638,43 +638,63 @@ window.loadAttendancePolicy();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
-      <span class="category-tag">Internal Communications</span>
-      <h2 class="page-heading">Team Chat</h2>
-      ${staffModuleTabs("StaffChat")}
-      ${panel(
-        "SECURE STAFF MESSAGES",
-        "Internal staff communication",
-        "Choose bank-wide chat or a branch channel you are authorized to access. Voice notes are stored privately and are never played automatically.",
-        `<div class="form-grid">
-           <label>Conversation
-             <select id="staff-chat-branch" onchange="window.loadStaffChat()">
-               <option value="">Bank-wide messages</option>
-             </select>
-           </label>
-           <div style="display:flex;align-items:end"><button type="button" class="secondary" onclick="window.loadStaffChat()">Refresh messages</button></div>
-         </div>
-         <p id="staff-chat-feedback" class="muted" role="status" aria-live="polite">Loading secure messages…</p>
-         <div id="staff-chat-messages" class="staff-chat-messages" aria-live="polite"></div>
-         <form id="staff-chat-form" onsubmit="window.sendStaffChatMessage(event)" style="margin-top:16px">
-           <label>Write a message
-             <textarea id="staff-chat-input" rows="3" maxlength="1000" required placeholder="Share an update with authorized staff…"></textarea>
-           </label>
-           <button type="submit" class="primary">Send message</button>
-         </form>
-         <section class="staff-voice-note-tools" aria-labelledby="staff-voice-note-heading">
-           <h3 id="staff-voice-note-heading">Voice note</h3>
-           <p class="muted">Record up to 120 seconds. Preview before sending. Maximum file size: 3 MB. Your browser will ask for microphone permission when you start.</p>
-           <div class="staff-voice-controls">
-             <button type="button" class="secondary" id="staff-voice-record" onclick="window.startStaffVoiceRecording()">🎙️ Record</button>
-             <button type="button" class="secondary" id="staff-voice-stop" onclick="window.stopStaffVoiceRecording()" disabled>Stop</button>
-             <button type="button" class="secondary" id="staff-voice-discard" onclick="window.discardStaffVoiceRecording()" disabled>Discard</button>
-             <button type="button" class="primary" id="staff-voice-send" onclick="window.sendStaffVoiceNote()" disabled>Send voice note</button>
-           </div>
-           <p id="staff-voice-feedback" class="muted" role="status" aria-live="polite">No recording yet.</p>
-           <audio id="staff-voice-preview" controls hidden preload="metadata"></audio>
-         </section>
-         <p class="muted">Do not share passwords, PINs, customer secrets, or full account credentials in chat. Live voice calls are not enabled yet.</p>`
-      )}
+      <div class="vicline-page">
+        ${staffModuleTabs("StaffChat")}
+        <section class="vicline-shell" aria-label="VIC LINE staff messaging">
+          <header class="vicline-topbar">
+            <div class="vicline-brand">
+              <div class="vicline-logo" aria-hidden="true"><span>✦</span></div>
+              <div class="vicline-brand-copy">
+                <span class="vicline-eyebrow">ZIVAMUNTUYO STAFF NETWORK</span>
+                <h2>VIC LINE <span>2026</span></h2>
+                <p>Stay connected with your team</p>
+              </div>
+            </div>
+            <div class="vicline-top-actions">
+              <span class="vicline-secure-pill"><span></span> Private staff chat</span>
+              <button type="button" class="vicline-icon-button" title="Refresh messages" aria-label="Refresh messages" onclick="window.loadStaffChat()">↻</button>
+            </div>
+          </header>
+          <div class="vicline-channelbar">
+            <div class="vicline-channel-title">
+              <span class="vicline-channel-icon" aria-hidden="true">◎</span>
+              <div><strong>Messages</strong><small>Bank-wide or authorized branch conversation</small></div>
+            </div>
+            <label class="vicline-channel-picker">CHAT CHANNEL
+              <select id="staff-chat-branch" onchange="window.loadStaffChat()">
+                <option value="">Bank-wide messages</option>
+              </select>
+            </label>
+          </div>
+          <div class="vicline-conversation-heading">
+            <div class="vicline-conversation-avatar" aria-hidden="true">✦</div>
+            <div class="vicline-conversation-copy"><strong id="vicline-current-channel">VIC LINE team</strong><span>Internal communication space</span></div>
+            <span class="vicline-conversation-mark" title="Authorized staff channels">•••</span>
+          </div>
+          <p id="staff-chat-feedback" class="vicline-feedback" role="status" aria-live="polite">Loading secure messages…</p>
+          <div id="staff-chat-messages" class="staff-chat-messages vicline-messages" aria-live="polite"></div>
+          <div class="vicline-composer-wrap">
+            <form id="staff-chat-form" class="vicline-composer" onsubmit="window.sendStaffChatMessage(event)">
+              <label class="vicline-message-label" for="staff-chat-input">Message</label>
+              <textarea id="staff-chat-input" rows="1" maxlength="1000" required placeholder="Write a message…" aria-label="Write a staff message"></textarea>
+              <button type="submit" class="vicline-send-button" aria-label="Send message" title="Send message">➤</button>
+            </form>
+            <section class="staff-voice-note-tools vicline-voice-tools" aria-labelledby="staff-voice-note-heading">
+              <div class="vicline-voice-heading"><span class="vicline-mic-badge" aria-hidden="true">♫</span><div><h3 id="staff-voice-note-heading">Voice note</h3><p>Record a quick update for your team</p></div></div>
+              <div class="staff-voice-controls">
+                <button type="button" class="secondary" id="staff-voice-record" onclick="window.startStaffVoiceRecording()">🎙️ Record</button>
+                <button type="button" class="secondary" id="staff-voice-stop" onclick="window.stopStaffVoiceRecording()" disabled>Stop</button>
+                <button type="button" class="secondary" id="staff-voice-discard" onclick="window.discardStaffVoiceRecording()" disabled>Discard</button>
+                <button type="button" class="primary" id="staff-voice-send" onclick="window.sendStaffVoiceNote()" disabled>Send voice note</button>
+              </div>
+              <p id="staff-voice-feedback" class="muted" role="status" aria-live="polite">Microphone access is requested only when you press Record.</p>
+              <audio id="staff-voice-preview" controls hidden preload="metadata"></audio>
+              <p class="vicline-voice-note">Maximum 120 seconds and 3 MB. Preview before sending; audio never plays automatically.</p>
+            </section>
+            <p class="vicline-safety-note">Keep passwords, PINs and customer credentials out of chat. Live calls are planned for a later phase.</p>
+          </div>
+        </section>
+      </div>
     `;
     window.loadStaffChat();
   }
