@@ -136,7 +136,7 @@ window.switchPage = function(pageName) {
                 <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
                 <span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span>
               </div>
-              <div class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Main Branch":"Outreach"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span></div>
+              <div class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Main Branch":"Branch"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span><button type="button" class="primary" ${b.is_active?"":"disabled"} onclick="openBranchWorkspace('${esc(b.id)}','${esc(b.branch_name).replace(/'/g,"&#39;")}')">Open</button></div>
             </div>
           `).join("");
         }).catch(()=>{
@@ -2036,6 +2036,8 @@ window.reactivateDormantAccount = async function(accountId){
 
 let appNavigationInitialized = false;
 let authenticatedUiVisible = false;
+let pendingBranchOpen = null;
+let activeBranchContext = null;
 
 function showLoginScreen(message) {
   authenticatedUiVisible = false;
@@ -2076,8 +2078,31 @@ function showAuthenticatedWorkspace() {
   }
   loadCurrentEmployeeGreeting();
   window.switchPage("Dashboard");
+  if (activeBranchContext) {
+    const banner = document.createElement("div");
+    banner.className = "branch-context-banner";
+    banner.style.cssText = "padding:12px 16px;margin:0 0 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap";
+    const label = document.createElement("div");
+    label.textContent = "BRANCH WORKSPACE · " + activeBranchContext.name;
+    label.style.fontWeight = "700";
+    const exit = document.createElement("button");
+    exit.type = "button"; exit.className = "secondary"; exit.textContent = "Return to branch directory";
+    exit.addEventListener("click", () => { activeBranchContext = null; window.switchPage("Branches"); });
+    banner.append(label, exit);
+    const mainContent = document.getElementById("main-content");
+    if (mainContent) mainContent.insertBefore(banner, mainContent.firstChild);
+  }
   setTimeout(setWelcomeMessage,100);
 }
+
+window.openBranchWorkspace = function(branchId, branchName) {
+  if (!branchId || !branchName) return;
+  pendingBranchOpen = { id: branchId, name: branchName };
+  activeBranchContext = null;
+  showLoginScreen("Sign in with your staff email and password to open " + branchName + ".");
+  const email = document.getElementById("login-email");
+  if (email) email.focus();
+};
 
 async function handleStaffLogin(event) {
   event.preventDefault();
@@ -2094,6 +2119,18 @@ async function handleStaffLogin(event) {
     const { data, error } = await db.auth.signInWithPassword({ email, password });
     if (error) throw error;
     if (!data?.session) throw new Error("Sign-in was not completed. Please try again.");
+    if (pendingBranchOpen) {
+      const requestedBranch = pendingBranchOpen;
+      const { data: allowed, error: accessError } = await db.rpc("current_employee_can_transact_in_branch", { target_branch_id: requestedBranch.id });
+      if (accessError) throw accessError;
+      if (allowed !== true) {
+        await db.auth.signOut();
+        pendingBranchOpen = null;
+        throw new Error("Your staff account is not authorized to open " + requestedBranch.name + ". Contact the system administrator if you need access.");
+      }
+      activeBranchContext = requestedBranch;
+      pendingBranchOpen = null;
+    }
     if (feedback) feedback.textContent = "";
   } catch (error) {
     if (feedback) feedback.textContent = "Sign-in failed. Check your email and password, or contact your bank administrator. " + (error?.message || "");
@@ -2131,7 +2168,7 @@ function initApp() {
     else showLoginScreen("");
   }).catch(() => showLoginScreen("Could not verify the saved session. Please sign in again."));
   db.auth.onAuthStateChange((event, session) => {
-    if (session) showAuthenticatedWorkspace();
+    if (session && !pendingBranchOpen) showAuthenticatedWorkspace();
     else if (event === "SIGNED_OUT") showLoginScreen("You have signed out.");
   });
 }
