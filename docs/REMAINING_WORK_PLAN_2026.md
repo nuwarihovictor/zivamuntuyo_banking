@@ -65,3 +65,20 @@ The new member/account register code passes the JavaScript syntax check and the 
 - [ ] Implement collection work queues, reminders, rescheduling/settlement, collateral and guarantor tracking, write-off and portfolio-at-risk reports.
 - [ ] Validate formulas against independently calculated cases and reconcile loan schedules to the posted ledger; obtain credit manager/accountant and compliance sign-off.
 - Design: `docs/LOAN_SERVICING_AND_ARREARS_DESIGN.md`; schema proposal: `docs/LOAN_SERVICING_SCHEMA_DRAFT.md`.
+
+
+
+## Integration pass — 18 October 2026
+- [x] Create a coordinated integration branch based on the newest account-eligibility/loan-servicing feature branch, retaining the release-candidate foundations.
+- [x] Add a consolidated system audit, feature-truth matrix, priority gates and recommended merge/deployment order in `docs/FULL_SYSTEM_INTEGRATION_AUDIT_2026-10-18.md`.
+- [x] Add a dependency-free static release guard and run it from GitHub Actions alongside JavaScript syntax checks.
+- [x] Update project setup/readiness notes to state clearly which capabilities are drafts versus production-tested.
+- [x] Restore mobile browser zoom for accessibility.
+- [ ] Review the integration PR and wait for its GitHub Actions result.
+- [ ] Run test-project SQL migrations and role/branch security tests; no live schema changes are included in this pass.
+- [ ] Implement and test joint-account multiple-holder UI/RPC and approval guard.
+- [ ] Implement trusted loan schedule/repayment/alert lifecycle and reconcile it to accounting journals.
+- [ ] Complete browser, Android, Windows, printer and selected fingerprint device acceptance.
+- [ ] Verify current Vercel quota, preview deployment, domain, production environment and rollback readiness before release.
+
+The integration pass improves project coordination and automated static checks. It does not mark the release gates above as passed.
