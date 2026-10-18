@@ -84,3 +84,12 @@ A feature is complete only when the UI, trusted database operation, permissions,
 ## Current release status
 
 **NOT READY FOR PRODUCTION.** This branch adds integration documentation and static validation; it does not apply Supabase SQL, merge all PRs, connect fingerprint hardware, implement loan repayment posting, or deploy to Vercel. Those limits are intentional and visible so financial data is not put at risk by an unverified “all done” claim.
+
+
+## Live deployment observation — 18 October 2026
+
+- The Vercel project `zivamuntuyo_banking` has an existing deployment in **READY** state from branch `feature/due-date-alerts-account-eligibility` (commit `548df359db42bbb1fb1226d37a821151de5fdba7`). Its preview URL returned HTTP 200 when fetched; this confirms the HTML is served, not that login or banking operations have passed end-to-end tests.
+- Existing preview: https://zivamuntuyobanking-axxjzwgfu-infonuwarihovictor-1047s-projects.vercel.app
+- The project alias `zivamuntuyobanking.vercel.app` is registered and verified in Vercel. It is a Vercel subdomain, not a separately purchased custom domain.
+- The Vercel status check on the integration PR commit reported a deployment rate-limit error (“retry in 24 hours”). The GitHub Actions static validation workflow itself completed successfully.
+- The integration PR commit has **not** been confirmed deployed. Do not confuse the existing feature-branch preview with this integration branch or with production.
