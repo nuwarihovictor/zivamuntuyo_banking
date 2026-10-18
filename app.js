@@ -433,14 +433,20 @@ window.switchPage = function(pageName) {
             window.renderAccountRegister([]);
             return;
           }
-          const [customersResult,branchesResult]=await Promise.all([
+          const [customersResult,branchesResult,accountDetailsResult]=await Promise.all([
             db.from("customers").select("id,customer_number,full_name,phone_number,email,address,nin_or_passport"),
-            db.from("branches").select("id,branch_name,branch_code")
+            db.from("branches").select("id,branch_name,branch_code"),
+            db.from("bank_accounts").select("id,account_number,currency_code,balance,status,branch_id,account_holders(customer_id,customers(id,full_name,customer_number,phone_number,email,address,nin_or_passport))").limit(1000)
           ]);
-          window.accountRegisterRows=data;
           window.accountRegisterCustomers=customersResult.error?[]:(customersResult.data||[]);
           window.accountRegisterBranches=branchesResult.error?[]:(branchesResult.data||[]);
-          window.renderAccountRegister(data);
+          const accountDetails=accountDetailsResult.error?[]:(accountDetailsResult.data||[]);
+          window.accountRegisterRows=data.map(row=>{
+            const detail=accountDetails.find(a=>String(a.id)===String(row.account_id))||{};
+            const holder=(detail.account_holders||[]).map(h=>h.customers).filter(Boolean);
+            return {...detail,...row,customer_id:row.customer_id||holder[0]?.id||holder[0]?.customer_id||detail.customer_id,customer_name:row.customer_name||holder.map(h=>h.full_name).filter(Boolean).join(", "),customer_number:row.customer_number||holder.map(h=>h.customer_number).filter(Boolean).join(", "),phone_number:row.phone_number||holder.map(h=>h.phone_number).filter(Boolean).join(", "),email:row.email||holder.map(h=>h.email).filter(Boolean).join(", "),address:row.address||holder.map(h=>h.address).filter(Boolean).join(" · "),account_status:row.account_status||detail.status,stored_balance:row.stored_balance??detail.balance,currency_code:row.currency_code||detail.currency_code,branch_id:row.branch_id||detail.branch_id};
+          });
+          window.renderAccountRegister(window.accountRegisterRows);
         })
         .catch(() => {
           const listEl = document.getElementById("acc-list");
