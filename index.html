@@ -1,63 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zivamuntuyo Financial Services Ltd</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ZIVAMUNTUYO FINANCIAL SERVICES LTD - Banking System</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <header class="header">
-        <div class="logo-container">
-            <div class="logo-icon">Z</div>
-            <div class="logo-text">
-                <h1>ZIVAMUNTUYO</h1>
-                <p>FINANCIAL SERVICES LTD</p>
+  <div id="app">
+    <!-- LOGIN INTERFACE -->
+    <div id="login-screen" class="login-container">
+      <div class="login-card">
+        <div class="brand-header">
+          <div class="brand-logo">Z</div>
+          <div class="brand-text">
+            <h1>ZIVAMUNTUYO</h1>
+            <p>FINANCIAL SERVICES LTD</p>
+          </div>
+        </div>
+
+        <div class="login-body">
+          <span class="login-badge">SECURE ACCESS</span>
+          <h2>Welcome back</h2>
+          <p class="subtitle">Sign in with your authorized staff account.</p>
+
+          <!-- AUTOCOMPLETE & AUTOFILL BLOCKED FORM -->
+          <form id="login-form" autocomplete="off" action="javascript:void(0);" method="post">
+            <!-- Hidden inputs trick browsers into ignoring automatic credential insertion -->
+            <input type="text" name="fake_username" style="display:none !important;" tabindex="-1" aria-hidden="true" />
+            <input type="password" name="fake_password" style="display:none !important;" tabindex="-1" aria-hidden="true" />
+
+            <div class="form-group">
+              <label for="work-email">Work email</label>
+              <input 
+                type="email" 
+                id="work-email" 
+                name="user_work_email_field" 
+                placeholder="info.nuwarihovictor@gmail.com" 
+                autocomplete="one-time-code" 
+                autocorrect="off" 
+                autocapitalize="none" 
+                spellcheck="false" 
+                required 
+              />
             </div>
+
+            <div class="form-group">
+              <label for="work-password">Password</label>
+              <input 
+                type="password" 
+                id="work-password" 
+                name="user_work_password_field" 
+                placeholder="••••••••" 
+                autocomplete="one-time-code" 
+                autocorrect="off" 
+                autocapitalize="none" 
+                spellcheck="false" 
+                required 
+              />
+            </div>
+
+            <button type="submit" id="btn-login" class="btn-primary">
+              Sign in securely &rarr;
+            </button>
+
+            <p id="login-error" class="error-msg"></p>
+          </form>
+
+          <p class="footer-note">Access depends on assigned role and branch permissions.</p>
         </div>
-        <div id="auth-actions">
-            <button id="signout" class="secondary hidden">Sign out</button>
+      </div>
+    </div>
+
+    <!-- MAIN DASHBOARD WORKSPACE (Initially Hidden) -->
+    <div id="workspace" class="workspace-container" style="display: none;">
+      <header class="top-nav">
+        <div class="nav-brand">
+          <span class="logo-sm">Z</span>
+          <span class="brand-name">ZIVAMUNTUYO FINANCIAL SERVICES</span>
         </div>
-    </header>
-
-    <nav id="nav" class="nav-bar"></nav>
-
-    <main class="main-container">
-        <!-- LOGIN SECTION -->
-        <section id="login" class="panel" style="margin-top: 20px;">
-            <span class="category-tag">SECURE ACCESS</span>
-            <h2>Welcome back</h2>
-            <p class="panel-desc">Sign in with your authorized staff account.</p>
-            
-            <form id="login-form">
-                <label>Work email
-                    <input type="email" id="email" value="info.nuwarihovictor@gmail.com" required>
-                </label>
-                <label>Password
-                    <input type="password" id="password" placeholder="••••••••" required>
-                </label>
-                <button type="submit" class="primary">Sign in securely →</button>
-                <p id="login-message" class="error"></p>
-            </form>
-            <p class="muted" style="margin-top: 16px;">Access depends on assigned role and branch permissions.</p>
-        </section>
-
-        <!-- WORKSPACE SECTION -->
-        <div id="workspace" class="hidden">
-            <span class="category-tag">BANKING MANAGEMENT SYSTEM</span>
-            <h1 id="title" class="page-heading">Overview</h1>
-            <div id="content"></div>
+        <div class="nav-user">
+          <span id="user-display">Staff User</span>
+          <button id="btn-logout" class="btn-secondary-sm">Logout</button>
         </div>
-    </main>
+      </header>
 
-    <div id="toast" class="toast" style="display:none; position:fixed; bottom:20px; right:20px; background:#063c2c; color:white; padding:12px 20px; border-radius:6px; font-size:13px; z-index:999;"></div>
+      <div class="main-layout">
+        <aside class="sidebar">
+          <nav class="side-menu">
+            <button class="nav-btn active" data-page="Dashboard">📊 Dashboard</button>
+            <button class="nav-btn" data-page="Customers">👥 Customers</button>
+            <button class="nav-btn" data-page="Accounts">🏦 Accounts</button>
+            <button class="nav-btn" data-page="Transactions">💰 Transactions</button>
+            <button class="nav-btn" data-page="Approvals">✅ Approvals</button>
+            <button class="nav-btn" data-page="Reports">📈 Reports</button>
+            <button class="nav-btn" data-page="Settings">⚙️ Settings</button>
+          </nav>
+        </aside>
 
-    <footer class="footer">
-        <p>© <span id="year"></span> Zivamuntuyo Financial Services Ltd</p>
-        <p><span style="color:#9e7a44;">Secure banking workspace</span> · Initial build</p>
-    </footer>
+        <main id="main-content" class="content-area">
+          <!-- Page content dynamically injected by app.js -->
+        </main>
+      </div>
+    </div>
+  </div>
 
-    <script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
-</html>
+    </html>
+    
