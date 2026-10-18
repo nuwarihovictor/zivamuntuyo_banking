@@ -309,10 +309,10 @@ window.switchPage = function(pageName) {
         </form>`
       )}
       ${panel(
-        "VERIFIED CUSTOMER DIRECTORY",
-        "Active CIF Records",
-        "List of all registered bank customers.",
-        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+        "MEMBERS & CUSTOMER REGISTER",
+        "Excel-style member directory",
+        "Search, filter and export authorized customer records. Handle NIN/passport details as confidential financial data.",
+        `<div class="register-toolbar"><label for="customer-register-search">Search members<input id="customer-register-search" type="search" placeholder="Name, CIF, phone, email, address…" oninput="window.filterCustomerRegister()"></label><label for="customer-register-status">Status<select id="customer-register-status" onchange="window.filterCustomerRegister()"><option value="">All records</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><button type="button" class="secondary" onclick="window.exportCustomerRegister()">Export visible rows to Excel (CSV)</button></div><p id="customer-register-count" class="muted" aria-live="polite">Loading member records…</p><div id="cust-list" class="table-wrap"><p class="muted">Loading customer records…</p></div><p class="register-privacy-note">Exports contain confidential member information. Store and share them only with authorized staff.</p>`
       )}
     `;
 
@@ -320,23 +320,16 @@ window.switchPage = function(pageName) {
       db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
-        if (error || !data || data.length === 0) {
-          listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
-          return;
-        }
-        listEl.innerHTML = data.map(cust => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
-            </div>
-            <span class="badge-role">${esc(cust.phone_number)}</span>
-          </div>
-        `).join("");
+        if (error) { listEl.innerHTML = `<p class="muted">Member register could not be loaded. Check your staff access and connection.</p>`; return; }
+        window.customerRegisterRows = data || [];
+        window.filterCustomerRegister();
       }).catch(() => {
         const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No customer records found yet.</p>`;
+        if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented member records from loading.</p>`;
       });
+    } else {
+      const listEl=document.getElementById("cust-list");
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No member records were loaded.</p>';
     }
   }
   else if (pageName === "Accounts") {
@@ -405,8 +398,7 @@ window.switchPage = function(pageName) {
         "BANK ACCOUNTS DIRECTORY",
         "Account status and stored balance",
         "The balance field below is the value stored on the account record; it is not independently reconciled against double-entry ledger postings. Do not use it as an audited balance until reconciliation is implemented.",
-        `<div class="notice-box">Balance integrity note: transaction requests should affect customer balances only after approved ledger posting. A stored account balance may be stale or not ledger-verified.</div>
-         <div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
+        `<div class="notice-box">Balances below distinguish stored values from posted-ledger values. A difference or missing ledger configuration must be investigated; exports are for authorized staff only.</div><div class="register-toolbar"><label for="account-register-search">Search accounts<input id="account-register-search" type="search" placeholder="Account number, member, phone, address…" oninput="window.filterAccountRegister()"></label><label for="account-register-status">Status<select id="account-register-status" onchange="window.filterAccountRegister()"><option value="">All records</option><option value="active">Active</option><option value="dormant">Dormant</option><option value="closed">Closed</option></select></label><button type="button" class="secondary" onclick="window.exportAccountRegister()">Export visible rows to Excel (CSV)</button></div><p id="account-register-count" class="muted" aria-live="polite">Loading account records…</p><div id="acc-list" class="table-wrap"><p class="muted">Loading accounts directory...</p></div><p class="register-privacy-note">Account exports include customer and balance information. Keep files secure and share only with authorized staff.</p>`
       )}
     `;
 
@@ -437,33 +429,18 @@ window.switchPage = function(pageName) {
             return;
           }
           if (!data || data.length === 0) {
-            listEl.innerHTML = `<p class="muted">No accounts are visible for your branch access, or no accounts have been registered.</p>`;
+            window.accountRegisterRows=[];
+            window.renderAccountRegister([]);
             return;
           }
-          listEl.innerHTML = data.map(a => {
-            const stored = Number(a.stored_balance);
-            const ledger = a.ledger_balance === null || a.ledger_balance === undefined ? null : Number(a.ledger_balance);
-            const fmt = value => Number.isFinite(value)
-              ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              : "Not available";
-            const currency = (a.currency_code || "UGX").trim();
-            const reconciliation = !a.ledger_configured || ledger === null || !Number.isFinite(ledger)
-              ? '<span class="muted">Reconciliation: NOT CONFIGURED — customer liability ledger missing</span>'
-              : '<span class="muted">Difference (stored − ledger): ' + fmt(stored - ledger) + ' ' + esc(currency) + '</span>';
-            return `
-              <div class="list-item">
-                <div>
-                  <strong>${esc(a.account_number || "Account number unavailable")}</strong><br>
-                  <span class="muted">Stored balance: ${fmt(stored)} ${esc(currency)}</span><br>
-                  <span class="muted">Posted-ledger balance: ${ledger === null ? "Unavailable" : fmt(ledger)} ${esc(currency)}</span><br>
-                  ${reconciliation}<br>
-                  <span class="muted">Account UUID: ${esc(a.account_id)}</span><br>
-                  <span class="muted">Branch UUID: ${esc(a.branch_id || "Not assigned")}</span>
-                </div>
-                <span class="badge-role">${esc(a.account_status || "unknown")}</span>
-              </div>
-            `;
-          }).join("");
+          const [customersResult,branchesResult]=await Promise.all([
+            db.from("customers").select("id,customer_number,full_name,phone_number,email,address,nin_or_passport"),
+            db.from("branches").select("id,branch_name,branch_code")
+          ]);
+          window.accountRegisterRows=data;
+          window.accountRegisterCustomers=customersResult.error?[]:(customersResult.data||[]);
+          window.accountRegisterBranches=branchesResult.error?[]:(branchesResult.data||[]);
+          window.renderAccountRegister(data);
         })
         .catch(() => {
           const listEl = document.getElementById("acc-list");
