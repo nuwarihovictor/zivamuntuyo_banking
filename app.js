@@ -1103,7 +1103,11 @@ window.loadCashApprovals = async function() {
       '</span><br><strong>' + Number(r.amount).toLocaleString() + ' ' + esc(r.currency_code) +
       '</strong></div><div><label>Cash ledger UUID<input data-cash-ledger="' + esc(r.journal_id) +
       '" type="text" placeholder="Active asset ledger UUID"></label><button type="button" class="primary" data-post-journal="' +
-      esc(r.journal_id) + '">Post to ledger</button></div></div>'
+      esc(r.journal_id) + '" data-receipt-reference="' + esc(r.journal_number||r.journal_id||"") +
+      '" data-receipt-date="' + esc(r.transaction_date||new Date().toLocaleDateString("en-CA",{timeZone:"Africa/Kampala"})) +
+      '" data-receipt-branch="' + esc(r.branch_name||"") + '" data-receipt-account="' + esc(r.account_number||"") +
+      '" data-receipt-type="' + esc(r.transaction_type||"") + '" data-receipt-amount="' + esc(String(r.amount||0)) +
+      '" data-receipt-currency="' + esc(r.currency_code||"") + '">Post to ledger</button></div></div>'
     ).join("") : '<p class="muted">No approved requests are ready for posting. Requester and approver cannot post the same transaction.</p>';
   }
   if (feedback) feedback.textContent = "Lists refreshed. Money moves only after successful ledger posting.";
@@ -1139,7 +1143,11 @@ window.postApprovedCashRequest = async function(journalId) {
     if (feedback) feedback.textContent = "Posting blocked: " + result.error.message;
     return;
   }
-  if (feedback) feedback.textContent = "Ledger posting completed. Verify the posted record before printing a transaction receipt.";
+  if (feedback) feedback.textContent = "Ledger posting completed successfully. If this was a deposit, the receipt is ready to print.";
+  const receiptDataButton=document.querySelector('[data-post-journal="' + journalId + '"]');
+  if(receiptDataButton && String(receiptDataButton.dataset.receiptType||"").toLowerCase()==="deposit"){
+    window.printTransactionReceipt(receiptDataButton);
+  }
   await window.loadCashApprovals();
 };
 
