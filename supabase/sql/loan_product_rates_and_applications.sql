@@ -175,3 +175,22 @@ create policy staff_delete_loan_application_documents on storage.objects for del
  and exists(select 1 from public.loan_applications la where la.id::text=split_part(name,'/',2)
   and (public.current_employee_role_code()='general_manager' or public.is_active_system_admin() or public.is_active_bank_admin() or public.is_active_branch_manager_for(la.branch_id) or public.current_employee_has_branch_access(la.branch_id)))
 );
+
+-- Record every change to a configurable loan rate in the financial audit log.
+create or replace function public.audit_loan_product_rate_change()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+begin
+ if new.rate_percent is distinct from old.rate_percent or new.rate_period is distinct from old.rate_period then
+  insert into public.audit_events(branch_id,actor_user_id,action,entity_type,entity_id,details)
+  values(null,auth.uid(),'loan_product_rate_changed','loan_product_rate',new.product_code,
+   jsonb_build_object('product_code',new.product_code,'product_name',new.product_name,
+    'old_rate_percent',old.rate_percent,'new_rate_percent',new.rate_percent,
+    'rate_period',new.rate_period,'changed_by_role',public.current_employee_role_code()));
+ end if;
+ return new;
+end; $$;
+revoke all on function public.audit_loan_product_rate_change() from public,anon,authenticated;
+drop trigger if exists audit_loan_product_rate_change on public.loan_product_rates;
+create trigger audit_loan_product_rate_change after update on public.loan_product_rates
+for each row execute function public.audit_loan_product_rate_change();
