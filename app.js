@@ -39,32 +39,104 @@ function switchPage(pageName) {
 
   if (pageName === "Dashboard") {
     c.innerHTML = `
-      <span class="category-tag">Executive Overview</span>
+      <span class="category-tag">Phase 1 & 2: Executive Overview</span>
       <h2 class="page-heading">Dashboard</h2>
       ${panel(
-        "EXECUTIVE COMMERCIAL DASHBOARD",
-        "Institutional Overview & Portfolio Health",
-        "Real-time metrics across all regional branches and core ledgers.",
+        "INSTITUTIONAL PERFORMANCE & MULTI-BRANCH METRICS",
+        "Zivamuntuyo Financial Services Ltd — Central Ledger",
+        "Real-time operational overview across regional branches (Uganda, Kenya, Tanzania, Rwanda, Burundi, DRC).",
         `<div class="grid-2">
            <div class="metric-card">
-             <div class="metric-sub">Core Architecture</div>
-             <div class="metric-val" style="font-size:20px;">Tier-1 Commercial</div>
+             <div class="metric-sub">Active Architecture</div>
+             <div class="metric-val" style="font-size:18px;">Tier-1 Commercial CBS</div>
            </div>
            <div class="metric-card">
-             <div class="metric-sub">Account Profiles</div>
-             <div class="metric-val" style="font-size:20px;">6 Standard Types</div>
+             <div class="metric-sub">Security & RBAC</div>
+             <div class="metric-val" style="color:#063c2c; font-size:18px;">8 Staff Roles Active</div>
            </div>
          </div>
          <div class="metric-card">
-           <div class="metric-sub">Ledger Status</div>
-           <div class="metric-val" style="color:#15803d; font-size:20px;">Balanced & Online</div>
+           <div class="metric-sub">General Ledger Status</div>
+           <div class="metric-val" style="color:#15803d; font-size:18px;">Balanced (Debits = Credits)</div>
          </div>`
       )}
     `;
   } 
+  else if (pageName === "Branches") {
+    c.innerHTML = `
+      <span class="category-tag">Phase 3: Branch & Country Hierarchy</span>
+      <h2 class="page-heading">Branches & Regions</h2>
+      ${panel(
+        "OPERATIONAL REGIONAL NETWORK",
+        "Branch Directory & Currency Mapping",
+        "Manage regional branches operating under the central core banking system.",
+        `<div id="branch-list"><p class="muted">Loading regional branches...</p></div>`
+      )}
+    `;
+
+    if (db) {
+      db.from("branches").select("id, branch_code, branch_name, countries(country_name, currency_code)").then(({ data, error }) => {
+        const listEl = document.getElementById("branch-list");
+        if (!listEl) return;
+        if (error) {
+          listEl.innerHTML = `<p class="error">Error loading branches: ${esc(error.message)}</p>`;
+          return;
+        }
+        if (data && data.length > 0) {
+          listEl.innerHTML = data.map(b => `
+            <div class="list-item">
+              <div>
+                <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
+                <span class="muted">Country: ${esc(b.countries?.country_name || "N/A")} | Currency: ${esc(b.countries?.currency_code || "UGX")}</span>
+              </div>
+              <span class="badge-role">Operational</span>
+            </div>
+          `).join("");
+        } else {
+          listEl.innerHTML = `<p class="muted">No branches configured yet.</p>`;
+        }
+      });
+    }
+  }
+  else if (pageName === "Staff") {
+    c.innerHTML = `
+      <span class="category-tag">Phase 2: Security & Access Control</span>
+      <h2 class="page-heading">Staff & Permissions</h2>
+      ${panel(
+        "AUTHORIZED PERSONNEL DIRECTORY",
+        "Role-Based Access Control (RBAC)",
+        "Assigned employee profiles, system roles, and home branch access restrictions.",
+        `<div id="staff-list"><p class="muted">Loading staff directory...</p></div>`
+      )}
+    `;
+
+    if (db) {
+      db.from("employee_profiles").select("id, full_name, email, status, staff_roles(role_name), branches(branch_name)").then(({ data, error }) => {
+        const listEl = document.getElementById("staff-list");
+        if (!listEl) return;
+        if (error) {
+          listEl.innerHTML = `<p class="error">Error loading staff: ${esc(error.message)}</p>`;
+          return;
+        }
+        if (data && data.length > 0) {
+          listEl.innerHTML = data.map(s => `
+            <div class="list-item">
+              <div>
+                <strong>${esc(s.full_name)}</strong> (${esc(s.email)})<br>
+                <span class="muted">Branch: ${esc(s.branches?.branch_name || "Central HQ")}</span>
+              </div>
+              <span class="badge-role">${esc(s.staff_roles?.role_name || "Staff")}</span>
+            </div>
+          `).join("");
+        } else {
+          listEl.innerHTML = `<p class="muted">No employee profiles registered. (Default Admin Bypass active for Nuwariho Victor).</p>`;
+        }
+      });
+    }
+  }
   else if (pageName === "Customers") {
     c.innerHTML = `
-      <span class="category-tag">CIF & KYC Module</span>
+      <span class="category-tag">Phase 4: CIF & KYC Module</span>
       <h2 class="page-heading">Customers</h2>
       ${panel(
         "CUSTOMER ONBOARDING",
@@ -124,12 +196,12 @@ function switchPage(pageName) {
   }
   else if (pageName === "Accounts") {
     c.innerHTML = `
-      <span class="category-tag">Product Management</span>
+      <span class="category-tag">Phase 5: Product Management</span>
       <h2 class="page-heading">Accounts</h2>
       ${panel(
         "COMMERCIAL ACCOUNT OPENING",
         "Open New Account (6 Core Product Types)",
-        "Select a customer and product type. Dynamic fields adapt for Group Signatories or Fixed Deposits.",
+        "Select a customer, product type, and home branch.",
         `<form id="acc-form" onsubmit="handleAccountSubmit(event)">
           <label>Customer * 
             <select name="customer_id" id="sel-cust" required>
@@ -202,7 +274,7 @@ function switchPage(pageName) {
   }
   else if (pageName === "Transactions") {
     c.innerHTML = `
-      <span class="category-tag">Ledger Engine</span>
+      <span class="category-tag">Phase 6: Ledger Engine</span>
       <h2 class="page-heading">Transactions</h2>
       ${panel(
         "TRANSACTION PROCESSING",
@@ -355,5 +427,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
-      }
-  
+    }
