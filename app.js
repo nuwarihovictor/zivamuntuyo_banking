@@ -728,8 +728,23 @@ window.loadAttendancePolicy();
       ${panel("APPLICATION INFORMATION","System environment","Use this section to confirm the product identity and key environment details.",`
         <div class="settings-info-grid"><div class="settings-info"><small>Organization</small><strong>Zivamuntuyo Financial Services Ltd</strong></div><div class="settings-info"><small>Timezone</small><strong>Africa/Kampala</strong></div><div class="settings-info"><small>Branch network</small><strong>Butare, Ntungamo, Rukungiri, Rubirizi and Mitooma</strong></div><div class="settings-info"><small>Preferences</small><strong>Device-local appearance settings</strong></div></div>
       `)}
+      <section id="approval-limit-admin-panel" class="panel" hidden>
+        <h2>APPROVAL LIMITS & DELEGATED AUTHORITY</h2>
+        <p class="panel-desc">General Manager / System Administrator only. Database-enforced starter limits: teller cash approvals up to UGX 5,000,000; branch-manager cash/loan approvals up to UGX 10,000,000; overdrafts up to UGX 5,000,000. Adjust these to the approved bank policy.</p>
+        <form id="approval-limit-form" onsubmit="saveApprovalLimitSettings(event)"><div class="form-grid">
+          <label>Staff role<select id="approval-limit-role" required><option value="teller">Teller</option><option value="branch_manager">Branch Manager</option><option value="bank_admin">Bank Administrator</option><option value="accountant">Accountant</option><option value="loan_officer">Loan Officer</option><option value="general_manager">General Manager</option><option value="system_admin">System Administrator</option></select></label>
+          <label>Approval action<select id="approval-limit-action" required><option value="cash_transaction">Cash transaction</option><option value="loan">Loan approval</option><option value="overdraft">Overdraft approval</option><option value="account_opening">Account opening</option></select></label>
+          <label>Currency<select id="approval-limit-currency" required><option value="UGX">UGX</option></select></label>
+          <label>Branch-specific override (optional)<select id="approval-limit-branch"><option value="">All branches (default)</option></select></label>
+          <label>Maximum amount (UGX)<input id="approval-limit-amount" type="number" min="0" step="1" placeholder="e.g. 5000000"></label>
+          <label class="checkbox-label"><input id="approval-limit-unlimited" type="checkbox"> Unlimited authority for this action</label>
+          <label>Reason for change<input id="approval-limit-reason" maxlength="500" minlength="3" required placeholder="Approved policy or management decision"></label>
+          <button type="submit" class="primary">Save approval policy</button>
+        </div></form><p id="approval-limit-feedback" class="muted" role="status" aria-live="polite"></p><div id="approval-limit-table"></div>
+      </section>
     `;
     initAppearanceControls();
+    window.loadApprovalLimitSettings();
   }
   else if (pageName === "FormStudio") {
     c.innerHTML = `
@@ -2105,6 +2120,70 @@ function showAuthenticatedWorkspace() {
   }
   setTimeout(setWelcomeMessage,100);
 }
+
+
+window.loadApprovalLimitSettings = async function() {
+  const panel=document.getElementById("approval-limit-admin-panel");
+  if(!panel || !db) return;
+  try {
+    const roleResult=await db.rpc("current_employee_role_code");
+    if(roleResult.error || !["system_admin","general_manager"].includes(roleResult.data)) { panel.hidden=true; return; }
+    panel.hidden=false;
+    const results=await Promise.all([
+      db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
+      db.from("role_approval_limits").select("role_code,action_type,currency_code,branch_id,max_amount,is_unlimited,is_active,updated_at").order("role_code").order("action_type")
+    ]);
+    if(results[0].error) throw results[0].error;
+    if(results[1].error) throw results[1].error;
+    const branches=results[0].data||[], rows=results[1].data||[];
+    const branchSelect=document.getElementById("approval-limit-branch");
+    if(branchSelect) {
+      const selected=branchSelect.value;
+      branchSelect.innerHTML='<option value="">All branches (default)</option>'+branches.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
+      if(selected) branchSelect.value=selected;
+    }
+    const table=document.getElementById("approval-limit-table");
+    if(table) table.innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Role</th><th>Action</th><th>Scope</th><th>Limit</th><th>Status</th></tr></thead><tbody>'+rows.map(x=>{
+      const branch=branches.find(b=>b.id===x.branch_id);
+      const amount=x.is_unlimited?"Unlimited":("UGX "+Number(x.max_amount||0).toLocaleString("en-UG"));
+      return '<tr><td>'+esc(x.role_code)+'</td><td>'+esc(x.action_type.replace(/_/g," "))+'</td><td>'+esc(branch?branch.branch_name:"All branches")+'</td><td>'+esc(amount)+'</td><td>'+(x.is_active?"Active":"Inactive")+'</td></tr>';
+    }).join("")+'</tbody></table></div>':'<p class="muted">No approval limits are configured.</p>';
+  } catch(error) {
+    const feedback=document.getElementById("approval-limit-feedback");
+    if(feedback) feedback.textContent="Approval policy could not be loaded: "+(error?.message||"Unexpected error");
+  }
+};
+
+window.saveApprovalLimitSettings = async function(event) {
+  event.preventDefault();
+  const feedback=document.getElementById("approval-limit-feedback");
+  const button=event.currentTarget.querySelector('button[type="submit"]');
+  const unlimited=Boolean(document.getElementById("approval-limit-unlimited")?.checked);
+  const amountText=document.getElementById("approval-limit-amount")?.value||"";
+  const amount=unlimited?null:Number(amountText);
+  if(!unlimited && (!amountText || !Number.isFinite(amount) || amount<0)) { if(feedback)feedback.textContent="Enter a valid maximum amount or select unlimited authority."; return; }
+  try {
+    if(!db) throw new Error("Database connection is unavailable.");
+    if(button){button.disabled=true;button.textContent="Saving policy…";}
+    const {error}=await db.rpc("set_role_approval_limit",{
+      p_role_code:document.getElementById("approval-limit-role").value,
+      p_action_type:document.getElementById("approval-limit-action").value,
+      p_currency_code:document.getElementById("approval-limit-currency").value,
+      p_branch_id:document.getElementById("approval-limit-branch").value||null,
+      p_max_amount:amount,
+      p_is_unlimited:unlimited,
+      p_reason:document.getElementById("approval-limit-reason").value.trim()
+    });
+    if(error) throw error;
+    if(feedback) feedback.textContent="Approval policy saved and audited.";
+    document.getElementById("approval-limit-reason").value="";
+    await window.loadApprovalLimitSettings();
+  } catch(error) {
+    if(feedback) feedback.textContent="Policy was not saved: "+(error?.message||"Unexpected error");
+  } finally {
+    if(button){button.disabled=false;button.textContent="Save approval policy";}
+  }
+};
 
 window.openBranchWorkspace = function(branchId, branchName) {
   if (!branchId || !branchName) return;
