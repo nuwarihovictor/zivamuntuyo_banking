@@ -33,7 +33,7 @@ function transactionModuleTabs(active){
 }
 
 function staffModuleTabs(active){
-  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","Team Chat","💬"]];
+  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","VIC LINE platform 2026","✦"]];
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
 
@@ -638,21 +638,79 @@ window.loadAttendancePolicy();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
-      <span class="category-tag">Internal Communications</span>
-      <h2 class="page-heading">Team Chat</h2>
-      ${staffModuleTabs("StaffChat")}
-      ${panel(
-        "TEAM MESSAGES",
-        "Internal staff communication",
-        "Messaging is not connected to a database yet; this page does not send or store messages.",
-        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
-         <label>Message preview
-           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
-         </label>
-         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
-         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
-      )}
+      <div class="vicline-page">
+        ${staffModuleTabs("StaffChat")}
+        <section class="vicline-shell" aria-label="VIC LINE staff messaging">
+          <header class="vicline-topbar">
+            <div class="vicline-brand">
+              <div class="vicline-logo" aria-hidden="true"><span>✦</span></div>
+              <div class="vicline-brand-copy">
+                <span class="vicline-eyebrow">ZIVAMUNTUYO STAFF NETWORK</span>
+                <h2>VIC LINE <span>2026</span></h2>
+                <p>Stay connected with your team</p>
+              </div>
+            </div>
+            <div class="vicline-top-actions">
+              <span class="vicline-secure-pill"><span></span> Private staff chat</span>
+              <button type="button" class="vicline-icon-button" title="Refresh messages" aria-label="Refresh messages" onclick="window.loadStaffChat()">↻</button>
+            </div>
+          </header>
+          <div class="vicline-toolbar">
+            <div class="vicline-channel-title"><span class="vicline-channel-icon" aria-hidden="true">◎</span><div><strong>Messages</strong><small>Keep 10+ branch and team conversations within reach</small></div></div>
+            <div class="vicline-toolbar-actions">
+              <button type="button" class="vicline-settings-button" onclick="window.toggleVicLineSettings()" aria-expanded="false" id="vicline-settings-toggle"><span aria-hidden="true">⚙</span> Settings</button>
+              <label class="vicline-channel-picker">OPEN CONVERSATION<select id="staff-chat-branch" onchange="window.loadStaffChat()"><option value="">Bank-wide messages</option></select></label>
+            </div>
+          </div>
+          <section class="vicline-settings-panel" id="vicline-settings-panel" hidden aria-labelledby="vicline-settings-title">
+            <div class="vicline-settings-heading"><div><h3 id="vicline-settings-title">VIC LINE settings</h3><p>Customize alerts and the look of your workspace on this device.</p></div><button type="button" class="vicline-close-settings" onclick="window.toggleVicLineSettings(false)" aria-label="Close settings">×</button></div>
+            <div class="vicline-settings-grid">
+              <label class="vicline-setting-row"><span><strong>Notification sounds</strong><small>Play a tone when a new message arrives while VIC LINE is open.</small></span><input type="checkbox" id="vicline-sound-enabled" checked onchange="window.saveVicLineSettings()"></label>
+              <label class="vicline-setting-row"><span><strong>Notification tone</strong><small>Choose the sound you prefer.</small></span><select id="vicline-sound-tone" onchange="window.saveVicLineSettings()"><option value="chime">Soft chime</option><option value="bell">Bell</option><option value="pop">Pop</option><option value="double">Double tone</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Sound volume</strong><small>Set notification loudness.</small></span><input type="range" id="vicline-sound-volume" min="0" max="100" value="55" oninput="window.updateVicLineVolumeLabel()" onchange="window.saveVicLineSettings()"><output id="vicline-volume-label">55%</output></label>
+              <label class="vicline-setting-row"><span><strong>Desktop notifications</strong><small>Ask permission to show browser alerts for new messages.</small></span><button type="button" class="secondary" id="vicline-notification-permission" onclick="window.enableVicLineDesktopNotifications()">Enable alerts</button></label>
+              <label class="vicline-setting-row"><span><strong>Appearance</strong><small>Choose a comfortable chat background.</small></span><select id="vicline-appearance" onchange="window.saveVicLineSettings()"><option value="light">Light</option><option value="soft">Soft lavender</option><option value="dark">Dark</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Message density</strong><small>Choose how compact the conversation looks.</small></span><select id="vicline-density" onchange="window.saveVicLineSettings()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+            </div>
+            <div class="vicline-settings-footer"><button type="button" class="secondary" onclick="window.testVicLineNotificationTone()">▶ Test tone</button><span id="vicline-settings-feedback" role="status" aria-live="polite">Settings are saved on this device.</span></div>
+          </section>
+          <div class="vicline-inbox-layout">
+            <aside class="vicline-inbox-sidebar" aria-label="Available conversations"><div class="vicline-inbox-sidebar-heading"><strong>Conversations</strong><span id="vicline-conversation-count">Loading…</span></div><div id="vicline-conversation-list" class="vicline-conversation-list"><p class="muted">Loading conversations…</p></div><p class="vicline-sidebar-note">Each conversation follows bank-wide or branch access permissions.</p></aside>
+            <div class="vicline-chat-column">
+          <div class="vicline-conversation-heading">
+            <div class="vicline-conversation-avatar" aria-hidden="true">✦</div>
+            <div class="vicline-conversation-copy"><strong id="vicline-current-channel">VIC LINE team</strong><span>Internal communication space</span></div>
+            <span class="vicline-conversation-mark" title="Authorized staff channels">•••</span>
+          </div>
+          <p id="staff-chat-feedback" class="vicline-feedback" role="status" aria-live="polite">Loading secure messages…</p>
+          <div id="staff-chat-messages" class="staff-chat-messages vicline-messages" aria-live="polite"></div>
+          <div class="vicline-composer-wrap">
+            <form id="staff-chat-form" class="vicline-composer" onsubmit="window.sendStaffChatMessage(event)">
+              <label class="vicline-message-label" for="staff-chat-input">Message</label>
+              <textarea id="staff-chat-input" rows="1" maxlength="1000" required placeholder="Write a message…" aria-label="Write a staff message"></textarea>
+              <button type="submit" class="vicline-send-button" aria-label="Send message" title="Send message">➤</button>
+            </form>
+            <section class="staff-voice-note-tools vicline-voice-tools" aria-labelledby="staff-voice-note-heading">
+              <div class="vicline-voice-heading"><span class="vicline-mic-badge" aria-hidden="true">♫</span><div><h3 id="staff-voice-note-heading">Voice note</h3><p>Record a quick update for your team</p></div></div>
+              <div class="staff-voice-controls">
+                <button type="button" class="secondary" id="staff-voice-record" onclick="window.startStaffVoiceRecording()">🎙️ Record</button>
+                <button type="button" class="secondary" id="staff-voice-stop" onclick="window.stopStaffVoiceRecording()" disabled>Stop</button>
+                <button type="button" class="secondary" id="staff-voice-discard" onclick="window.discardStaffVoiceRecording()" disabled>Discard</button>
+                <button type="button" class="primary" id="staff-voice-send" onclick="window.sendStaffVoiceNote()" disabled>Send voice note</button>
+              </div>
+              <p id="staff-voice-feedback" class="muted" role="status" aria-live="polite">Microphone access is requested only when you press Record.</p>
+              <audio id="staff-voice-preview" controls hidden preload="metadata"></audio>
+              <p class="vicline-voice-note">Maximum 120 seconds and 3 MB. Preview before sending; audio never plays automatically.</p>
+            </section>
+            <p class="vicline-safety-note">Keep passwords, PINs and customer credentials out of chat. Live calls are planned for a later phase.</p>
+          </div>
+            </div>
+          </div>
+        </section>
+      </div>
     `;
+    window.applyVicLineSettings();
+    window.loadStaffChat().then(() => { if (!window.vicLinePollHandle) window.vicLineStartPolling(); });
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
@@ -981,8 +1039,9 @@ window.loadTransactionMonitor = async function() {
     const type=String(r.transaction_type||"").toLowerCase();
     const isPosted=status==="posted";
     const isDeposit=type==="deposit";
-    const receiptButton=(isPosted&&isDeposit)
-      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(r.transaction_type||"deposit")+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print deposit receipt</button>'
+    const isReceiptEligible=isDeposit||type==="withdrawal";
+    const receiptButton=(isPosted&&isReceiptEligible)
+      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(type)+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print '+(type==="withdrawal"?"withdrawal":"deposit")+' receipt</button>'
       : "";
     return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><div class="transaction-status-actions"><span class="badge-role">'+esc(r.status||"unknown")+'</span>'+receiptButton+'</div></div>';
   }).join("");
@@ -1745,13 +1804,329 @@ document.addEventListener("click", function(event) {
   if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
 });
 
-window.previewStaffMessage = function() {
-  const input = document.getElementById("chat-preview");
-  const output = document.getElementById("chat-preview-result");
-  if (!input || !output) return;
-  output.textContent = input.value.trim()
-    ? "Draft preview only: " + input.value.trim()
-    : "Enter a message to preview. Nothing has been sent or saved.";
+window.staffVoiceRecorder = null;
+window.staffVoiceStream = null;
+window.staffVoiceChunks = [];
+window.staffVoiceBlob = null;
+window.staffVoiceMimeType = "";
+window.staffVoiceStartedAt = 0;
+window.staffVoiceTimer = null;
+window.staffVoiceChannelAtStart = null;
+window.staffVoicePreviewUrl = null;
+
+function staffVoiceFormatTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+function staffVoiceSetButtons(state) {
+  const record = document.getElementById("staff-voice-record");
+  const stop = document.getElementById("staff-voice-stop");
+  const discard = document.getElementById("staff-voice-discard");
+  const send = document.getElementById("staff-voice-send");
+  if (!record || !stop || !discard || !send) return;
+  record.disabled = state === "recording" || state === "ready" || state === "uploading";
+  stop.disabled = state !== "recording";
+  discard.disabled = state !== "ready";
+  send.disabled = state !== "ready";
+}
+
+window.startStaffVoiceRecording = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const preview = document.getElementById("staff-voice-preview");
+  if (!db || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    if (feedback) feedback.textContent = "Voice recording is not supported in this browser. Try a current Chrome or Edge browser over HTTPS.";
+    return;
+  }
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const supported = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+    const mime = supported.find(type => MediaRecorder.isTypeSupported(type)) || "";
+    const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    window.staffVoiceStream = stream;
+    window.staffVoiceRecorder = recorder;
+    window.staffVoiceChunks = [];
+    window.staffVoiceBlob = null;
+    window.staffVoiceMimeType = (recorder.mimeType || mime || "audio/webm").split(";")[0].toLowerCase();
+    window.staffVoiceChannelAtStart = (document.getElementById("staff-chat-branch") || {}).value || "";
+    window.staffVoiceStartedAt = Date.now();
+    if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+    window.staffVoicePreviewUrl = null;
+    if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+    recorder.ondataavailable = event => { if (event.data && event.data.size) window.staffVoiceChunks.push(event.data); };
+    recorder.onerror = () => {
+      if (feedback) feedback.textContent = "The browser could not record audio. Stop and try again.";
+      window.stopStaffVoiceRecording();
+    };
+    recorder.onstop = () => {
+      const duration = Math.ceil((Date.now() - window.staffVoiceStartedAt) / 1000);
+      const blob = new Blob(window.staffVoiceChunks, { type: window.staffVoiceMimeType });
+      window.staffVoiceBlob = blob;
+      if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+      window.staffVoiceStream = null;
+      if (window.staffVoiceTimer) clearInterval(window.staffVoiceTimer);
+      window.staffVoiceTimer = null;
+      if (blob.size > 3145728) {
+        window.staffVoiceBlob = null;
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "This recording is larger than 3 MB. Record a shorter note.";
+        return;
+      }
+      if (!blob.size || duration < 1) {
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "The recording was too short or empty. Please record again.";
+        return;
+      }
+      window.staffVoiceDuration = Math.min(duration, 120);
+      window.staffVoicePreviewUrl = URL.createObjectURL(blob);
+      if (preview) { preview.src = window.staffVoicePreviewUrl; preview.hidden = false; }
+      staffVoiceSetButtons("ready");
+      if (feedback) feedback.textContent = "Preview the recording before sending (" + staffVoiceFormatTime(window.staffVoiceDuration) + ", " + Math.ceil(blob.size / 1024) + " KB).";
+    };
+    recorder.start(500);
+    staffVoiceSetButtons("recording");
+    if (feedback) feedback.textContent = "Recording… 00:00 / 02:00";
+    window.staffVoiceTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - window.staffVoiceStartedAt) / 1000);
+      if (feedback) feedback.textContent = "Recording… " + staffVoiceFormatTime(elapsed) + " / 02:00";
+      if (elapsed >= 120) window.stopStaffVoiceRecording();
+    }, 500);
+  } catch (error) {
+    if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+    window.staffVoiceStream = null;
+    staffVoiceSetButtons("idle");
+    if (feedback) feedback.textContent = error && error.name === "NotAllowedError"
+      ? "Microphone permission was denied. Allow microphone access in your browser settings and try again."
+      : "Microphone unavailable. Check that it is connected and not being used by another app.";
+  }
+};
+
+window.stopStaffVoiceRecording = function() {
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") {
+    try { window.staffVoiceRecorder.stop(); } catch (error) {}
+  }
+};
+
+window.discardStaffVoiceRecording = function() {
+  const preview = document.getElementById("staff-voice-preview");
+  if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+  window.staffVoicePreviewUrl = null;
+  window.staffVoiceBlob = null;
+  window.staffVoiceChunks = [];
+  if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+  staffVoiceSetButtons("idle");
+  const feedback = document.getElementById("staff-voice-feedback");
+  if (feedback) feedback.textContent = "Recording discarded.";
+};
+
+window.sendStaffVoiceNote = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const selector = document.getElementById("staff-chat-branch");
+  const blob = window.staffVoiceBlob;
+  if (!db || !blob) return;
+  const branchId = selector && selector.value ? selector.value : null;
+  if ((branchId || "") !== (window.staffVoiceChannelAtStart || "")) {
+    if (feedback) feedback.textContent = "The conversation changed after recording. Discard this note and record it in the intended channel.";
+    return;
+  }
+  if (blob.size > 3145728 || !window.staffVoiceDuration || window.staffVoiceDuration > 120) {
+    if (feedback) feedback.textContent = "This recording exceeds the allowed size or duration.";
+    return;
+  }
+  const sendButton = document.getElementById("staff-voice-send");
+  staffVoiceSetButtons("uploading");
+  if (sendButton) sendButton.disabled = true;
+  if (feedback) feedback.textContent = "Uploading voice note securely…";
+  let uploadedPath = null;
+  try {
+    const { data: userData, error: userError } = await db.auth.getUser();
+    if (userError || !userData || !userData.user) throw new Error("Your signed-in user could not be verified. Sign in again.");
+    const ext = window.staffVoiceMimeType === "audio/mp4" ? "m4a"
+      : window.staffVoiceMimeType === "audio/ogg" ? "ogg"
+      : window.staffVoiceMimeType === "audio/mpeg" ? "mp3"
+      : window.staffVoiceMimeType === "audio/wav" ? "wav" : "webm";
+    const channelKey = branchId || "global";
+    uploadedPath = userData.user.id + "/" + channelKey + "/" + crypto.randomUUID() + "." + ext;
+    const { error: uploadError } = await db.storage.from("staff-voice-notes").upload(uploadedPath, blob, {
+      contentType: window.staffVoiceMimeType,
+      cacheControl: "300",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { error: registerError } = await db.rpc("register_staff_voice_note", {
+      p_branch_id: branchId,
+      p_storage_path: uploadedPath,
+      p_mime_type: window.staffVoiceMimeType,
+      p_byte_size: blob.size,
+      p_duration_seconds: window.staffVoiceDuration
+    });
+    if (registerError) throw registerError;
+    window.discardStaffVoiceRecording();
+    if (feedback) feedback.textContent = "Voice note sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  } catch (error) {
+    if (uploadedPath) {
+      try { await db.storage.from("staff-voice-notes").remove([uploadedPath]); } catch (cleanupError) {}
+    }
+    if (feedback) feedback.textContent = "Voice note was not confirmed as sent. " + (error && error.message ? error.message : "Check your connection and try again.");
+    staffVoiceSetButtons("ready");
+  }
+};
+
+window.vicLineSeenMessages = window.vicLineSeenMessages || {};
+window.vicLineSeenTimestamps = window.vicLineSeenTimestamps || {};
+window.vicLineSettingsDefaults = { soundEnabled:true, tone:"chime", volume:55, appearance:"light", density:"comfortable" };
+window.getVicLineSettings = function() {
+  try { return { ...window.vicLineSettingsDefaults, ...JSON.parse(localStorage.getItem("zfs-vic-line-settings") || "{}") }; }
+  catch (_) { return { ...window.vicLineSettingsDefaults }; }
+};
+window.applyVicLineSettings = function() {
+  const settings=window.getVicLineSettings(), shell=document.querySelector(".vicline-shell");
+  if(shell){shell.dataset.appearance=settings.appearance;shell.dataset.density=settings.density;}
+  const set=(id,value)=>{const el=document.getElementById(id);if(el&&value!==undefined)el.value=String(value);};
+  const sound=document.getElementById("vicline-sound-enabled");if(sound)sound.checked=!!settings.soundEnabled;
+  set("vicline-sound-tone",settings.tone);set("vicline-sound-volume",settings.volume);set("vicline-appearance",settings.appearance);set("vicline-density",settings.density);
+  window.updateVicLineVolumeLabel();
+  const button=document.getElementById("vicline-notification-permission");
+  if(button&&"Notification" in window)button.textContent=Notification.permission==="granted"?"Alerts enabled":"Enable alerts";
+};
+window.saveVicLineSettings = function() {
+  const el=id=>document.getElementById(id);
+  const existing=window.getVicLineSettings();const settings={soundEnabled:!!el("vicline-sound-enabled")?.checked,tone:el("vicline-sound-tone")?.value||"chime",volume:Math.max(0,Math.min(100,Number(el("vicline-sound-volume")?.value||55))),desktopNotifications:existing.desktopNotifications===true,appearance:el("vicline-appearance")?.value||"light",density:el("vicline-density")?.value||"comfortable"};
+  try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}
+  window.applyVicLineSettings();
+  const feedback=el("vicline-settings-feedback");if(feedback)feedback.textContent="Your VIC LINE preferences have been saved on this device.";
+};
+window.updateVicLineVolumeLabel=function(){const slider=document.getElementById("vicline-sound-volume"),label=document.getElementById("vicline-volume-label");if(slider&&label)label.textContent=slider.value+"%";};
+window.toggleVicLineSettings=function(force){const panel=document.getElementById("vicline-settings-panel"),button=document.getElementById("vicline-settings-toggle");if(!panel)return;const open=typeof force==="boolean"?force:panel.hidden;panel.hidden=!open;if(button)button.setAttribute("aria-expanded",String(open));};
+window.enableVicLineDesktopNotifications=async function(){
+  const feedback=document.getElementById("vicline-settings-feedback");
+  if(!("Notification" in window)){if(feedback)feedback.textContent="This browser does not support desktop notifications.";return;}
+  let permission=Notification.permission;
+  if(permission==="default")permission=await Notification.requestPermission();
+  if(feedback)feedback.textContent=permission==="granted"?"Browser notifications enabled.":"Notifications were not enabled. Check this site's browser permissions.";
+  if(permission==="granted"){const settings=window.getVicLineSettings();settings.desktopNotifications=true;try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}}
+  const button=document.getElementById("vicline-notification-permission");if(button)button.textContent=permission==="granted"?"Alerts enabled":"Enable alerts";
+};
+window.playVicLineTone=function(toneOverride){
+  const settings=window.getVicLineSettings();if(!settings.soundEnabled&&!toneOverride)return;
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(!AudioContextClass)return;
+  try{
+    const ctx=new AudioContextClass();if(ctx.state==="suspended")ctx.resume();
+    const tone=toneOverride||settings.tone,volume=Math.max(0,Math.min(1,Number(settings.volume)/100))*.14;
+    const notes=tone==="bell"?[880]:tone==="pop"?[520]:tone==="double"?[660,880]:[740,988];
+    notes.forEach((frequency,index)=>{const start=ctx.currentTime+index*(tone==="double"?.15:.1),osc=ctx.createOscillator(),gain=ctx.createGain();osc.type=tone==="pop"?"triangle":"sine";osc.frequency.setValueAtTime(frequency,start);gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),start+.018);gain.gain.exponentialRampToValueAtTime(.0001,start+(tone==="pop"?.12:.24));osc.connect(gain);gain.connect(ctx.destination);osc.start(start);osc.stop(start+.27);});
+    setTimeout(()=>ctx.close().catch(()=>{}),650);
+  }catch(_){}
+};
+window.testVicLineNotificationTone=function(){window.playVicLineTone(window.getVicLineSettings().tone);const f=document.getElementById("vicline-settings-feedback");if(f)f.textContent="Playing a preview of your selected tone.";};
+window.notifyVicLineNewMessage=function(message,channelName){
+  const settings=window.getVicLineSettings();if(settings.soundEnabled)window.playVicLineTone();
+  if(settings.desktopNotifications&&"Notification" in window&&Notification.permission==="granted"&&document.hidden){try{const n=new Notification("VIC LINE · "+channelName,{body:String(message||"New staff message").slice(0,140),tag:"vic-line-"+channelName});n.onclick=()=>{window.focus();n.close();};}catch(_){}}
+};
+window.renderVicLineConversationList=function(branches){
+  const list=document.getElementById("vicline-conversation-list"),count=document.getElementById("vicline-conversation-count"),selector=document.getElementById("staff-chat-branch");if(!list||!selector)return;
+  const current=selector.value||"",conversations=[{id:"",name:"Bank-wide messages",short:"All staff",icon:"✦"}].concat((branches||[]).map(b=>({id:b.id,name:b.branch_name,short:"Branch conversation",icon:"◎"})));
+  selector.innerHTML=conversations.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join("");
+  if(conversations.some(item=>String(item.id)===String(current)))selector.value=current;
+  list.innerHTML=conversations.map(item=>'<button type="button" class="vicline-conversation-item '+(String(item.id)===String(selector.value||"")?"active":"")+'" data-conversation-id="'+esc(item.id)+'" onclick="window.openVicLineConversation(this.dataset.conversationId)"><span class="vicline-list-avatar">'+item.icon+'</span><span class="vicline-list-copy"><strong>'+esc(item.name)+'</strong><small>'+esc(item.short)+'</small></span><span class="vicline-list-arrow">›</span></button>').join("");
+  if(count)count.textContent=conversations.length+" conversation"+(conversations.length===1?"":"s");
+};
+window.openVicLineConversation=function(id){const selector=document.getElementById("staff-chat-branch");if(!selector)return;selector.value=id||"";window.loadStaffChat();};
+window.loadStaffChat=async function(options={}){
+  const feedback=document.getElementById("staff-chat-feedback"),list=document.getElementById("staff-chat-messages"),selector=document.getElementById("staff-chat-branch");if(!feedback||!list||!selector)return;
+  if(!db){feedback.textContent="Database connection unavailable. Messages were not loaded.";return;}
+  feedback.textContent="Loading messages and voice notes…";
+  try{
+    const currentValue=selector.value||"";
+    const [branchResult,messageResult,voiceResult]=await Promise.all([
+      db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
+      db.rpc("list_staff_channel_messages",{p_branch_id:currentValue||null,p_limit:100}),
+      db.rpc("list_staff_voice_notes",{p_branch_id:currentValue||null,p_limit:100})
+    ]);
+    if(branchResult.error){feedback.textContent="Branch channels could not be loaded: "+branchResult.error.message;return;}
+    window.renderVicLineConversationList(branchResult.data||[]);selector.value=currentValue;
+    const selected=[...selector.options].find(o=>o.value===currentValue),channelName=selected?selected.textContent:"Bank-wide messages";
+    const title=document.getElementById("vicline-current-channel");if(title)title.textContent=currentValue?channelName:"VIC LINE team";
+    const conversationList=document.getElementById("vicline-conversation-list");if(conversationList)conversationList.querySelectorAll("[data-conversation-id]").forEach(b=>b.classList.toggle("active",b.dataset.conversationId===currentValue));
+    if(messageResult.error){feedback.textContent="Messages could not be loaded: "+messageResult.error.message;list.innerHTML="";return;}
+    if(voiceResult.error)feedback.textContent="Text messages loaded, but voice notes are unavailable until the voice-note database setup is applied: "+voiceResult.error.message;
+    const items=(messageResult.data||[]).map(m=>({kind:"text",data:m,at:new Date(m.created_at).getTime()||0}));
+    const notes=voiceResult.error?[]:(voiceResult.data||[]);
+    const noteItems=await Promise.all(notes.map(async note=>{const {data,error}=await db.storage.from("staff-voice-notes").createSignedUrl(note.storage_path,300);return{kind:"voice",data:note,url:error||!data?"":data.signedUrl,at:new Date(note.created_at).getTime()||0};}));
+    const merged=items.concat(noteItems).sort((a,b)=>a.at-b.at),newest=merged.length?merged[merged.length-1].data:null,newestId=newest&&(newest.id||newest.message_id||newest.storage_path||newest.created_at),seenKey=currentValue||"bankwide",previous=window.vicLineSeenMessages[seenKey];
+    if(options.polling&&newestId&&previous&&String(newestId)!==String(previous)){
+      const newItems=merged.filter(item=>item.at>(window.vicLineSeenTimestamps[seenKey]||0));
+      const incoming=newItems.filter(item=>{const sender=String(item.data.sender_name||item.data.sender_employee_number||"");return !sender||sender!==String(window.currentEmployeeName||"");}).pop();
+      if(incoming)window.notifyVicLineNewMessage(incoming.kind==="voice"?"New voice note received":incoming.data.message_text,channelName);
+    }
+    window.vicLineSeenMessages[seenKey]=newestId;window.vicLineSeenTimestamps[seenKey]=newest?(new Date(newest.created_at).getTime()||0):0;
+    list.innerHTML=merged.map(item=>{
+      const m=item.data,sender=m.sender_name||m.sender_employee_number||"Staff member",initials=sender.trim().split(/\\s+/).slice(0,2).map(part=>part.charAt(0)).join("").toUpperCase()||"S",time=m.created_at?new Date(m.created_at).toLocaleString():"";
+      if(item.kind==="voice"){const player=item.url?'<audio controls preload="none" aria-label="Voice note from '+esc(sender)+'" src="'+esc(item.url)+'"></audio>':'<p class="muted">Audio playback unavailable. Refresh and check your channel access.</p>';return '<article class="staff-chat-message staff-voice-message"><div class="vicline-message-avatar" aria-hidden="true">'+esc(initials)+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(time)+'</span></div><div class="vicline-bubble vicline-audio-bubble"><p class="staff-voice-label">🎙️ Voice note · '+esc(staffVoiceFormatTime(m.duration_seconds))+'</p>'+player+'</div></div></article>';}
+      return '<article class="staff-chat-message"><div class="vicline-message-avatar" aria-hidden="true">'+esc(initials)+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(time)+'</span></div><div class="vicline-bubble"><p class="staff-chat-text">'+esc(m.message_text)+'</p></div></div></article>';
+    }).join("")||'<p class="muted">No messages in this conversation yet. You can send the first message.</p>';
+    feedback.textContent=merged.length+" item"+(merged.length===1?"":"s")+" loaded. New-message checks run while VIC LINE is open.";
+  }catch(error){feedback.textContent="A connection error prevented messages and voice notes from loading.";}
+};
+window.pollVicLineAllConversations=async function(){
+  if(!db||!document.getElementById("staff-chat-branch"))return;
+  try{
+    const branchResult=await db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name");
+    if(branchResult.error)return;
+    const channels=[{id:"",name:"Bank-wide messages"}].concat((branchResult.data||[]).map(b=>({id:b.id,name:b.branch_name})));
+    await Promise.all(channels.map(async channel=>{
+      const key=channel.id||"bankwide";
+      const [messages,voices]=await Promise.all([
+        db.rpc("list_staff_channel_messages",{p_branch_id:channel.id||null,p_limit:1}),
+        db.rpc("list_staff_voice_notes",{p_branch_id:channel.id||null,p_limit:1})
+      ]);
+      if(messages.error)return;
+      const latestText=(messages.data||[]).map(m=>({kind:"text",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0];
+      const latestVoice=!voices.error?(voices.data||[]).map(m=>({kind:"voice",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0]:null;
+      const latest=[latestText,latestVoice].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
+      if(!latest){if(window.vicLineSeenTimestamps[key]===undefined)window.vicLineSeenTimestamps[key]=0;return;}
+      const previous=window.vicLineSeenTimestamps[key];
+      if(previous!==undefined&&previous>0&&latest.at>previous){
+        const sender=String(latest.data.sender_name||latest.data.sender_employee_number||"");
+        if(!sender||sender!==String(window.currentEmployeeName||""))window.notifyVicLineNewMessage(latest.kind==="voice"?"New voice note received":latest.data.message_text,channel.name);
+      }
+      window.vicLineSeenMessages[key]=latest.data.id||latest.data.message_id||latest.data.storage_path||latest.data.created_at;
+      window.vicLineSeenTimestamps[key]=latest.at;
+    }));
+    if(!document.hidden&&document.getElementById("staff-chat-branch"))await window.loadStaffChat();
+  }catch(_){}
+};
+window.vicLineStartPolling=function(){if(window.vicLinePollHandle)clearInterval(window.vicLinePollHandle);window.vicLinePollHandle=setInterval(()=>{window.pollVicLineAllConversations();},30000);};
+window.sendStaffChatMessage = async function(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const input = document.getElementById("staff-chat-input");
+  const feedback = document.getElementById("staff-chat-feedback");
+  const selector = document.getElementById("staff-chat-branch");
+  const submitButton = form?.querySelector('button[type="submit"]');
+  const message = input ? input.value.trim() : "";
+  if (!db || !form || !input || !form.reportValidity() || !message) return;
+  if (submitButton) submitButton.disabled = true;
+  if (feedback) feedback.textContent = "Sending message…";
+  try {
+    const { error } = await db.rpc("send_staff_channel_message", {
+      p_message: message,
+      p_branch_id: selector && selector.value ? selector.value : null
+    });
+    if (error) {
+      if (feedback) feedback.textContent = "Message was not sent: " + error.message;
+      return;
+    }
+    input.value = "";
+    if (feedback) feedback.textContent = "Message sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  } catch (error) {
+    if (feedback) feedback.textContent = "A connection error prevented the message from being sent. Check the conversation before retrying.";
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
@@ -1764,18 +2139,20 @@ window.printTransactionReceipt = function(button, skipConfirmation) {
   const type=String(button.dataset.receiptType||"").toLowerCase();
   const amount=Number(button.dataset.receiptAmount);
   const currency=button.dataset.receiptCurrency||"";
-  if(type!=="deposit"||!reference||!Number.isFinite(amount)||amount<=0){
-    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit.";
+  if(!["deposit","withdrawal"].includes(type)||!reference||!Number.isFinite(amount)||amount<=0){
+    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit or withdrawal.";
     return;
   }
-  if(!skipConfirmation && !confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
+  const label=type==="withdrawal"?"WITHDRAWAL":"DEPOSIT";
+  const amountLabel=type==="withdrawal"?"AMOUNT PAID OUT":"AMOUNT RECEIVED";
+  if(!skipConfirmation && !confirm("Print the receipt for posted "+type+" "+reference+"? Verify the transaction reference and amount."))return;
   const printWindow=window.open("","_blank","width=420,height=700");
-  if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
+  if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print "+type+" receipt again.";return;}
   const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   const money=amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+" "+currency;
-  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deposit Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER DEPOSIT RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>DEPOSIT</span></div><hr class="line"><p class="label">AMOUNT RECEIVED</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${label} Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER ${label} RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>${label}</span></div><hr class="line"><p class="label">${amountLabel}</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\\/script></body></html>`);
   printWindow.document.close();
-  if(status)status.textContent="Receipt opened for printing for posted deposit "+reference+".";
+  if(status)status.textContent="Receipt opened for printing for posted "+type+" "+reference+".";
 };
 document.addEventListener("click",function(event){
   const receiptButton=event.target.closest(".transaction-print-receipt");
