@@ -144,3 +144,5 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .responsibility-card p { color:var(--text-muted); font-size:12px; line-height:1.5; margin-bottom:8px; }
 .responsibility-card ul { padding-left:18px; font-size:12px; line-height:1.7; }
 @media (max-width:700px) { .header { align-items:flex-start; } .header-tools { width:100%; } .header-control { flex:1; } .header-control select { width:100%; min-width:0; } .staff-card { grid-template-columns:64px minmax(0,1fr); gap:10px; } .staff-photo,.staff-photo-placeholder { width:64px; height:64px; } .main-container { padding:12px; } }
+
+.staff-status { display:inline-flex; align-items:center; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:700; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); }
