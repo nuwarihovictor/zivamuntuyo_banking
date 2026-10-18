@@ -32,6 +32,7 @@ body { background: var(--page-bg); color: var(--text-main); font-size: 14px; min
 .branch-state { display:inline-block; border-radius:999px; padding:4px 8px; font-size:11px; font-weight:700; white-space:nowrap; }
 .branch-state-active { color:#0c5b3c; background:#dff4e8; }
 .branch-state-inactive { color:#66501f; background:#f8edcf; }
+@media (max-width: 700px) { .nav-bar { flex-wrap: nowrap; } .nav { flex-shrink: 0; } }
 .nav { background: rgba(255,255,255,0.1); border: none; color: #a3c2b5; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .nav.active { background: rgba(255,255,255,0.22); color: #ffffff; border-bottom: 2px solid #e3bc6b; }
 
