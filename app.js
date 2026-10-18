@@ -75,7 +75,7 @@ function switchPage(pageName) {
     `;
 
     if (db) {
-      db.from("branches").select("id, branch_code, branch_name, country_id").then(async ({ data: branches, error }) => {
+      db.from("branches").select("*").then(async ({ data: branches, error }) => {
         const listEl = document.getElementById("branch-list");
         if (!listEl) return;
         if (error) {
@@ -83,11 +83,10 @@ function switchPage(pageName) {
           return;
         }
         
-        // Fetch countries separately to ensure clean mapping without join ambiguity
-        const { data: countries } = await db.from("countries").select("id, country_name, currency_code");
+        const { data: countries } = await db.from("countries").select("*");
         const countryMap = {};
         if (countries) {
-          countries.forEach(co => { countryMap[co.id] = co; });
+          countries.forEach(co => { countryMap[co.id || co.country_id] = co; });
         }
 
         if (branches && branches.length > 0) {
@@ -96,8 +95,8 @@ function switchPage(pageName) {
             return `
               <div class="list-item">
                 <div>
-                  <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
-                  <span class="muted">Country: ${esc(co.country_name || "N/A")} | Currency: ${esc(co.currency_code || "UGX")}</span>
+                  <strong>${esc(b.branch_name || b.name)} (${esc(b.branch_code || b.code)})</strong><br>
+                  <span class="muted">Country: ${esc(co.country_name || co.name || "N/A")} | Currency: ${esc(co.currency_code || "UGX")}</span>
                 </div>
                 <span class="badge-role">Operational</span>
               </div>
@@ -122,7 +121,7 @@ function switchPage(pageName) {
     `;
 
     if (db) {
-      db.from("employee_profiles").select("id, full_name, email, status, role_id, home_branch_id").then(async ({ data: staff, error }) => {
+      db.from("employee_profiles").select("*").then(async ({ data: staff, error }) => {
         const listEl = document.getElementById("staff-list");
         if (!listEl) return;
         if (error) {
@@ -131,22 +130,22 @@ function switchPage(pageName) {
         }
 
         const [rolesRes, branchRes] = await Promise.all([
-          db.from("staff_roles").select("id, role_name"),
-          db.from("branches").select("id, branch_name")
+          db.from("staff_roles").select("*"),
+          db.from("branches").select("*")
         ]);
 
         const roleMap = {};
-        if (rolesRes.data) rolesRes.data.forEach(r => { roleMap[r.id] = r.role_name; });
+        if (rolesRes.data) rolesRes.data.forEach(r => { roleMap[r.id || r.role_id] = r.role_name || r.name; });
         
         const branchMap = {};
-        if (branchRes.data) branchRes.data.forEach(b => { branchMap[b.id] = b.branch_name; });
+        if (branchRes.data) branchRes.data.forEach(b => { branchMap[b.id || b.branch_id] = b.branch_name || b.name; });
 
         if (staff && staff.length > 0) {
           listEl.innerHTML = staff.map(s => `
             <div class="list-item">
               <div>
-                <strong>${esc(s.full_name)}</strong> (${esc(s.email)})<br>
-                <span class="muted">Branch: ${esc(branchMap[s.home_branch_id] || "Central HQ")}</span>
+                <strong>${esc(s.full_name || s.name)}</strong> (${esc(s.email)})<br>
+                <span class="muted">Branch: ${esc(branchMap[s.home_branch_id || s.branch_id] || "Central HQ")}</span>
               </div>
               <span class="badge-role">${esc(roleMap[s.role_id] || "Staff")}</span>
             </div>
@@ -450,4 +449,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
-    }
+      }
