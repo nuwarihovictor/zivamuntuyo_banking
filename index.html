@@ -73,8 +73,14 @@
     const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa"; 
 
     let db = null;
-    if (window.supabase) {
-      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    try {
+      if (typeof supabase !== 'undefined' && supabase.createClient) {
+        db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      } else {
+        console.error("Supabase library not loaded correctly.");
+      }
+    } catch (err) {
+      console.error("Database initialization error:", err);
     }
 
     function esc(str) {
@@ -310,5 +316,4 @@
             <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Chairperson Name *
               <input type="text" name="chairperson" required placeholder="Chairperson Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
             </label>
-            <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Secretary Name *
-              <input type="text" name="secretary" required placeholder="Secretary Full Name" style="b
+            <label style=
