@@ -53,16 +53,26 @@ window.switchPage = function(pageName) {
          </div>
          <div id="dashboard-feedback" class="muted" aria-live="polite">Loading live accounting data…</div>
          <div id="dashboard-kpis" class="grid-2"></div>
+         <label>Chart currency <select id="dashboard-chart-currency" onchange="renderDashboardAnalyticsCharts()"></select></label>
          <div class="grid-2 dashboard-chart-grid">
            <div class="metric-card dashboard-chart-card">
-             <h3>Debits vs credits by currency</h3>
-             <p class="muted">Posted ledger totals; currencies are not combined.</p>
-             <div class="dashboard-chart-wrap"><canvas id="dashboard-debit-credit" role="img" aria-label="Bar chart comparing posted debits and credits by currency"></canvas></div>
+             <h3>Monthly transaction trend</h3>
+             <p class="muted">Number of posted deposit and withdrawal requests per month.</p>
+             <div class="dashboard-chart-wrap"><canvas id="dashboard-monthly-trend" role="img" aria-label="Line chart of monthly deposit and withdrawal counts"></canvas></div>
+           </div>
+           <div class="metric-card dashboard-chart-card">
+             <h3>Deposits versus withdrawals</h3>
+             <p class="muted">Posted transaction values over the last 12 months, for the selected currency.</p>
+             <div class="dashboard-chart-wrap"><canvas id="dashboard-deposits-withdrawals" role="img" aria-label="Bar chart comparing monthly deposit and withdrawal amounts"></canvas></div>
+           </div>
+           <div class="metric-card dashboard-chart-card">
+             <h3>Branch performance comparison</h3>
+             <p class="muted">Posted deposit and withdrawal values by branch. Branch access is enforced by the database.</p>
+             <div class="dashboard-chart-wrap"><canvas id="dashboard-branch-performance" role="img" aria-label="Bar chart comparing deposit and withdrawal values across branches"></canvas></div>
            </div>
            <div class="metric-card dashboard-chart-card">
              <h3>Ledger activity by account type</h3>
              <p class="muted">Absolute posted movement by ledger type, for the selected currency.</p>
-             <label>Chart currency <select id="dashboard-chart-currency" onchange="renderDashboardTypeChart()"></select></label>
              <div class="dashboard-chart-wrap"><canvas id="dashboard-account-types" role="img" aria-label="Doughnut chart showing posted ledger movement by account type"></canvas></div>
            </div>
          </div>
