@@ -55,6 +55,18 @@ This is the source checklist for the next coordinated release. A feature is not 
 - [ ] Test data export/backup and a documented recovery procedure.
 - [ ] Verify mobile responsive behavior and keyboard/accessibility basics.
 
+
+
+### P1 — member and account register (new)
+- [ ] Verify the spreadsheet-style customer register shows authorized CIF, legal name, NIN/passport, phone, email, address, status and registration date.
+- [ ] Verify account register shows account number, linked member, CIF, contact/address, branch, product, currency, stored balance, posted-ledger balance, reconciliation difference and status.
+- [ ] Verify search and status filters work across the full loaded dataset and the table scrolls horizontally on phone screens.
+- [ ] Verify CSV exports open correctly in Excel and Google Sheets, export only currently filtered rows, and neutralize spreadsheet-formula injection.
+- [ ] Confirm exported member/account data requires a confirmation and is handled as confidential financial information.
+- [ ] Confirm one customer may have multiple accounts and the account-to-member relationship is accurate; test with authorized sample records.
+- [ ] Verify member/account lists remain limited by Supabase row-level security and branch authorization.
+- [ ] Investigate reconciliation differences before production; stored balances must not be presented as audited balances.
+
 ## Release gates — must all pass before production
 - [ ] Static syntax workflow passes on the exact release commit.
 - [ ] SQL reviewed and applied in test; database permission tests pass.

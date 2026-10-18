@@ -309,10 +309,10 @@ window.switchPage = function(pageName) {
         </form>`
       )}
       ${panel(
-        "VERIFIED CUSTOMER DIRECTORY",
-        "Active CIF Records",
-        "List of all registered bank customers.",
-        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+        "MEMBERS & CUSTOMER REGISTER",
+        "Excel-style member directory",
+        "Search, filter and export authorized customer records. Handle NIN/passport details as confidential financial data.",
+        `<div class="register-toolbar"><label for="customer-register-search">Search members<input id="customer-register-search" type="search" placeholder="Name, CIF, phone, email, address…" oninput="window.filterCustomerRegister()"></label><label for="customer-register-status">Status<select id="customer-register-status" onchange="window.filterCustomerRegister()"><option value="">All records</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><button type="button" class="secondary" onclick="window.exportCustomerRegister()">Export visible rows to Excel (CSV)</button></div><p id="customer-register-count" class="muted" aria-live="polite">Loading member records…</p><div id="cust-list" class="table-wrap"><p class="muted">Loading customer records…</p></div><p class="register-privacy-note">Exports contain confidential member information. Store and share them only with authorized staff.</p>`
       )}
     `;
 
@@ -320,23 +320,16 @@ window.switchPage = function(pageName) {
       db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
-        if (error || !data || data.length === 0) {
-          listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
-          return;
-        }
-        listEl.innerHTML = data.map(cust => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
-            </div>
-            <span class="badge-role">${esc(cust.phone_number)}</span>
-          </div>
-        `).join("");
+        if (error) { listEl.innerHTML = `<p class="muted">Member register could not be loaded. Check your staff access and connection.</p>`; return; }
+        window.customerRegisterRows = data || [];
+        window.filterCustomerRegister();
       }).catch(() => {
         const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No customer records found yet.</p>`;
+        if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented member records from loading.</p>`;
       });
+    } else {
+      const listEl=document.getElementById("cust-list");
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No member records were loaded.</p>';
     }
   }
   else if (pageName === "Accounts") {
@@ -405,8 +398,7 @@ window.switchPage = function(pageName) {
         "BANK ACCOUNTS DIRECTORY",
         "Account status and stored balance",
         "The balance field below is the value stored on the account record; it is not independently reconciled against double-entry ledger postings. Do not use it as an audited balance until reconciliation is implemented.",
-        `<div class="notice-box">Balance integrity note: transaction requests should affect customer balances only after approved ledger posting. A stored account balance may be stale or not ledger-verified.</div>
-         <div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
+        `<div class="notice-box">Balances below distinguish stored values from posted-ledger values. A difference or missing ledger configuration must be investigated; exports are for authorized staff only.</div><div class="register-toolbar"><label for="account-register-search">Search accounts<input id="account-register-search" type="search" placeholder="Account number, member, phone, address…" oninput="window.filterAccountRegister()"></label><label for="account-register-status">Status<select id="account-register-status" onchange="window.filterAccountRegister()"><option value="">All records</option><option value="active">Active</option><option value="dormant">Dormant</option><option value="closed">Closed</option></select></label><button type="button" class="secondary" onclick="window.exportAccountRegister()">Export visible rows to Excel (CSV)</button></div><p id="account-register-count" class="muted" aria-live="polite">Loading account records…</p><div id="acc-list" class="table-wrap"><p class="muted">Loading accounts directory...</p></div><p class="register-privacy-note">Account exports include customer and balance information. Keep files secure and share only with authorized staff.</p>`
       )}
     `;
 
@@ -429,7 +421,7 @@ window.switchPage = function(pageName) {
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           const listEl = document.getElementById("acc-list");
           if (!listEl) return;
           if (error) {
@@ -437,33 +429,24 @@ window.switchPage = function(pageName) {
             return;
           }
           if (!data || data.length === 0) {
-            listEl.innerHTML = `<p class="muted">No accounts are visible for your branch access, or no accounts have been registered.</p>`;
+            window.accountRegisterRows=[];
+            window.renderAccountRegister([]);
             return;
           }
-          listEl.innerHTML = data.map(a => {
-            const stored = Number(a.stored_balance);
-            const ledger = a.ledger_balance === null || a.ledger_balance === undefined ? null : Number(a.ledger_balance);
-            const fmt = value => Number.isFinite(value)
-              ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              : "Not available";
-            const currency = (a.currency_code || "UGX").trim();
-            const reconciliation = !a.ledger_configured || ledger === null || !Number.isFinite(ledger)
-              ? '<span class="muted">Reconciliation: NOT CONFIGURED — customer liability ledger missing</span>'
-              : '<span class="muted">Difference (stored − ledger): ' + fmt(stored - ledger) + ' ' + esc(currency) + '</span>';
-            return `
-              <div class="list-item">
-                <div>
-                  <strong>${esc(a.account_number || "Account number unavailable")}</strong><br>
-                  <span class="muted">Stored balance: ${fmt(stored)} ${esc(currency)}</span><br>
-                  <span class="muted">Posted-ledger balance: ${ledger === null ? "Unavailable" : fmt(ledger)} ${esc(currency)}</span><br>
-                  ${reconciliation}<br>
-                  <span class="muted">Account UUID: ${esc(a.account_id)}</span><br>
-                  <span class="muted">Branch UUID: ${esc(a.branch_id || "Not assigned")}</span>
-                </div>
-                <span class="badge-role">${esc(a.account_status || "unknown")}</span>
-              </div>
-            `;
-          }).join("");
+          const [customersResult,branchesResult,accountDetailsResult]=await Promise.all([
+            db.from("customers").select("id,customer_number,full_name,phone_number,email,address,nin_or_passport"),
+            db.from("branches").select("id,branch_name,branch_code"),
+            db.from("bank_accounts").select("id,account_number,currency_code,balance,status,branch_id,account_holders(customer_id,customers(id,full_name,customer_number,phone_number,email,address,nin_or_passport))").limit(1000)
+          ]);
+          window.accountRegisterCustomers=customersResult.error?[]:(customersResult.data||[]);
+          window.accountRegisterBranches=branchesResult.error?[]:(branchesResult.data||[]);
+          const accountDetails=accountDetailsResult.error?[]:(accountDetailsResult.data||[]);
+          window.accountRegisterRows=data.map(row=>{
+            const detail=accountDetails.find(a=>String(a.id)===String(row.account_id))||{};
+            const holder=(detail.account_holders||[]).map(h=>h.customers).filter(Boolean);
+            return {...detail,...row,customer_id:row.customer_id||holder[0]?.id||holder[0]?.customer_id||detail.customer_id,customer_name:row.customer_name||holder.map(h=>h.full_name).filter(Boolean).join(", "),customer_number:row.customer_number||holder.map(h=>h.customer_number).filter(Boolean).join(", "),phone_number:row.phone_number||holder.map(h=>h.phone_number).filter(Boolean).join(", "),email:row.email||holder.map(h=>h.email).filter(Boolean).join(", "),address:row.address||holder.map(h=>h.address).filter(Boolean).join(" · "),account_status:row.account_status||detail.status,stored_balance:row.stored_balance??detail.balance,currency_code:row.currency_code||detail.currency_code,branch_id:row.branch_id||detail.branch_id};
+          });
+          window.renderAccountRegister(window.accountRegisterRows);
         })
         .catch(() => {
           const listEl = document.getElementById("acc-list");
@@ -2805,4 +2788,87 @@ window.attachInstitutionPayrollEvidence = async function(){
   if(error)throw error;
   if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
  }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
+
+
+// Excel-style customer and account registers. Data comes only from the signed-in user's authorized database queries.
+window.customerRegisterRows = window.customerRegisterRows || [];
+window.accountRegisterRows = window.accountRegisterRows || [];
+window.accountRegisterCustomers = window.accountRegisterCustomers || [];
+window.accountRegisterBranches = window.accountRegisterBranches || [];
+
+window.registerCsvCell = function(value) {
+  let textValue = value === null || value === undefined ? "" : String(value);
+  // Prevent spreadsheet formula execution when exporting user-controlled values.
+  if (/^[\\s]*[=+@-]/.test(textValue)) textValue = "'" + textValue;
+  return '"' + textValue.replace(/"/g, '""') + '"';
+};
+window.downloadRegisterCsv = function(filename, headers, rows) {
+  const csv = [headers, ...rows].map(row => row.map(window.registerCsvCell).join(",")).join("\\r\\n");
+  const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; link.style.display = "none";
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+window.customerRegisterView = function() {
+  const q=(document.getElementById("customer-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("customer-register-status")?.value||"").toLowerCase();
+  return (window.customerRegisterRows||[]).filter(c=>{
+    const active=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"inactive":"active";
+    const fields=[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status].join(" ").toLowerCase();
+    return (!q||fields.includes(q))&&(!status||active===status);
+  });
+};
+window.filterCustomerRegister = function() {
+  const target=document.getElementById("cust-list");if(!target)return;
+  const rows=window.customerRegisterView();
+  const count=document.getElementById("customer-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.customerRegisterRows||[]).length+" member record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No member records match the current search or filter.</p>';return;}
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Member / legal name</th><th>CIF number</th><th>NIN / Passport</th><th>Phone</th><th>Email</th><th>Address</th><th>Status</th><th>Registered</th></tr></thead><tbody>'+rows.map(c=>{
+    const status=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"Inactive":esc(c.status||"Active / registered");
+    return '<tr><td>'+esc(c.full_name||"—")+'</td><td>'+esc(c.customer_number||"—")+'</td><td>'+esc(c.nin_or_passport||"—")+'</td><td>'+esc(c.phone_number||"—")+'</td><td>'+esc(c.email||"—")+'</td><td>'+esc(c.address||"—")+'</td><td><span class="badge-role">'+status+'</span></td><td>'+esc(c.created_at?new Date(c.created_at).toLocaleDateString():"—")+'</td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportCustomerRegister = function() {
+  const rows=window.customerRegisterView();
+  if(!rows.length){alert("There are no member rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" member record(s), including confidential identification and contact information, to a CSV file that opens in Excel? Store it securely."))return;
+  window.downloadRegisterCsv("zivamuntuyo-members-"+new Date().toISOString().slice(0,10)+".csv",["Member name","CIF number","NIN or passport","Phone","Email","Address","Status","Registered"],rows.map(c=>[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status||(c.is_active===false?"Inactive":"Active / registered"),c.created_at]));
+};
+window.accountRegisterView = function() {
+  const q=(document.getElementById("account-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("account-register-status")?.value||"").toLowerCase();
+  const customers=window.accountRegisterCustomers||[],branches=window.accountRegisterBranches||[];
+  return (window.accountRegisterRows||[]).map(a=>{
+    const customer=customers.find(c=>String(c.id)===String(a.customer_id||a.customer_uuid))||null;
+    const branch=branches.find(b=>String(b.id)===String(a.branch_id))||null;
+    return {...a,_member:customer?.full_name||a.customer_name||a.full_name||"Not linked in register",_cif:customer?.customer_number||a.customer_number||"",_phone:customer?.phone_number||a.phone_number||"",_email:customer?.email||a.email||"",_address:customer?.address||a.address||"",_branch:branch?.branch_name||a.branch_name||a.branch_id||"Not assigned"};
+  }).filter(a=>{
+    const st=String(a.account_status||a.status||"unknown").toLowerCase();
+    const search=[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.account_type,a.product_type,a.currency_code,a.account_status].join(" ").toLowerCase();
+    return (!q||search.includes(q))&&(!status||st===status||((status==="active")&&st==="open"));
+  });
+};
+window.filterAccountRegister = function() {
+  const target=document.getElementById("acc-list");if(!target)return;
+  const rows=window.accountRegisterView();
+  const count=document.getElementById("account-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.accountRegisterRows||[]).length+" account record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No accounts match this search/filter, or no accounts are visible under your permissions.</p>';return;}
+  const fmt=v=>v===null||v===undefined||v===""?"Unavailable":Number.isFinite(Number(v))?Number(v).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2}):"Unavailable";
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Account number</th><th>Member</th><th>CIF</th><th>Phone</th><th>Address</th><th>Branch</th><th>Product</th><th>Currency</th><th>Stored balance</th><th>Posted-ledger balance</th><th>Reconciliation difference</th><th>Status</th></tr></thead><tbody>'+rows.map(a=>{
+    const stored=Number(a.stored_balance),ledger=a.ledger_balance===null||a.ledger_balance===undefined?null:Number(a.ledger_balance);
+    const diff=(!a.ledger_configured||ledger===null||!Number.isFinite(ledger)||!Number.isFinite(stored))?"Not configured":fmt(stored-ledger);
+    return '<tr><td>'+esc(a.account_number||"Unavailable")+'</td><td>'+esc(a._member)+'</td><td>'+esc(a._cif||"—")+'</td><td>'+esc(a._phone||"—")+'</td><td>'+esc(a._address||"—")+'</td><td>'+esc(a._branch)+'</td><td>'+esc(a.product_type||a.account_type||a.account_type_name||"—")+'</td><td>'+esc(a.currency_code||"UGX")+'</td><td>'+fmt(a.stored_balance)+'</td><td>'+fmt(a.ledger_balance)+'</td><td>'+diff+'</td><td><span class="badge-role">'+esc(a.account_status||a.status||"unknown")+'</span></td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportAccountRegister = function() {
+  const rows=window.accountRegisterView();
+  if(!rows.length){alert("There are no account rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" account record(s), including customer contact/address details and balances, to an Excel-compatible CSV? Store it securely."))return;
+  const fmt=v=>v===null||v===undefined?"":v;
+  window.downloadRegisterCsv("zivamuntuyo-accounts-"+new Date().toISOString().slice(0,10)+".csv",["Account number","Member name","CIF number","Phone","Email","Address","Branch","Product","Currency","Stored balance","Posted-ledger balance","Account status","Account UUID","Branch UUID"],rows.map(a=>[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.product_type||a.account_type||a.account_type_name,a.currency_code,fmt(a.stored_balance),fmt(a.ledger_balance),a.account_status||a.status,a.account_id,a.branch_id]));
 };
