@@ -606,9 +606,9 @@ window.loadAttendancePolicy();
           <div class="form-grid">
             <label>Requested amount *<input type="number" name="requested_amount" min="0.01" step="0.01" required></label>
             <label>Currency *<select name="currency_code" id="loan-currency-select" required><option value="">Loading currencies…</option></select></label>
-            <label>Loan product *<select name="loan_type" id="loan-type-select" onchange="updateSelectedLoanRate()" required><option value="">Loading loan products…</option></select></label><div class="loan-rate-notice" id="loan-rate-notice" aria-live="polite">The approved product rate will be applied automatically.</div>
-            <label>Tenure (months) *<input type="number" name="tenure_months" min="1" max="360" step="1" value="12" required></label>
+            <label>Loan product *<select name="loan_type" id="loan-type-select" onchange="updateSelectedLoanRate()" required><option value="">Loading loan products…</option></select></label><label>Tenure (months) *<input type="number" name="tenure_months" min="1" max="360" step="1" value="12" required></label>
           </div>
+          <div class="loan-rate-notice" id="loan-rate-notice" aria-live="polite">The approved product rate will be applied automatically.</div>
           <label>Loan purpose *<textarea name="loan_purpose" rows="3" minlength="3" maxlength="2000" required placeholder="Explain how the funds will be used"></textarea></label>
           <label>Collateral / land title details<textarea name="collateral_description" rows="2" maxlength="2000" placeholder="Describe collateral if applicable"></textarea></label>
           <div class="form-grid">
