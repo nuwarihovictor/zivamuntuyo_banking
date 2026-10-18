@@ -45,3 +45,11 @@ This plan coordinates the open draft pull requests. It is not a claim that the a
 
 ## Current status
 The new member/account register code passes the JavaScript syntax check and the GitHub Actions static validation workflow on its latest tested commit. This does not replace live database, browser, privacy, financial, or printer tests. No Vercel deployment or production database migration is claimed.
+
+
+## New requirement — National ID and account eligibility
+- [ ] Use one normalized NIN/passport identity per customer/CIF; reuse the existing customer profile for joint accounts.
+- [ ] Review duplicate-identity preflight results before enabling the normalized unique index; resolve any collisions with an auditable KYC review.
+- [ ] Enforce the requested one-individual-account-per-person rule inside the authoritative account-opening database RPC, while permitting valid joint accounts. Do not rely on browser-only checks.
+- [ ] Confirm how pending, active, dormant, frozen, rejected and closed accounts affect eligibility, then test concurrency and bypass attempts.
+- Policy/design: `docs/national-id-and-account-opening-policy.md`; SQL preflight draft: `supabase/sql/customer_identity_uniqueness_preflight.sql`.

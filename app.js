@@ -1273,28 +1273,61 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loaded " + rows.length + " active ledger account(s) using posted journals only. Figures are grouped by currency.";
 };
 
+window.normalizeCustomerIdentity = function(value) {
+  return String(value || "").normalize("NFKC").trim().toUpperCase().replace(/[\\s-]+/g, "");
+};
+
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  if (feedback) feedback.textContent = "Registering customer KYC profile...";
+  if (!db) { if (feedback) feedback.textContent = "Database connection unavailable. No customer was registered."; return; }
+  if (feedback) feedback.textContent = "Checking identity uniqueness before registration…";
 
   const formData = new FormData(form);
+  const identity = window.normalizeCustomerIdentity(formData.get("nin_or_passport"));
+  const fullName = String(formData.get("full_name") || "").trim().replace(/\\s+/g, " ");
+  if (!identity || identity.length < 5) {
+    if (feedback) feedback.textContent = "Enter a valid National ID (NIN) or passport number. The identifier is required.";
+    return;
+  }
+  if (!fullName) { if (feedback) feedback.textContent = "Enter the customer's full legal name."; return; }
+
+  // UX pre-check only. The database's normalized unique index is the authoritative
+  // protection against duplicate identities and concurrent registration attempts.
+  const { data: existing, error: lookupError } = await db.from("customers")
+    .select("id,customer_number,full_name,nin_or_passport")
+    .limit(10000);
+  if (lookupError) {
+    if (feedback) feedback.textContent = "Identity check failed. Registration was stopped; check database access and try again.";
+    return;
+  }
+  const duplicate = (existing || []).find(row =>
+    window.normalizeCustomerIdentity(row.nin_or_passport) === identity
+  );
+  if (duplicate) {
+    if (feedback) feedback.textContent = "This National ID/passport is already registered to an existing customer. Do not create a second customer profile; verify the existing record and use it for eligible joint accounts.";
+    return;
+  }
+
   const payload = {
     customer_number: "CUST-" + Math.floor(100000 + Math.random() * 900000),
-    full_name: formData.get("full_name"),
-    nin_or_passport: formData.get("nin_or_passport"),
-    phone_number: formData.get("phone_number"),
-    email: formData.get("email"),
-    address: formData.get("address"),
+    full_name: fullName,
+    nin_or_passport: identity,
+    phone_number: String(formData.get("phone_number") || "").trim(),
+    email: String(formData.get("email") || "").trim() || null,
+    address: String(formData.get("address") || "").trim(),
     status: "active"
   };
 
   const { error } = await db.from("customers").insert([payload]);
   if (error) {
-    if (feedback) feedback.textContent = "Registration failed: " + error.message;
+    const message = /unique|duplicate|customers_identity_normalized_uidx/i.test(error.message || "")
+      ? "This National ID/passport is already registered. Search for the existing customer instead of creating another profile."
+      : "Registration failed. Check the required fields, your permissions and the database connection.";
+    if (feedback) feedback.textContent = message;
   } else {
-    if (feedback) feedback.textContent = "Customer successfully registered!";
+    if (feedback) feedback.textContent = "Customer registered. Use this same customer profile for individual and any eligible joint account relationships.";
     form.reset();
     setTimeout(() => window.switchPage("Customers"), 1000);
   }
@@ -1312,7 +1345,7 @@ window.searchAccountOpeningCustomers = async function(input) {
   if(!db){results.textContent="Database connection unavailable.";return;}
   results.textContent="Searching customers you can access…";
   try{
-    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").ilike("full_name","%"+term.replace(/[%_]/g,"\\window.handleAccountSubmit = async function(e) {")+"%").limit(10);
+    const safeTerm=term.replace(/[\\%_]/g, "\\$&");
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     const rows=(data||[]).filter(row=>["active","approved"].includes(String(row.status||"").toLowerCase()));
     if(!rows.length){results.textContent="No matching active or approved customer found in records you can access.";return;}
@@ -1483,7 +1516,7 @@ window.searchLoanCustomers = async function(input) {
   results.textContent="Searching customers available to your staff account…";
   try{
     const safe=term.replace(/[,%_]/g," ");
-    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safe+"%,customer_number.ilike.%"+safe+"%").in("status",["active","approved"]).limit(12);
+    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safeTerm+"%,customer_number.ilike.%"+safeTerm+"%").limit(10);
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     if(!data?.length){results.textContent="No active or approved matching customers found.";return;}
     results.innerHTML=data.map((x,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(x.full_name||"Customer")+'</strong><span>'+esc(x.customer_number||"No customer number")+'</span><small>'+esc(x.phone_number||"")+'</small></button>').join("");
