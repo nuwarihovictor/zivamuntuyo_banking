@@ -2038,6 +2038,7 @@ let appNavigationInitialized = false;
 let authenticatedUiVisible = false;
 let pendingBranchOpen = null;
 let activeBranchContext = null;
+let bankWideLoginRequested = false;
 
 function showLoginScreen(message) {
   authenticatedUiVisible = false;
@@ -2055,6 +2056,13 @@ function showLoginScreen(message) {
   if (user) user.textContent = "Signed out";
   const feedback = document.getElementById("login-feedback");
   if (feedback && message) feedback.textContent = message;
+  const branchDirectory = document.getElementById("branch-entry-directory");
+  const loginCard = document.getElementById("staff-login-card");
+  const showLogin = Boolean(pendingBranchOpen || bankWideLoginRequested);
+  if (branchDirectory) branchDirectory.hidden = showLogin;
+  if (loginCard) loginCard.hidden = !showLogin;
+  const branchFeedback = document.getElementById("branch-entry-feedback");
+  if (branchFeedback && message && !showLogin) branchFeedback.textContent = message;
 }
 
 function showAuthenticatedWorkspace() {
@@ -2101,10 +2109,66 @@ function showAuthenticatedWorkspace() {
 window.openBranchWorkspace = function(branchId, branchName) {
   if (!branchId || !branchName) return;
   pendingBranchOpen = { id: branchId, name: branchName };
+  bankWideLoginRequested = false;
   activeBranchContext = null;
   showLoginScreen("Sign in with your staff email and password to open " + branchName + ".");
   const email = document.getElementById("login-email");
   if (email) email.focus();
+};
+
+window.openBankWideStaffLogin = function() {
+  pendingBranchOpen = null;
+  bankWideLoginRequested = true;
+  showLoginScreen("Bank-wide sign-in is for staff whose role permits central administration.");
+  const email = document.getElementById("login-email");
+  if (email) email.focus();
+};
+
+window.returnToBranchDirectory = function() {
+  pendingBranchOpen = null;
+  bankWideLoginRequested = false;
+  showLoginScreen("");
+};
+
+window.loadPublicBranchDirectory = async function() {
+  const list = document.getElementById("branch-entry-list");
+  const feedback = document.getElementById("branch-entry-feedback");
+  if (!list) return;
+  try {
+    if (!db) throw new Error("Secure database connection is unavailable.");
+    const { data, error } = await db.from("branch_directory_public")
+      .select("id,branch_code,branch_name,is_head_office")
+      .order("is_head_office", { ascending: false })
+      .order("branch_name", { ascending: true });
+    if (error) throw error;
+    list.replaceChildren();
+    if (!data || !data.length) {
+      list.textContent = "No active branches are published. Contact the system administrator.";
+      return;
+    }
+    data.forEach(branch => {
+      const row = document.createElement("div");
+      row.className = "list-item branch-entry-row";
+      const info = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = branch.branch_name + " (" + branch.branch_code + ")";
+      const type = document.createElement("div");
+      type.className = "muted";
+      type.textContent = branch.is_head_office ? "Main Branch · Head Office" : "Branch office";
+      info.append(name, type);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "primary";
+      button.textContent = "Open";
+      button.addEventListener("click", () => window.openBranchWorkspace(branch.id, branch.branch_name));
+      row.append(info, button);
+      list.append(row);
+    });
+    if (feedback) feedback.textContent = "";
+  } catch (error) {
+    list.textContent = "Branch directory could not be loaded. Check your connection or contact the system administrator.";
+    if (feedback) feedback.textContent = error?.message || "Could not load branch directory.";
+  }
 };
 
 async function handleStaffLogin(event) {
@@ -2128,7 +2192,6 @@ async function handleStaffLogin(event) {
       if (accessError) throw accessError;
       if (allowed !== true) {
         await db.auth.signOut();
-        pendingBranchOpen = null;
         throw new Error("Your staff account is not authorized to open " + requestedBranch.name + ". Contact the system administrator if you need access.");
       }
       activeBranchContext = requestedBranch;
@@ -2147,6 +2210,7 @@ async function handleStaffSignOut() {
   if (!db) return;
   pendingBranchOpen = null;
   activeBranchContext = null;
+  bankWideLoginRequested = false;
   document.getElementById("branch-context-banner")?.remove();
   const button = document.getElementById("sign-out-button");
   if (button) button.disabled = true;
@@ -2165,10 +2229,13 @@ function initApp() {
   initAppearanceControls();
   const loginForm = document.getElementById("login-form");
   if (loginForm) loginForm.addEventListener("submit", handleStaffLogin);
+  document.getElementById("bank-wide-login-button")?.addEventListener("click", window.openBankWideStaffLogin);
+  document.getElementById("back-to-branch-directory")?.addEventListener("click", window.returnToBranchDirectory);
   const signOutButton = document.getElementById("sign-out-button");
   if (signOutButton) signOutButton.addEventListener("click", handleStaffSignOut);
   if (!db) { showLoginScreen("Secure database connection is unavailable. Contact the system administrator."); return; }
   showLoginScreen("");
+  window.loadPublicBranchDirectory();
   db.auth.getSession().then(({ data, error }) => {
     if (error) showLoginScreen("Could not verify the saved session. Please sign in again.");
     else if (data?.session) showAuthenticatedWorkspace();
