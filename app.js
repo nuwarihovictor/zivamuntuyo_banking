@@ -593,25 +593,43 @@ window.loadAttendancePolicy();
     c.innerHTML = `
       <span class="category-tag">Credit operations</span>
       <h2 class="page-heading">Loans & Credit</h2>
-      <p class="muted">Attach and manage supporting evidence for existing loan records. Loan approval, disbursement, and repayment workflows are not replaced by this document-upload panel.</p>
-            ${panel(
-              "LOAN APPLICATION DOCUMENTS",
-              "Attach borrower and collateral evidence",
-              "Upload documents to an existing loan record. Examples: scanned IDs, land titles, chairperson letters, guarantor IDs, proof of income and valuation reports. Files are private and access is limited by staff branch permissions.",
-              `<form id="loan-document-form" onsubmit="handleLoanDocumentUpload(event)">
-                <label>Loan record UUID *<input type="text" name="loan_id" required placeholder="Paste the existing loan UUID"></label>
-                <label>Document category *
-                  <select name="document_category" required>
-                    <option value="national-id">Borrower national ID</option><option value="passport">Passport</option><option value="land-title">Land title / collateral ownership</option><option value="chairperson-letter">LC / chairperson letter</option><option value="guarantor-id">Guarantor identification</option><option value="income-proof">Proof of income / business</option><option value="valuation-report">Collateral valuation report</option><option value="other">Other supporting document</option>
-                  </select>
-                </label>
-                <label>Scanned documents *<input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required></label>
-                <p class="muted">PDF, JPG or PNG; maximum 10 MB per file. Use an existing loan UUID and only upload documents you are authorized to handle.</p>
-                <button type="submit" class="primary">Upload loan documents</button>
-                <p id="loan-document-feedback" class="muted" aria-live="polite"></p>
-              </form>`
-            )}
+      <p class="muted">Register a loan application, attach evidence, and track independent review decisions. Approval here records a credit decision; it does not disburse funds or create a posted loan ledger.</p>
+      ${panel("NEW LOAN APPLICATION","Capture request and supporting evidence","Use an active customer and the branch responsible for the application. Attach ID, land title, chairperson letter and other supporting documents.",`
+        <form id="loan-application-form" onsubmit="handleLoanApplicationSubmit(event)">
+          <label>Customer *
+            <input type="search" id="loan-customer-search" autocomplete="off" placeholder="Search customer name or number" oninput="searchLoanCustomers(this)" required>
+            <input type="hidden" name="customer_id" required>
+            <div id="loan-customer-results" class="account-search-results" role="listbox"></div>
+            <p id="loan-customer-selected" class="muted">Choose a customer from the results.</p>
+          </label>
+          <label>Branch *<select name="branch_id" id="loan-branch-select" required><option value="">Loading active branches…</option></select></label>
+          <div class="form-grid">
+            <label>Requested amount *<input type="number" name="requested_amount" min="0.01" step="0.01" required></label>
+            <label>Currency *<select name="currency_code" id="loan-currency-select" required><option value="">Loading currencies…</option></select></label>
+            <label>Annual interest (%) *<input type="number" name="interest_rate_annual" min="0" max="100" step="0.01" value="18" required></label>
+            <label>Tenure (months) *<input type="number" name="tenure_months" min="1" max="360" step="1" value="12" required></label>
+          </div>
+          <label>Loan purpose *<textarea name="loan_purpose" rows="3" minlength="3" maxlength="2000" required placeholder="Explain how the funds will be used"></textarea></label>
+          <label>Collateral / land title details<textarea name="collateral_description" rows="2" maxlength="2000" placeholder="Describe collateral if applicable"></textarea></label>
+          <div class="form-grid">
+            <label>Guarantor name<input name="guarantor_name" maxlength="200"></label>
+            <label>Guarantor phone<input name="guarantor_phone" maxlength="40" inputmode="tel"></label>
+          </div>
+          <label>Scanned supporting documents (optional)
+            <input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple>
+          </label>
+          <p class="muted">PDF, JPG or PNG, up to 10 MB each. Files are stored privately and branch-scoped.</p>
+          <button type="submit" class="primary">Submit loan application</button>
+          <p id="loan-application-feedback" class="muted" aria-live="polite"></p>
+        </form>
+      `)}
+      <section class="loan-applications-section">
+        <div class="section-heading-row"><div><h3>Loan application register</h3><p class="muted">Real applications from the database; no sample figures.</p></div><button type="button" class="secondary" onclick="loadLoanApplications()">Refresh</button></div>
+        <div id="loan-application-list" class="loan-application-list">Loading authorized loan applications…</div>
+      </section>
     `;
+    window.loadLoanApplicationFormOptions();
+    window.loadLoanApplications();
   }
   else if (pageName === "Approvals") {
     c.innerHTML = `
@@ -1117,7 +1135,7 @@ window.handleAccountSubmit = async function(e) {
 
 window.uploadApplicationDocuments = async function(kind,recordId,files,category) {
   if(!db)return {ok:false,error:"Database connection unavailable."};
-  if(!["loans","account-opening"].includes(kind))return {ok:false,error:"Unsupported document destination."};
+  if(!["loans","loan-applications","account-opening"].includes(kind))return {ok:false,error:"Unsupported document destination."};
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId))return {ok:false,error:"Invalid record UUID."};
   const allowed=["application/pdf","image/jpeg","image/png"];
   for(const file of files){
@@ -1132,6 +1150,120 @@ window.uploadApplicationDocuments = async function(kind,recordId,files,category)
     count++;
   }
   return {ok:true,count};
+};
+
+window.loadLoanApplicationFormOptions = async function() {
+  if(!db)return;
+  const branchSelect=document.getElementById("loan-branch-select"),currencySelect=document.getElementById("loan-currency-select");
+  try{
+    const [branches,currencies]=await Promise.all([
+      db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
+      db.from("currencies").select("code").order("code")
+    ]);
+    if(branchSelect){
+      if(branches.error)branchSelect.innerHTML='<option value="">Branches unavailable</option>';
+      else branchSelect.innerHTML='<option value="">Choose branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
+    }
+    if(currencySelect){
+      if(currencies.error)currencySelect.innerHTML='<option value="">Currencies unavailable</option>';
+      else currencySelect.innerHTML='<option value="">Choose currency</option>'+(currencies.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
+    }
+  }catch(e){if(branchSelect)branchSelect.innerHTML='<option value="">Unable to load branches</option>';if(currencySelect)currencySelect.innerHTML='<option value="">Unable to load currencies</option>';}
+};
+
+window.searchLoanCustomers = async function(input) {
+  const results=document.getElementById("loan-customer-results"),hidden=document.querySelector('#loan-application-form input[name="customer_id"]'),summary=document.getElementById("loan-customer-selected");
+  if(!results||!hidden)return;
+  hidden.value="";
+  if(summary)summary.textContent="Choose a customer from the results.";
+  const term=String(input.value||"").trim();
+  if(term.length<2){results.textContent=term?"Type at least 2 characters.":"";return;}
+  if(!db){results.textContent="Database connection unavailable.";return;}
+  results.textContent="Searching customers available to your staff account…";
+  try{
+    const safe=term.replace(/[,%_]/g," ");
+    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safe+"%,customer_number.ilike.%"+safe+"%").in("status",["active","approved"]).limit(12);
+    if(error){results.textContent="Customer search unavailable: "+error.message;return;}
+    if(!data?.length){results.textContent="No active or approved matching customers found.";return;}
+    results.innerHTML=data.map((x,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(x.full_name||"Customer")+'</strong><span>'+esc(x.customer_number||"No customer number")+'</span><small>'+esc(x.phone_number||"")+'</small></button>').join("");
+    results.querySelectorAll(".account-search-option").forEach((btn,i)=>btn.addEventListener("click",()=>{
+      const x=data[i];hidden.value=x.id;input.value=(x.full_name||"Customer")+" · "+(x.customer_number||"");
+      results.innerHTML="";if(summary)summary.textContent="Selected "+(x.full_name||"customer")+". The server rechecks eligibility.";
+    }));
+  }catch(e){results.textContent="Customer search failed. Check your connection.";}
+};
+
+window.handleLoanApplicationSubmit = async function(e) {
+  e.preventDefault();
+  const form=e.target,feedback=document.getElementById("loan-application-feedback"),button=form.querySelector('button[type="submit"]');
+  const fd=new FormData(form),files=Array.from(form.querySelector('input[name="loan_documents"]')?.files||[]);
+  const customerId=String(fd.get("customer_id")||"");
+  if(!customerId){if(feedback)feedback.textContent="Select a customer from the search results.";return;}
+  if(!db){if(feedback)feedback.textContent="Database connection unavailable.";return;}
+  if(button)button.disabled=true;if(feedback)feedback.textContent="Submitting application…";
+  try{
+    const {data,error}=await db.rpc("create_loan_application",{
+      p_customer_id:customerId,p_branch_id:String(fd.get("branch_id")||""),p_requested_amount:Number(fd.get("requested_amount")),
+      p_currency_code:String(fd.get("currency_code")||""),p_interest_rate_annual:Number(fd.get("interest_rate_annual")),
+      p_tenure_months:Number(fd.get("tenure_months")),p_loan_purpose:String(fd.get("loan_purpose")||""),
+      p_collateral_description:String(fd.get("collateral_description")||""),p_guarantor_name:String(fd.get("guarantor_name")||""),p_guarantor_phone:String(fd.get("guarantor_phone")||"")
+    });
+    if(error)throw error;
+    const result=Array.isArray(data)?data[0]:data;
+    let docsText="";
+    if(files.length){
+      const uploaded=await window.uploadApplicationDocuments("loan-applications",result.id,files,String(fd.get("document_category")||"supporting"));
+      docsText=uploaded.ok?" "+uploaded.count+" document(s) uploaded.":" WARNING: application created but document upload failed: "+uploaded.error;
+    }
+    if(feedback)feedback.textContent="Application "+result.application_number+" submitted with status "+result.status+"."+docsText;
+    form.reset();
+    const hidden=form.querySelector('input[name="customer_id"]');if(hidden)hidden.value="";
+    await window.loadLoanApplications();
+  }catch(err){if(feedback)feedback.textContent="Loan application failed: "+(err?.message||"Unexpected error");}
+  finally{if(button)button.disabled=false;}
+};
+
+window.loadLoanApplications = async function() {
+  const host=document.getElementById("loan-application-list");if(!host||!db)return;
+  host.textContent="Loading authorized loan applications…";
+  try{
+    const {data,error}=await db.rpc("list_loan_applications",{p_branch_id:null});
+    if(error)throw error;
+    if(!data?.length){host.innerHTML='<p class="muted">No loan applications are available to your account yet.</p>';return;}
+    host.innerHTML=data.map((x,i)=>{
+      const final=["approved","rejected","cancelled"].includes(x.status);
+      return '<article class="loan-application-card"><div class="loan-card-top"><div><strong>'+esc(x.application_number)+'</strong><p>'+esc(x.customer_name||"Customer")+' · '+esc(x.branch_name||"Branch")+'</p></div><span class="loan-status status-'+esc(x.status)+'">'+esc(String(x.status).replaceAll("_"," "))+'</span></div><div class="loan-card-amount">'+esc(x.currency_code)+' '+Number(x.requested_amount).toLocaleString(undefined,{maximumFractionDigits:2})+'</div><p>'+esc(x.tenure_months)+' months · '+esc(x.interest_rate_annual)+'% annual</p><p>'+esc(x.loan_purpose||"")+'</p>'+(x.collateral_description?'<p><strong>Collateral:</strong> '+esc(x.collateral_description)+'</p>':"")+(x.review_note?'<p><strong>Review note:</strong> '+esc(x.review_note)+'</p>':"")+
+      '<form class="loan-document-inline" onsubmit="handleLoanApplicationDocumentUpload(event)" data-application-id="'+esc(x.id)+'"><label>Attach ID, land title, chairperson letter or other evidence<select name="document_category"><option value="national-id">National ID</option><option value="passport">Passport</option><option value="land-title">Land title</option><option value="chairperson-letter">Chairperson letter</option><option value="guarantor-id">Guarantor ID</option><option value="income-proof">Income proof</option><option value="valuation-report">Valuation report</option><option value="other">Other</option></select></label><input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required><button type="submit" class="secondary">Upload documents</button><p class="muted" aria-live="polite"></p></form>'+
+      (final?"":'<form class="loan-review-form" onsubmit="handleLoanApplicationReview(event)" data-application-id="'+esc(x.id)+'"><label>Review decision<select name="decision"><option value="under_review">Move to review</option><option value="more_information_required">Request more information</option><option value="approved">Approve application</option><option value="rejected">Reject application</option></select></label><label>Review note<textarea name="review_note" rows="2" maxlength="2000" placeholder="Reason, conditions or missing documents"></textarea></label><button type="submit" class="primary">Save review decision</button><p class="muted" aria-live="polite"></p></form>')+
+      '</article>';
+    }).join("");
+  }catch(err){host.textContent="Unable to load loan applications: "+(err?.message||"Check role and branch access.");}
+};
+
+window.handleLoanApplicationDocumentUpload = async function(e) {
+  e.preventDefault();const form=e.target,feedback=form.querySelector("p"),button=form.querySelector('button[type="submit"]');
+  const files=Array.from(form.querySelector('input[name="loan_documents"]')?.files||[]);
+  if(!files.length){if(feedback)feedback.textContent="Choose at least one document.";return;}
+  if(button)button.disabled=true;if(feedback)feedback.textContent="Uploading privately…";
+  try{
+    const result=await window.uploadApplicationDocuments("loan-applications",form.dataset.applicationId,files,String(new FormData(form).get("document_category")||"other"));
+    if(feedback)feedback.textContent=result.ok?"Uploaded "+result.count+" document(s).":"Upload failed: "+result.error;
+    if(result.ok)form.reset();
+  }catch(err){if(feedback)feedback.textContent="Upload failed: "+(err?.message||"Unexpected error");}
+  finally{if(button)button.disabled=false;}
+};
+
+window.handleLoanApplicationReview = async function(e) {
+  e.preventDefault();const form=e.target,feedback=form.querySelector("p"),button=form.querySelector('button[type="submit"]'),fd=new FormData(form);
+  if(!db)return;
+  if(button)button.disabled=true;if(feedback)feedback.textContent="Saving review…";
+  try{
+    const {data,error}=await db.rpc("review_loan_application",{p_application_id:form.dataset.applicationId,p_decision:String(fd.get("decision")||""),p_review_note:String(fd.get("review_note")||"")});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Review saved: "+(data?.status||String(fd.get("decision")));
+    await window.loadLoanApplications();
+  }catch(err){if(feedback)feedback.textContent="Review failed: "+(err?.message||"Unexpected error");}
+  finally{if(button)button.disabled=false;}
 };
 
 window.handleLoanDocumentUpload = async function(e) {
