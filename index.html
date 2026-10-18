@@ -21,10 +21,28 @@
         <p>COMMERCIAL CORE BANKING</p>
       </div>
     </div>
-    <div class="header-tools"><div id="signed-in-user" class="signed-in-user">Zivamuntuyo Staff</div></div>
+    <div class="header-tools"><div id="signed-in-user" class="signed-in-user">Signed out</div><button id="sign-out-button" type="button" class="secondary sign-out-button" hidden>Sign out</button></div>
   </header>
 
-  <div class="nav-bar">
+  <section id="login-screen" class="login-screen" aria-labelledby="login-title" hidden>
+    <div class="login-card">
+      <div class="login-brand-mark">Z</div>
+      <p class="login-eyebrow">SECURE STAFF ACCESS</p>
+      <h2 id="login-title">Sign in to Zivamuntuyo</h2>
+      <p class="login-description">Use the staff email and password issued by your system administrator. Public registration is disabled.</p>
+      <form id="login-form" class="login-form">
+        <label for="login-email">Staff email</label>
+        <input id="login-email" name="email" type="email" autocomplete="username" maxlength="254" required placeholder="name@institution.org">
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        <button id="login-submit" type="submit" class="primary">Sign in securely</button>
+        <p id="login-feedback" class="login-feedback" role="status" aria-live="polite"></p>
+      </form>
+      <p class="login-security-note">Access is controlled by your assigned bank role and branch permissions. Never share your password.</p>
+    </div>
+  </section>
+
+  <div class="nav-bar" hidden>
     <button class="nav active" data-page="Dashboard">📊 Dashboard</button>
     <button class="nav" data-page="Branches">🏛️ Branches</button>
     <button class="nav" data-page="Staff">👥 Staff & People</button>
@@ -43,14 +61,14 @@
     <button class="nav" data-page="Settings">⚙️ Settings</button>
   </div>
 
-  <main id="main-content" class="main-container">
+  <main id="main-content" class="main-container" hidden>
     <div class="panel">
       <h2>Loading Core System...</h2>
       <p class="muted">Establishing secure session...</p>
     </div>
   </main>
 
-  <footer class="footer">
+  <footer class="footer" hidden>
     <p><strong>Zivamuntuyo Financial Services Ltd</strong></p>
     <p>Tier-1 Core Banking System — Secure Staging Environment</p>
   </footer>
