@@ -615,6 +615,40 @@ window.loadAttendancePolicy();
     `;
     window.loadTrialBalance();
   }
+  else if (pageName === "Settings") {
+    c.innerHTML = `
+      <span class="category-tag">Personalize your workspace</span>
+      <h2 class="page-heading">Settings</h2>
+      ${panel("APPEARANCE & DISPLAY","Themes and fonts","Choose how the banking workspace looks on this device. Your preferences are saved locally and do not change financial data or other users' settings.",`
+        <div class="settings-section">
+          <div class="settings-section-heading"><span class="settings-icon">🎨</span><div><h3>Colour theme</h3><p class="muted">Seven carefully chosen themes for different working preferences.</p></div></div>
+          <label for="theme-picker">Application theme</label>
+          <select id="theme-picker" aria-label="Choose color theme">
+            <option value="emerald">Emerald & Gold</option><option value="ocean">Ocean Blue</option><option value="midnight">Midnight</option><option value="light">Classic Light</option><option value="violet">Royal Violet</option><option value="teal">Teal</option><option value="burgundy">Burgundy</option>
+          </select>
+          <div class="theme-swatches">
+            <button type="button" class="theme-swatch" data-theme-choice="emerald"><span class="swatch-colors emerald-swatches"></span><strong>Emerald & Gold</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="ocean"><span class="swatch-colors ocean-swatches"></span><strong>Ocean Blue</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="midnight"><span class="swatch-colors midnight-swatches"></span><strong>Midnight</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="light"><span class="swatch-colors light-swatches"></span><strong>Classic Light</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="violet"><span class="swatch-colors violet-swatches"></span><strong>Royal Violet</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="teal"><span class="swatch-colors teal-swatches"></span><strong>Teal</strong></button>
+            <button type="button" class="theme-swatch" data-theme-choice="burgundy"><span class="swatch-colors burgundy-swatches"></span><strong>Burgundy</strong></button>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-section-heading"><span class="settings-icon">🔤</span><div><h3>Font family</h3><p class="muted">Choose from 25 readable fonts. This preference applies across the application.</p></div></div>
+          <label for="font-picker">Application font</label>
+          <select id="font-picker" aria-label="Choose font family">${ZFS_FONTS.map(font => `<option value="${esc(font)}">${esc(font)}</option>`).join("")}</select>
+          <div class="font-preview" id="font-preview"><strong>Preview: Zivamuntuyo Financial Services</strong><p>Account statement · Customer service · UGX 125,000.00</p><span>The quick brown fox jumps over the lazy dog. 0123456789</span></div>
+          <div class="settings-actions"><button type="button" class="secondary" id="reset-appearance">Reset appearance</button><span class="muted" id="appearance-feedback" aria-live="polite">Preferences are stored on this device.</span></div>
+        </div>`
+      )}
+      ${panel("APPLICATION INFORMATION","System environment","Use this section to confirm the product identity and key environment details.",`
+        <div class="settings-info-grid"><div class="settings-info"><small>Organization</small><strong>Zivamuntuyo Financial Services Ltd</strong></div><div class="settings-info"><small>Timezone</small><strong>Africa/Kampala</strong></div><div class="settings-info"><small>Branch network</small><strong>Butare, Ntungamo, Rukungiri, Rubirizi and Mitooma</strong></div><div class="settings-info"><small>Preferences</small><strong>Device-local appearance settings</strong></div></div>
+      `)}
+    `;
+    initAppearanceControls();
+  }
   else if (pageName === "Reports") {
     c.innerHTML = `
       <span class="category-tag">Live ledger reports</span>
@@ -1278,8 +1312,38 @@ function initAppearanceControls() {
   applyAppearance();
   const themePicker=document.getElementById("theme-picker");
   const fontPicker=document.getElementById("font-picker");
-  if(themePicker)themePicker.addEventListener("change",()=>{document.body.dataset.theme=themePicker.value;try{localStorage.setItem("zfs-theme",themePicker.value);}catch(e){}});
-  if(fontPicker)fontPicker.addEventListener("change",()=>{document.documentElement.style.setProperty("--font-family",'"'+fontPicker.value+'", sans-serif');try{localStorage.setItem("zfs-font",fontPicker.value);}catch(e){}});
+  if(themePicker){
+    themePicker.value=document.body.dataset.theme||"emerald";
+    themePicker.onchange=()=>applySelectedTheme(themePicker.value);
+  }
+  if(fontPicker){
+    fontPicker.value=(document.documentElement.style.getPropertyValue("--font-family").match(/"([^"]+)"/)||[])[1]||"Inter";
+    fontPicker.onchange=()=>applySelectedFont(fontPicker.value);
+  }
+  document.querySelectorAll("[data-theme-choice]").forEach(btn=>{
+    btn.onclick=()=>{if(themePicker)themePicker.value=btn.dataset.themeChoice;applySelectedTheme(btn.dataset.themeChoice);};
+  });
+  const reset=document.getElementById("reset-appearance");
+  if(reset)reset.onclick=()=>{
+    applySelectedTheme("emerald");applySelectedFont("Inter");
+    if(themePicker)themePicker.value="emerald";if(fontPicker)fontPicker.value="Inter";
+    const feedback=document.getElementById("appearance-feedback");if(feedback)feedback.textContent="Appearance reset to Emerald & Gold and Inter.";
+  };
+}
+function applySelectedTheme(theme){
+  const valid=["emerald","ocean","midnight","light","violet","teal","burgundy"];
+  if(!valid.includes(theme))return;
+  document.body.dataset.theme=theme;
+  try{localStorage.setItem("zfs-theme",theme);}catch(e){}
+  const picker=document.getElementById("theme-picker");if(picker)picker.value=theme;
+  const feedback=document.getElementById("appearance-feedback");if(feedback)feedback.textContent="Theme saved on this device.";
+}
+function applySelectedFont(font){
+  if(!ZFS_FONTS.includes(font))return;
+  document.documentElement.style.setProperty("--font-family",'"'+font+'", sans-serif');
+  try{localStorage.setItem("zfs-font",font);}catch(e){}
+  const preview=document.getElementById("font-preview");if(preview)preview.style.fontFamily='"'+font+'", sans-serif';
+  const feedback=document.getElementById("appearance-feedback");if(feedback)feedback.textContent="Font saved on this device.";
 }
 
 async function loadCurrentEmployeeGreeting() {
