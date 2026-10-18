@@ -59,7 +59,7 @@ begin
  end if;
  if tg_op='UPDATE' then
   if old.product_code<>new.product_code then raise exception 'Loan product codes cannot be changed'; end if;
-  if (new.rate_percent is distinct from old.rate_percent or new.rate_period is distinct from old.rate_period or new.editable_by_general_manager is distinct from old.editable_by_general_manager) and public.current_employee_role_code()<>'general_manager' then
+  if (new.rate_percent is distinct from old.rate_percent or new.rate_period is distinct from old.rate_period or new.editable_by_general_manager is distinct from old.editable_by_general_manager) and public.current_employee_role_code() is distinct from 'general_manager' then
    raise exception 'Only the General Manager may change loan product rates';
   end if;
  end if;
