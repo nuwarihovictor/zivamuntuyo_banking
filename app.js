@@ -334,7 +334,7 @@ window.switchPage = function(pageName) {
               <input type="file" name="account_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple>
             </label>
           </fieldset>
-          <button type="submit" class="primary">Submit Account Request</button>
+          <div class="account-opening-pricing"><h3>Account-opening package — UGX 30,000</h3><ul><li>One cheque book included</li><li>One transaction log book included</li><li>Account-opening form included</li><li>UGX 10,000 buys one share</li><li>UGX 8,500 restricted security reserve</li><li>UGX 11,500 bundled opening costs</li></ul><p>Replacement cheque book: UGX 2,500 · Replacement transaction log book: UGX 1,500.</p><label class="fs-check-row"><input type="checkbox" name="opening_package_received" required> I confirm that the teller has received UGX 30,000 and I am recording this collection against the account request.</label></div><button type="submit" class="primary">Submit Account Request and Record Teller Collection</button>
           <p id="acc-feedback" class="muted" aria-live="polite"></p>
         </form>`
       )}
@@ -613,11 +613,11 @@ window.loadAttendancePolicy();
           </label>
           <label>Branch *<select name="branch_id" id="loan-branch-select" required><option value="">Loading active branches…</option></select></label>
           <div class="form-grid">
-            <label>Requested amount *<input type="number" name="requested_amount" min="0.01" step="0.01" required></label>
+            <label>Requested amount *<input type="number" name="requested_amount" min="0.01" step="0.01" required oninput="refreshLoanShareRequirement()"></label>
             <label>Currency *<select name="currency_code" id="loan-currency-select" required><option value="">Loading currencies…</option></select></label>
             <label>Loan product *<select name="loan_type" id="loan-type-select" onchange="updateSelectedLoanRate()" required><option value="">Loading loan products…</option></select></label><label>Tenure (months) *<input type="number" name="tenure_months" min="1" max="360" step="1" value="12" required></label>
           </div>
-          <div class="loan-rate-notice" id="loan-rate-notice" aria-live="polite">The approved product rate will be applied automatically.</div>
+          <div class="loan-rate-notice" id="loan-rate-notice" aria-live="polite">The approved product rate will be applied automatically.</div><div class="loan-share-guidance" id="loan-share-guidance">UGX 100,000 requested loan corresponds to 1 share as a guideline. Select a customer to see recorded shareholding. Shareholding does not guarantee loan approval.</div>
           <label>Loan purpose *<textarea name="loan_purpose" rows="3" minlength="3" maxlength="2000" required placeholder="Explain how the funds will be used"></textarea></label>
           <label>Collateral / land title details<textarea name="collateral_description" rows="2" maxlength="2000" placeholder="Describe collateral if applicable"></textarea></label>
           <div class="form-grid">
@@ -1155,13 +1155,16 @@ window.handleAccountSubmit = async function(e) {
     });
     if(error){if(feedback)feedback.textContent="Account request not submitted: "+error.message;return;}
     const result=Array.isArray(data)?data[0]:data;
+    const {data:packageData,error:packageError}=await db.rpc("record_account_opening_package_collection",{p_customer_id:customerId,p_account_id:String(result?.account_id||"")});
+    if(packageError){if(feedback)feedback.textContent="Account request was submitted ("+String(result?.account_number||"created")+") but the UGX 30,000 collection was NOT recorded: "+packageError.message+". Please resolve it in Shares & Charges.";return;}
+    const packageResult=Array.isArray(packageData)?packageData[0]:packageData;
     const files=Array.from(form.querySelector('input[name="account_documents"]')?.files||[]);
     let documentStatus="";
     if(files.length){
       const uploaded=await window.uploadApplicationDocuments("account-opening",customerId,files,String(formData.get("account_document_category")||"other"));
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
-    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+documentStatus;
+    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+" · Teller receipt: "+String(packageResult?.receipt_number||"recorded")+" · 1 share issued · UGX 8,500 security reserve recorded"+documentStatus;
     form.reset();
     setTimeout(()=>window.switchPage("Accounts"),1200);
   }catch(err){
@@ -1268,6 +1271,7 @@ window.handleSharePurchase=async function(e){e.preventDefault();const f=e.target
 window.handleSecurityMonthlyFee=async function(e){e.preventDefault();const f=e.target,feedback=document.getElementById("security-fee-feedback"),button=f.querySelector('button[type="submit"]');if(button)button.disabled=true;try{const [y,m]=f.period_month.value.split("-").map(Number);const {data,error}=await db.rpc("apply_monthly_account_security_fee",{p_account_id:f.account_id.value,p_period_month:y+"-"+String(m).padStart(2,"0")+"-01"});if(error)throw error;const x=Array.isArray(data)?data[0]:data;if(feedback)feedback.textContent="Monthly charge applied: UGX "+Number(x.deducted).toLocaleString()+". Shortfall: UGX "+Number(x.shortfall).toLocaleString()+(x.top_up_required?". Security top-up required.":".");await window.loadSharesAndCharges();}catch(err){if(feedback)feedback.textContent="Charge not applied: "+err.message;}finally{if(button)button.disabled=false;}};
 window.handleSecurityTopUp=async function(e){e.preventDefault();const f=e.target,feedback=document.getElementById("security-topup-feedback"),button=f.querySelector('button[type="submit"]');if(button)button.disabled=true;try{const {data,error}=await db.rpc("record_account_security_top_up",{p_account_id:f.account_id.value,p_amount:Number(f.amount.value),p_receipt_number:f.receipt_number.value||null});if(error)throw error;const x=Array.isArray(data)?data[0]:data;if(feedback)feedback.textContent="Top-up recorded. Receipt "+x.receipt_number+" · UGX "+Number(x.amount).toLocaleString()+". Reconcile during teller cash-up.";f.reset();await window.loadSharesAndCharges();}catch(err){if(feedback)feedback.textContent="Top-up not recorded: "+err.message;}finally{if(button)button.disabled=false;}};
 window.handleLoanFeeCollection=async function(e){e.preventDefault();const f=e.target,feedback=document.getElementById("loan-fee-feedback"),button=f.querySelector('button[type="submit"]');if(button)button.disabled=true;try{const {data,error}=await db.rpc("record_loan_processing_fee_collection",{p_loan_application_id:f.application_id.value});if(error)throw error;const x=Array.isArray(data)?data[0]:data;if(feedback)feedback.textContent="Loan-processing fee recorded: UGX "+Number(x.amount).toLocaleString()+" · receipt "+x.receipt_number+". Reconcile during teller cash-up.";await window.loadSharesAndCharges();}catch(err){if(feedback)feedback.textContent="Fee not recorded: "+err.message;}finally{if(button)button.disabled=false;}};
+window.refreshLoanShareRequirement=async function(){const customerId=document.querySelector('#loan-application-form input[name="customer_id"]')?.value,amount=Number(document.querySelector('#loan-application-form input[name="requested_amount"]')?.value||0),host=document.getElementById("loan-share-guidance");if(!host)return;if(!customerId){host.textContent="Select a customer to check recorded shares. UGX 100,000 requested loan corresponds to 1 share as a guideline.";return;}try{const {data,error}=await db.rpc("get_customer_share_eligibility",{p_customer_id:customerId,p_requested_amount:amount});if(error)throw error;const x=Array.isArray(data)?data[0]:data;host.textContent="Recorded shares: "+x.shares_owned+". Guideline for this amount: "+x.shares_suggested_for_amount+" share(s); additional shares suggested: "+x.additional_shares_suggested+". Shareholding improves consideration but does not guarantee approval.";}catch(e){host.textContent="Share guidance unavailable: "+e.message;}};
 window.searchLoanCustomers = async function(input) {
   const results=document.getElementById("loan-customer-results"),hidden=document.querySelector('#loan-application-form input[name="customer_id"]'),summary=document.getElementById("loan-customer-selected");
   if(!results||!hidden)return;
@@ -1285,7 +1289,7 @@ window.searchLoanCustomers = async function(input) {
     results.innerHTML=data.map((x,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(x.full_name||"Customer")+'</strong><span>'+esc(x.customer_number||"No customer number")+'</span><small>'+esc(x.phone_number||"")+'</small></button>').join("");
     results.querySelectorAll(".account-search-option").forEach((btn,i)=>btn.addEventListener("click",()=>{
       const x=data[i];hidden.value=x.id;input.value=(x.full_name||"Customer")+" · "+(x.customer_number||"");
-      results.innerHTML="";if(summary)summary.textContent="Selected "+(x.full_name||"customer")+". The server rechecks eligibility.";
+      results.innerHTML="";if(summary)summary.textContent="Selected "+(x.full_name||"customer")+". The server rechecks eligibility.";window.refreshLoanShareRequirement();
     }));
   }catch(e){results.textContent="Customer search failed. Check your connection.";}
 };
