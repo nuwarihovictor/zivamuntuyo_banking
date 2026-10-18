@@ -56,7 +56,7 @@ BEGIN
       role_id=p_role_id,
       sex=p_sex,
       date_of_birth=p_date_of_birth,
-      national_id=NULLIF(pg_catalog.btrim(p_national_id),''),
+      national_id=CASE WHEN p_national_id IS NULL THEN national_id ELSE NULLIF(pg_catalog.btrim(p_national_id),'') END,
       photo_url=NULLIF(pg_catalog.btrim(p_photo_url),''),
       employment_status=p_employment_status,
       job_title=NULLIF(pg_catalog.btrim(p_job_title),''),
