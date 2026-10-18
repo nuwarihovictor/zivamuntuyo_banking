@@ -37,6 +37,102 @@ function staffModuleTabs(active){
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
 
+
+window.renderBranchManagementPage = function() {
+  return `
+    <span class="category-tag">Operational regional network</span>
+    <h2 class="page-heading">Branches & Regions</h2>
+    ${panel("BRANCH DIRECTORY & MANAGEMENT","Authorized branch administration","System administrators can add, edit, activate, or archive branches. Database permissions remain the final security control.",`
+      <div id="branch-management-feedback" class="muted" role="status" aria-live="polite">Loading branch directory…</div>
+      <div id="branch-management-list"></div>
+      <details class="panel" style="margin-top:18px">
+        <summary style="cursor:pointer;font-weight:700">＋ Add a branch</summary>
+        <form id="branch-create-form" class="form-grid" style="margin-top:14px" onsubmit="window.createBranch(event)">
+          <label>Branch code<input name="branch_code" maxlength="30" required pattern="[A-Za-z0-9_-]+" placeholder="e.g. KASESE"></label>
+          <label>Branch name<input name="branch_name" maxlength="120" required placeholder="e.g. Kasese Branch"></label>
+          <label>Country<select name="country_id" id="branch-create-country" required><option value="">Loading countries…</option></select></label>
+          <label>Address<input name="address" maxlength="250" placeholder="Street / town"></label>
+          <label>Time zone<select name="timezone"><option value="Africa/Kampala">Africa/Kampala</option><option value="Africa/Nairobi">Africa/Nairobi</option><option value="Africa/Kigali">Africa/Kigali</option></select></label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_head_office"> Mark as head office</label>
+          <button class="primary" type="submit">Create branch</button>
+        </form>
+      </details>
+      <p class="muted">Branches with linked financial records are archived rather than deleted, preserving transaction history. A successful screen update does not bypass database role policies.</p>
+    `)}
+  `;
+};
+
+window.loadBranchManagement = async function() {
+  const feedback=document.getElementById("branch-management-feedback");
+  const list=document.getElementById("branch-management-list");
+  const countrySelect=document.getElementById("branch-create-country");
+  if(!db){if(feedback)feedback.textContent="Database connection unavailable.";return;}
+  const [branchResult,countryResult]=await Promise.all([
+    db.from("branches").select("id,country_id,branch_code,branch_name,address,timezone,is_head_office,is_active").order("is_active",{ascending:false}).order("is_head_office",{ascending:false}).order("branch_name"),
+    db.from("countries").select("id,name").eq("is_active",true).order("name")
+  ]);
+  if(branchResult.error){if(feedback)feedback.textContent="Branch directory could not be loaded: "+branchResult.error.message;return;}
+  if(countrySelect){
+    if(countryResult.error){countrySelect.innerHTML='<option value="">Countries unavailable</option>';}
+    else countrySelect.innerHTML='<option value="">Choose country</option>'+((countryResult.data||[]).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""));
+  }
+  if(feedback)feedback.textContent=(branchResult.data||[]).length+" branch records visible. If you cannot manage branches, sign in with an authorized system administrator account.";
+  if(!list)return;
+  list.innerHTML=(branchResult.data||[]).map(b=>`
+    <details class="list-item" style="display:block;margin-top:10px" ${b.is_active?"":" "}>
+      <summary style="cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+        <span><strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br><span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span></span>
+        <span class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Head Office":"Branch"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span></span>
+      </summary>
+      <form class="form-grid" style="margin-top:14px" onsubmit="window.updateBranch(event,'${esc(b.id)}')">
+        <label>Branch code<input name="branch_code" maxlength="30" required pattern="[A-Za-z0-9_-]+" value="${esc(b.branch_code)}"></label>
+        <label>Branch name<input name="branch_name" maxlength="120" required value="${esc(b.branch_name)}"></label>
+        <label>Country<select name="country_id" required>${(countryResult.data||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===b.country_id?'selected':'')+'>'+esc(x.name)+'</option>').join("")}</select></label>
+        <label>Address<input name="address" maxlength="250" value="${esc(b.address||"")}"></label>
+        <label>Time zone<select name="timezone">${["Africa/Kampala","Africa/Nairobi","Africa/Kigali"].map(t=>'<option '+(t===(b.timezone||"Africa/Kampala")?'selected':'')+'>'+t+'</option>').join("")}</select></label>
+        <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_head_office" ${b.is_head_office?"checked":""}> Head office</label>
+        <button class="primary" type="submit">Save changes</button>
+        <button class="secondary" type="button" onclick="window.setBranchActive('${esc(b.id)}',${!b.is_active})">${b.is_active?"Archive branch":"Reactivate branch"}</button>
+      </form>
+    </details>
+  `).join("")||'<p class="muted">No branch records are visible to your account.</p>';
+};
+
+window.createBranch = async function(event) {
+  event.preventDefault();
+  const form=event.currentTarget, feedback=document.getElementById("branch-management-feedback");
+  if(!db||!form.reportValidity())return;
+  const data=new FormData(form);
+  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on",is_active:true};
+  if(feedback)feedback.textContent="Creating branch…";
+  const {error}=await db.from("branches").insert(payload);
+  if(error){if(feedback)feedback.textContent="Branch was not created: "+error.message;return;}
+  form.reset();await window.loadBranchManagement();
+};
+
+window.updateBranch = async function(event,id) {
+  event.preventDefault();
+  const form=event.currentTarget, feedback=document.getElementById("branch-management-feedback");
+  if(!db||!form.reportValidity())return;
+  const data=new FormData(form);
+  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
+  if(feedback)feedback.textContent="Saving branch changes…";
+  const {error}=await db.from("branches").update(payload).eq("id",id);
+  if(error){if(feedback)feedback.textContent="Branch changes were not saved: "+error.message;return;}
+  await window.loadBranchManagement();
+};
+
+window.setBranchActive = async function(id,active) {
+  const action=active?"reactivate":"archive";
+  if(!confirm("Are you sure you want to "+action+" this branch? Existing financial history will be preserved."))return;
+  const feedback=document.getElementById("branch-management-feedback");
+  if(!db)return;
+  if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
+  const {error}=await db.from("branches").update({is_active:active}).eq("id",id);
+  if(error){if(feedback)feedback.textContent="Branch status was not changed: "+error.message;return;}
+  await window.loadBranchManagement();
+};
+
 window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
     if (btn.dataset.page === pageName || (btn.dataset.page === "Staff" && ["Staff","Attendance","StaffChat"].includes(pageName)) || (btn.dataset.page === "Transactions" && ["Transactions","Deposits","Withdrawals"].includes(pageName))) {
@@ -109,44 +205,8 @@ window.switchPage = function(pageName) {
     });
   } 
   else if (pageName === "Branches") {
-    c.innerHTML = `
-      <span class="category-tag">Operational regional network</span>
-      <h2 class="page-heading">Branches & Regions</h2>
-      ${panel(
-        "ZIVAMUNTUYO BRANCH DIRECTORY",
-        "Current and archived branch locations",
-        "Active branches appear first. Inactive historical records remain visible for audit and reporting; their status is clearly marked.",
-        `<div id="branch-list"><p class="muted">Loading active branches…</p></div>`
-      )}
-    `;
-
-    if (db) {
-      db.from("branches").select("id,branch_code,branch_name,address,timezone,is_head_office,is_active")
-        .order("is_active",{ascending:false})
-        .order("is_head_office",{ascending:false})
-        .order("branch_name",{ascending:true})
-        .then(({data:branches,error})=>{
-          const listEl=document.getElementById("branch-list");
-          if(!listEl)return;
-          if(error){listEl.innerHTML='<p class="muted">Branch directory could not be loaded: '+esc(error.message)+'</p>';return;}
-          if(!branches||!branches.length){listEl.innerHTML='<p class="muted">No branches are visible to your account. Check your staff role and branch access.</p>';return;}
-          listEl.innerHTML=branches.map(b=>`
-            <div class="list-item">
-              <div>
-                <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
-                <span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span>
-              </div>
-              <div class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Main Branch":"Outreach"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span></div>
-            </div>
-          `).join("");
-        }).catch(()=>{
-          const listEl=document.getElementById("branch-list");
-          if(listEl)listEl.innerHTML='<p class="muted">Could not connect to the branch directory.</p>';
-        });
-    } else {
-      const listEl=document.getElementById("branch-list");
-      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No sample branches are displayed.</p>';
-    }
+    c.innerHTML = renderBranchManagementPage();
+    window.loadBranchManagement();
   }
   else if (pageName === "Staff") {
     c.innerHTML = `
