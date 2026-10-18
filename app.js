@@ -390,7 +390,7 @@ window.switchPage = function(pageName) {
       ${panel(
         "TRANSACTION PROCESSING",
         "Cash transaction request",
-        "Submit deposits and withdrawals for approval. Requests are not treated as posted transactions until an authorized approver completes the ledger workflow.",
+        "Submit deposits and withdrawals for approval. A customer receipt becomes available for a deposit only after the approved transaction is successfully posted to the ledger.",
         `<form onsubmit="handleTransaction(event)">
            <label>Account UUID * 
              <input type="text" name="account_id" required placeholder="Enter Account UUID">
@@ -426,7 +426,7 @@ window.switchPage = function(pageName) {
           <button type="button" class="secondary" onclick="loadTransactionMonitor()">Refresh activity</button>
         </div>
         <p id="transaction-monitor-feedback" class="muted" aria-live="polite">Loading transaction activity…</p>
-        <div id="transaction-monitor-list"></div>`
+        <div id="transaction-monitor-list"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`
       )}
     `;
 
@@ -546,29 +546,6 @@ window.loadAttendancePolicy();
          </label>
          <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
          <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
-      )}
-    `;
-  }
-  else if (pageName === "Receipts") {
-    c.innerHTML = `
-      <span class="category-tag">Teller Tools</span>
-      <h2 class="page-heading">Receipt Printer</h2>
-      ${panel(
-        "THERMAL PRINTER SETUP",
-        "X printer / receipt printer",
-        "Print a clearly marked test slip to check paper layout. This is not proof of a financial transaction.",
-        `<div id="test-receipt" class="receipt-preview">
-           <h3>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h3>
-           <p>PRINTER TEST — NOT A TRANSACTION</p>
-           <hr>
-           <p>Paper layout test</p>
-           <p>Windows 10 / Windows 11</p>
-           <p>Amount: UGX 0</p>
-           <hr>
-           <p>TEST ONLY — NO MONEY RECEIVED OR PAID</p>
-         </div>
-         <button type="button" class="primary" onclick="printTestReceipt()">Print test slip</button>
-         <p class="muted">Printing uses your browser's print dialog. Select the connected thermal/X printer and its correct paper width.</p>`
       )}
     `;
   }
@@ -764,7 +741,14 @@ window.loadTransactionMonitor = async function() {
   feedback.textContent="Showing "+data.length+" recent records. Only posted entries count toward financial reports.";
   list.innerHTML=data.map(r=>{
     const amount=Number(r.amount||0).toLocaleString(undefined,{maximumFractionDigits:2})+" "+esc(r.currency_code||"");
-    return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><span class="badge-role">'+esc(r.status||"unknown")+'</span></div>';
+    const status=String(r.status||"").toLowerCase();
+    const type=String(r.transaction_type||"").toLowerCase();
+    const isPosted=status==="posted";
+    const isDeposit=type==="deposit";
+    const receiptButton=(isPosted&&isDeposit)
+      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(r.transaction_type||"deposit")+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print deposit receipt</button>'
+      : "";
+    return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><div class="transaction-status-actions"><span class="badge-role">'+esc(r.status||"unknown")+'</span>'+receiptButton+'</div></div>';
   }).join("");
 };
 
@@ -1175,32 +1159,33 @@ window.previewStaffMessage = function() {
     : "Enter a message to preview. Nothing has been sent or saved.";
 };
 
-window.printTestReceipt = function() {
-  const receipt = document.getElementById("test-receipt");
-  if (!receipt) return;
-  const printWindow = window.open("", "_blank", "width=420,height=650");
-  if (!printWindow) {
-    alert("Please allow pop-ups for this site, then try printing again.");
+window.printTransactionReceipt = function(button) {
+  if(!button || !button.dataset) return;
+  const status=document.getElementById("transaction-receipt-status");
+  const reference=button.dataset.receiptReference||"";
+  const transactionDate=button.dataset.receiptDate||"";
+  const branch=button.dataset.receiptBranch||"";
+  const account=button.dataset.receiptAccount||"";
+  const type=String(button.dataset.receiptType||"").toLowerCase();
+  const amount=Number(button.dataset.receiptAmount);
+  const currency=button.dataset.receiptCurrency||"";
+  if(type!=="deposit"||!reference||!Number.isFinite(amount)||amount<=0){
+    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit.";
     return;
   }
-  printWindow.document.write(`<!doctype html><html><head><title>Printer Test</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>
-      @page { size: 80mm auto; margin: 4mm; }
-      body { font: 12px/1.45 monospace; color: #000; width: 72mm; margin: 0 auto; }
-      h3 { font-size: 14px; text-align: center; }
-      p { margin: 7px 0; text-align: center; }
-      hr { border: 0; border-top: 1px dashed #000; }
-      .warning { font-weight: bold; }
-    </style></head><body>
-    <h3>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h3>
-    <p class="warning">PRINTER TEST — NOT A TRANSACTION</p><hr>
-    <p>Paper layout test</p><p>Windows 10 / Windows 11</p><p>Amount: UGX 0</p>
-    <hr><p class="warning">TEST ONLY — NO MONEY RECEIVED OR PAID</p>
-    <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script>
-    </body></html>`);
+  if(!confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
+  const printWindow=window.open("","_blank","width=420,height=700");
+  if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
+  const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  const money=amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+" "+currency;
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deposit Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER DEPOSIT RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>DEPOSIT</span></div><hr class="line"><p class="label">AMOUNT RECEIVED</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
   printWindow.document.close();
+  if(status)status.textContent="Receipt opened for printing for posted deposit "+reference+".";
 };
+document.addEventListener("click",function(event){
+  const receiptButton=event.target.closest(".transaction-print-receipt");
+  if(receiptButton)window.printTransactionReceipt(receiptButton);
+});
 
 window.loadAttendancePolicy = async function() {
   const feedback=document.getElementById("attendance-policy-feedback");
