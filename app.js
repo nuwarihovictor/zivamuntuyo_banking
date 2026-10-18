@@ -1808,19 +1808,28 @@ window.sendStaffChatMessage = async function(event) {
   const input = document.getElementById("staff-chat-input");
   const feedback = document.getElementById("staff-chat-feedback");
   const selector = document.getElementById("staff-chat-branch");
+  const submitButton = form?.querySelector('button[type="submit"]');
   const message = input ? input.value.trim() : "";
-  if (!db || !form.reportValidity() || !message) return;
+  if (!db || !form || !input || !form.reportValidity() || !message) return;
+  if (submitButton) submitButton.disabled = true;
   if (feedback) feedback.textContent = "Sending message…";
-  const { error } = await db.rpc("send_staff_message", {
-    p_message: message,
-    p_branch_id: selector && selector.value ? selector.value : null
-  });
-  if (error) {
-    if (feedback) feedback.textContent = "Message was not sent: " + error.message;
-    return;
+  try {
+    const { error } = await db.rpc("send_staff_message", {
+      p_message: message,
+      p_branch_id: selector && selector.value ? selector.value : null
+    });
+    if (error) {
+      if (feedback) feedback.textContent = "Message was not sent: " + error.message;
+      return;
+    }
+    input.value = "";
+    if (feedback) feedback.textContent = "Message sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  } catch (error) {
+    if (feedback) feedback.textContent = "A connection error prevented the message from being sent. Check the conversation before retrying.";
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
-  input.value = "";
-  await window.loadStaffChat();
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
