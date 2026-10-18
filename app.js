@@ -1222,16 +1222,14 @@ window.handleAccountSubmit = async function(e) {
   if(button)button.disabled=true;
   if(feedback)feedback.textContent="Submitting account request for approval…";
   try{
-    const {data,error}=await db.rpc("create_bank_account_request",{
+    const {data,error}=await db.rpc("create_bank_account_request_with_opening_package",{
       p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
       p_product_type:formData.get("product_type")||"savings",
       p_currency_code:formData.get("currency_code")||"UGX"
     });
-    if(error){if(feedback)feedback.textContent="Account request not submitted: "+error.message;return;}
+    if(error)throw error;
     const result=Array.isArray(data)?data[0]:data;
-    const {data:packageData,error:packageError}=await db.rpc("record_account_opening_package_collection",{p_customer_id:customerId,p_account_id:String(result?.account_id||"")});
-    if(packageError){if(feedback)feedback.textContent="Account request was submitted ("+String(result?.account_number||"created")+") but the UGX 30,000 collection was NOT recorded: "+packageError.message+". Please resolve it in Shares & Charges.";return;}
-    const packageResult=Array.isArray(packageData)?packageData[0]:packageData;
+    const packageResult=result;
     const files=Array.from(form.querySelector('input[name="account_documents"]')?.files||[]);
     let documentStatus="";
     if(files.length){
