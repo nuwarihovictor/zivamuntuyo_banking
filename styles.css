@@ -178,3 +178,7 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .settings-info { border:1px solid var(--border-color); border-radius:10px; padding:12px; }
 .settings-info small { display:block; color:var(--text-muted); text-transform:uppercase; font-size:10px; margin-bottom:6px; }
 .settings-info strong { font-size:13px; overflow-wrap:anywhere; }
+
+.transaction-status-actions { display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:145px; }
+.transaction-print-receipt { white-space:nowrap; }
+@media (max-width:640px) { .transaction-status-actions { align-items:stretch; min-width:0; } .transaction-print-receipt { white-space:normal; } }
