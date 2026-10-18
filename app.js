@@ -260,17 +260,37 @@ window.switchPage = function(pageName) {
       <span class="category-tag">Staff Operations</span>
       <h2 class="page-heading">Staff Attendance</h2>
       ${panel(
-        "ATTENDANCE & TIME CLOCK",
-        "Fingerprint-ready integration",
-        "This screen is a setup stage; it does not yet read fingerprints or record official attendance.",
-        `<div class="notice-box"><strong>Hardware requirement:</strong> fingerprint readers need a compatible vendor SDK or a local Windows attendance connector. A browser alone cannot communicate with every fingerprint device.</div>
+        "DEVICE-COMPATIBLE ATTENDANCE",
+        "Windows 10 / Windows 11",
+        "Designed around common fingerprint terminals and USB readers. Actual compatibility depends on the exact model, firmware, vendor SDK and connection method.",
+        `<div class="notice-box"><strong>Important:</strong> no fingerprint device is connected yet. This setup page does not scan fingerprints or create official attendance records. A secure Windows connector or supported terminal API must be installed and tested first.</div>
+         <label for="attendance-device">Choose device family / connection method
+           <select id="attendance-device" onchange="showAttendanceDeviceHelp()">
+             <option value="zkteco">ZKTeco fingerprint terminals (LAN / ADMS / vendor SDK)</option>
+             <option value="suprema">Suprema BioStation / BioEntry (BioStar API / SDK)</option>
+             <option value="hikvision">Hikvision access-control terminals (ISAPI / vendor SDK)</option>
+             <option value="secugen">SecuGen USB fingerprint reader (Windows SDK)</option>
+             <option value="digitalpersona">DigitalPersona / HID USB reader (vendor SDK)</option>
+             <option value="generic">Other device (vendor SDK or documented API required)</option>
+           </select>
+         </label>
+         <div id="attendance-device-help" class="notice-box" aria-live="polite">Terminal integration is usually best through a supported LAN/API or vendor push protocol; exact model support must be verified.</div>
          <div class="grid-2">
-           <div class="metric-card"><div class="metric-sub">Connection status</div><div class="metric-val" style="font-size:18px;">Not configured</div></div>
-           <div class="metric-card"><div class="metric-sub">Attendance records</div><div class="metric-val" style="font-size:18px;">Not enabled</div></div>
+           <div class="metric-card"><div class="metric-sub">Device connection</div><div class="metric-val" style="font-size:18px;">Not connected</div></div>
+           <div class="metric-card"><div class="metric-sub">Official attendance</div><div class="metric-val" style="font-size:18px;">Not enabled</div></div>
          </div>
-         <p class="muted">Next step: identify the fingerprint device brand and model, then configure a secure local connector and staff attendance database policies.</p>`
+         <h3 style="margin:16px 0 8px;">Compatibility strategy</h3>
+         <ul style="padding-left:20px;line-height:1.8;">
+           <li>Use a device adapter for each supported vendor/model family.</li>
+           <li>Run a signed local Windows connector for USB readers; use documented LAN/API push where supported.</li>
+           <li>Store attendance events and device identifiers, not raw fingerprint images.</li>
+           <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
+         </ul>
+         <p class="muted">Select a family above to see the intended integration path. This is a compatibility plan, not a claim that every model has been tested.</p>
+         <p><a href="https://github.com/nuwarihovictor/zivamuntuyo_banking/blob/main/docs/attendance-device-compatibility.md" target="_blank" rel="noopener noreferrer">Read device compatibility and implementation plan</a></p>`
       )}
     `;
+    window.showAttendanceDeviceHelp();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
@@ -448,6 +468,21 @@ window.printTestReceipt = function() {
     <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script>
     </body></html>`);
   printWindow.document.close();
+};
+
+window.showAttendanceDeviceHelp = function() {
+  const select = document.getElementById("attendance-device");
+  const help = document.getElementById("attendance-device-help");
+  if (!select || !help) return;
+  const messages = {
+    zkteco: "ZKTeco: prefer a documented ADMS/push protocol or supported SDK for the exact terminal. LAN pull protocols vary by model and firmware.",
+    suprema: "Suprema: use a supported BioStar API/SDK for the installed version and configure the terminal through its authorized administrator.",
+    hikvision: "Hikvision: use the documented ISAPI/API or SDK only on compatible access-control models; confirm event and biometric support for the exact firmware.",
+    secugen: "SecuGen USB: requires the matching Windows driver and vendor SDK plus a local connector service; browser JavaScript alone is not enough.",
+    digitalpersona: "DigitalPersona / HID: requires the supported device driver and vendor SDK/connector. Confirm the specific reader and SDK licensing before purchase.",
+    generic: "Other devices: integration requires a documented vendor SDK, API, or standard event export. Devices without a supported interface cannot be guaranteed compatible."
+  };
+  help.textContent = messages[select.value] || messages.generic;
 };
 
 function initApp() {
