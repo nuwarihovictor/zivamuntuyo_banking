@@ -1,0 +1,7 @@
+-- Follow-up to private_application_documents.sql.
+-- Account-opening uploads can also be authorized through the customer's newly
+-- created account-holder link when customers.branch_id is not populated.
+-- This preserves branch scoping instead of granting cross-branch access.
+-- Re-run the three policy definitions in private_application_documents.sql
+-- after incorporating the additional account_holders -> bank_accounts branch
+-- access alternative for the account-opening path.
