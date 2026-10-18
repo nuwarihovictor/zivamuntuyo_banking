@@ -5,9 +5,11 @@
 const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa"; 
 
-let db = null;
-if (window.supabase) {
-  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+function getSupabase() {
+  if (window.supabase && window.supabase.createClient) {
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return null;
 }
 
 function esc(str) {
@@ -36,6 +38,8 @@ window.switchPage = function(pageName) {
 
   const c = document.getElementById("main-content");
   if (!c) return;
+
+  const db = getSupabase();
 
   if (pageName === "Dashboard") {
     c.innerHTML = `
@@ -402,6 +406,7 @@ window.handleCustomerSubmit = async function(e) {
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
   if (feedback) feedback.textContent = "Registering customer KYC profile...";
+  const db = getSupabase();
 
   const formData = new FormData(form);
   const payload = {
@@ -420,7 +425,7 @@ window.handleCustomerSubmit = async function(e) {
   } else {
     if (feedback) feedback.textContent = "Customer successfully registered!";
     form.reset();
-    setTimeout(() => switchPage("Customers"), 1000);
+    setTimeout(() => window.switchPage("Customers"), 1000);
   }
 };
 
@@ -429,6 +434,7 @@ window.handleAccountSubmit = async function(e) {
   const form = e.target;
   const feedback = document.getElementById("acc-feedback");
   if (feedback) feedback.textContent = "Processing account application...";
+  const db = getSupabase();
 
   const formData = new FormData(form);
   const payload = {
@@ -447,7 +453,7 @@ window.handleAccountSubmit = async function(e) {
   } else {
     if (feedback) feedback.textContent = "Account successfully opened!";
     form.reset();
-    setTimeout(() => switchPage("Accounts"), 1200);
+    setTimeout(() => window.switchPage("Accounts"), 1200);
   }
 };
 
@@ -456,6 +462,7 @@ window.handleTransaction = async function(e) {
   const form = e.target;
   const feedback = document.getElementById("tx-feedback");
   if (feedback) feedback.textContent = "Posting to ledger...";
+  const db = getSupabase();
 
   const formData = new FormData(form);
   const payload = {
@@ -480,16 +487,11 @@ window.handleTransaction = async function(e) {
 function initApp() {
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      switchPage(e.currentTarget.dataset.page);
+      window.switchPage(e.currentTarget.dataset.page);
     });
   });
-  switchPage("Dashboard");
+  window.switchPage("Dashboard");
 }
 
-// Immediate execution listener to prevent hanging on "Initializing workspace..."
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-  }
-                                                                
+  document.addEventListener('DOMContentLoaded', initApp)
