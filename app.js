@@ -255,6 +255,63 @@ window.switchPage = function(pageName) {
       )}
     `;
   }
+  else if (pageName === "Attendance") {
+    c.innerHTML = `
+      <span class="category-tag">Staff Operations</span>
+      <h2 class="page-heading">Staff Attendance</h2>
+      ${panel(
+        "ATTENDANCE & TIME CLOCK",
+        "Fingerprint-ready integration",
+        "This screen is a setup stage; it does not yet read fingerprints or record official attendance.",
+        `<div class="notice-box"><strong>Hardware requirement:</strong> fingerprint readers need a compatible vendor SDK or a local Windows attendance connector. A browser alone cannot communicate with every fingerprint device.</div>
+         <div class="grid-2">
+           <div class="metric-card"><div class="metric-sub">Connection status</div><div class="metric-val" style="font-size:18px;">Not configured</div></div>
+           <div class="metric-card"><div class="metric-sub">Attendance records</div><div class="metric-val" style="font-size:18px;">Not enabled</div></div>
+         </div>
+         <p class="muted">Next step: identify the fingerprint device brand and model, then configure a secure local connector and staff attendance database policies.</p>`
+      )}
+    `;
+  }
+  else if (pageName === "StaffChat") {
+    c.innerHTML = `
+      <span class="category-tag">Internal Communications</span>
+      <h2 class="page-heading">Staff Chat</h2>
+      ${panel(
+        "TEAM MESSAGES",
+        "Internal staff communication",
+        "Messaging is not connected to a database yet; this page does not send or store messages.",
+        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
+         <label>Message preview
+           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
+         </label>
+         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
+         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
+      )}
+    `;
+  }
+  else if (pageName === "Receipts") {
+    c.innerHTML = `
+      <span class="category-tag">Teller Tools</span>
+      <h2 class="page-heading">Receipt Printer</h2>
+      ${panel(
+        "THERMAL PRINTER SETUP",
+        "X printer / receipt printer",
+        "Print a clearly marked test slip to check paper layout. This is not proof of a financial transaction.",
+        `<div id="test-receipt" class="receipt-preview">
+           <h3>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h3>
+           <p>PRINTER TEST — NOT A TRANSACTION</p>
+           <hr>
+           <p>Paper layout test</p>
+           <p>Windows 10 / Windows 11</p>
+           <p>Amount: UGX 0</p>
+           <hr>
+           <p>TEST ONLY — NO MONEY RECEIVED OR PAID</p>
+         </div>
+         <button type="button" class="primary" onclick="printTestReceipt()">Print test slip</button>
+         <p class="muted">Printing uses your browser's print dialog. Select the connected thermal/X printer and its correct paper width.</p>`
+      )}
+    `;
+  }
   else if (pageName === "Accounting") {
     c.innerHTML = `
       <span class="category-tag">Phase 5 & 8: General Ledger & Trial Balance</span>
@@ -355,6 +412,42 @@ window.handleTransaction = async function(e) {
     if (feedback) feedback.textContent = "Transaction successfully posted!";
     form.reset();
   }
+};
+
+window.previewStaffMessage = function() {
+  const input = document.getElementById("chat-preview");
+  const output = document.getElementById("chat-preview-result");
+  if (!input || !output) return;
+  output.textContent = input.value.trim()
+    ? "Draft preview only: " + input.value.trim()
+    : "Enter a message to preview. Nothing has been sent or saved.";
+};
+
+window.printTestReceipt = function() {
+  const receipt = document.getElementById("test-receipt");
+  if (!receipt) return;
+  const printWindow = window.open("", "_blank", "width=420,height=650");
+  if (!printWindow) {
+    alert("Please allow pop-ups for this site, then try printing again.");
+    return;
+  }
+  printWindow.document.write(`<!doctype html><html><head><title>Printer Test</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+      @page { size: 80mm auto; margin: 4mm; }
+      body { font: 12px/1.45 monospace; color: #000; width: 72mm; margin: 0 auto; }
+      h3 { font-size: 14px; text-align: center; }
+      p { margin: 7px 0; text-align: center; }
+      hr { border: 0; border-top: 1px dashed #000; }
+      .warning { font-weight: bold; }
+    </style></head><body>
+    <h3>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h3>
+    <p class="warning">PRINTER TEST — NOT A TRANSACTION</p><hr>
+    <p>Paper layout test</p><p>Windows 10 / Windows 11</p><p>Amount: UGX 0</p>
+    <hr><p class="warning">TEST ONLY — NO MONEY RECEIVED OR PAID</p>
+    <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script>
+    </body></html>`);
+  printWindow.document.close();
 };
 
 function initApp() {
