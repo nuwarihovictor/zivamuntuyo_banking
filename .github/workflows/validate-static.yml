@@ -5,11 +5,12 @@ on:
     branches:
       - main
       - release/deployment-readiness-2026
+      - integration/full-system-audit-2026-10
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  syntax:
+  syntax-and-release-guard:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -20,8 +21,7 @@ jobs:
           node-version: 22
       - name: Check application JavaScript syntax
         run: node --check app.js
-      - name: Verify core static files exist
-        run: |
-          test -s index.html
-          test -s styles.css
-          test -s app.js
+      - name: Check release validation script syntax
+        run: node --check scripts/validate-release.mjs
+      - name: Run dependency-free release guard
+        run: node scripts/validate-release.mjs
