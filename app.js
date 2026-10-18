@@ -13,8 +13,8 @@ if (window.supabase) {
 }
 
 function esc(str) {
-  if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function panel(title, subtitle, desc, contentHtml) {
