@@ -1233,11 +1233,34 @@ window.loadLoanApplications = async function() {
     host.innerHTML=data.map((x,i)=>{
       const final=["approved","rejected","cancelled"].includes(x.status);
       return '<article class="loan-application-card"><div class="loan-card-top"><div><strong>'+esc(x.application_number)+'</strong><p>'+esc(x.customer_name||"Customer")+' · '+esc(x.branch_name||"Branch")+'</p></div><span class="loan-status status-'+esc(x.status)+'">'+esc(String(x.status).replaceAll("_"," "))+'</span></div><div class="loan-card-amount">'+esc(x.currency_code)+' '+Number(x.requested_amount).toLocaleString(undefined,{maximumFractionDigits:2})+'</div><p>'+esc(x.tenure_months)+' months · '+esc(x.interest_rate_annual)+'% annual</p><p>'+esc(x.loan_purpose||"")+'</p>'+(x.collateral_description?'<p><strong>Collateral:</strong> '+esc(x.collateral_description)+'</p>':"")+(x.review_note?'<p><strong>Review note:</strong> '+esc(x.review_note)+'</p>':"")+
-      '<form class="loan-document-inline" onsubmit="handleLoanApplicationDocumentUpload(event)" data-application-id="'+esc(x.id)+'"><label>Attach ID, land title, chairperson letter or other evidence<select name="document_category"><option value="national-id">National ID</option><option value="passport">Passport</option><option value="land-title">Land title</option><option value="chairperson-letter">Chairperson letter</option><option value="guarantor-id">Guarantor ID</option><option value="income-proof">Income proof</option><option value="valuation-report">Valuation report</option><option value="other">Other</option></select></label><input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required><button type="submit" class="secondary">Upload documents</button><p class="muted" aria-live="polite"></p></form>'+
+      '<div class="loan-documents-actions"><button type="button" class="secondary" data-application-id="'+esc(x.id)+'" onclick="loadLoanApplicationDocuments(this)">View attached documents</button><div class="loan-documents-list" data-documents-for="'+esc(x.id)+'"></div></div><form class="loan-document-inline" onsubmit="handleLoanApplicationDocumentUpload(event)" data-application-id="'+esc(x.id)+'"><label>Attach ID, land title, chairperson letter or other evidence<select name="document_category"><option value="national-id">National ID</option><option value="passport">Passport</option><option value="land-title">Land title</option><option value="chairperson-letter">Chairperson letter</option><option value="guarantor-id">Guarantor ID</option><option value="income-proof">Income proof</option><option value="valuation-report">Valuation report</option><option value="other">Other</option></select></label><input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required><button type="submit" class="secondary">Upload documents</button><p class="muted" aria-live="polite"></p></form>'+
       (final?"":'<form class="loan-review-form" onsubmit="handleLoanApplicationReview(event)" data-application-id="'+esc(x.id)+'"><label>Review decision<select name="decision"><option value="under_review">Move to review</option><option value="more_information_required">Request more information</option><option value="approved">Approve application</option><option value="rejected">Reject application</option></select></label><label>Review note<textarea name="review_note" rows="2" maxlength="2000" placeholder="Reason, conditions or missing documents"></textarea></label><button type="submit" class="primary">Save review decision</button><p class="muted" aria-live="polite"></p></form>')+
       '</article>';
     }).join("");
   }catch(err){host.textContent="Unable to load loan applications: "+(err?.message||"Check role and branch access.");}
+};
+
+window.loadLoanApplicationDocuments = async function(button) {
+  const id=String(button?.dataset?.applicationId||"");
+  const host=document.querySelector('.loan-documents-list[data-documents-for="'+id+'"]');
+  if(!host||!db)return;
+  button.disabled=true;host.textContent="Loading private documents…";
+  try{
+    const folder="loan-applications/"+id;
+    const {data,error}=await db.storage.from("bank-application-documents").list(folder,{limit:100,sortBy:{column:"name",order:"desc"}});
+    if(error)throw error;
+    const files=(data||[]).filter(x=>x.name&&!x.id===false);
+    if(!files.length){host.textContent="No attached documents found yet.";return;}
+    const links=await Promise.all(files.map(async file=>{
+      const path=folder+"/"+file.name;
+      const {data:signed,error:signedError}=await db.storage.from("bank-application-documents").createSignedUrl(path,120);
+      if(signedError||!signed?.signedUrl)return null;
+      return {name:file.name,url:signed.signedUrl};
+    }));
+    const valid=links.filter(Boolean);
+    host.innerHTML=valid.length?valid.map(file=>'<p><a href="'+esc(file.url)+'" target="_blank" rel="noopener noreferrer">'+esc(file.name)+'</a> <small>(private link expires in 2 minutes)</small></p>').join(""):"Could not create access links. Check your branch permissions.";
+  }catch(err){host.textContent="Unable to load attachments: "+(err?.message||"Check access and connection.");}
+  finally{button.disabled=false;}
 };
 
 window.handleLoanApplicationDocumentUpload = async function(e) {
