@@ -438,7 +438,7 @@ window.switchPage = function(pageName) {
           <button type="button" class="secondary" onclick="loadTransactionMonitor()">Refresh activity</button>
         </div>
         <p id="transaction-monitor-feedback" class="muted" aria-live="polite">Loading transaction activity…</p>
-        <div id="transaction-monitor-list"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`)}
+        <div id="transaction-monitor-list" data-transaction-mode="${transactionMode}"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`)}
     `;
     window.loadTransactionMonitor();
   }
@@ -748,9 +748,16 @@ window.loadTransactionMonitor = async function() {
   feedback.textContent="Loading recent journal activity…";list.innerHTML="";
   const {data,error}=await db.rpc("list_transaction_monitoring",{p_branch_id:branchId||null,p_status:status||null,p_limit:100});
   if(error){feedback.textContent="Transaction monitor needs the secure list_transaction_monitoring SQL function installed in Supabase. Details: "+error.message;return;}
-  if(!data||!data.length){feedback.textContent="No transactions matched this filter.";return;}
-  feedback.textContent="Showing "+data.length+" recent records. Only posted entries count toward financial reports.";
-  list.innerHTML=data.map(r=>{
+  const mode=list.dataset.transactionMode||"both";
+  const visibleRows=(data||[]).filter(r=>{
+    const type=String(r.transaction_type||"").toLowerCase();
+    if(mode==="deposit")return type==="deposit";
+    if(mode==="withdrawal")return type==="withdrawal";
+    return true;
+  });
+  if(!visibleRows.length){feedback.textContent=mode==="deposit"?"No deposit transactions matched this filter.":mode==="withdrawal"?"No withdrawal transactions matched this filter.":"No transactions matched this filter.";return;}
+  feedback.textContent="Showing "+visibleRows.length+" "+(mode==="deposit"?"deposit":mode==="withdrawal"?"withdrawal":"transaction")+" records. Only posted entries count toward financial reports.";
+  list.innerHTML=visibleRows.map(r=>{
     const amount=Number(r.amount||0).toLocaleString(undefined,{maximumFractionDigits:2})+" "+esc(r.currency_code||"");
     const status=String(r.status||"").toLowerCase();
     const type=String(r.transaction_type||"").toLowerCase();
