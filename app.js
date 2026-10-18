@@ -3,7 +3,9 @@
 // ============================================================================
 
 const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa"; 
+const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
+window.currentEmployeeName = "";
+window.currentEmployeeRole = ""; 
 
 let db = null;
 if (window.supabase) {
@@ -41,6 +43,7 @@ window.switchPage = function(pageName) {
     c.innerHTML = `
       <span class="category-tag">Executive overview</span>
       <h2 class="page-heading">Dashboard</h2>
+      <div class="welcome-banner" id="welcome-banner"><div class="welcome-kicker">Zivamuntuyo Financial Services · Uganda</div><h2 id="welcome-title">Welcome</h2><p id="welcome-message">Your branch network and financial operations, in one place.</p></div>
       ${panel(
         "FINANCIAL PERFORMANCE",
         "Live general-ledger overview",
@@ -89,6 +92,7 @@ window.switchPage = function(pageName) {
          <p class="muted">Charts are operational summaries, not audited financial statements. A balanced total does not prove all transactions have been recorded.</p>`
       )}
     `;
+    setWelcomeMessage();
     window.loadDashboardBranchOptions().then(() => {
       window.loadDashboardCharts();
       window.loadBranchPortfolioSummary();
@@ -136,42 +140,59 @@ window.switchPage = function(pageName) {
   }
   else if (pageName === "Staff") {
     c.innerHTML = `
-      <span class="category-tag">Phase 2: Security & Access Control</span>
-      <h2 class="page-heading">Staff & Permissions</h2>
-      ${panel(
-        "AUTHORIZED PERSONNEL DIRECTORY",
-        "Role-Based Access Control (RBAC)",
-        "Assigned employee profiles, system roles, and home branch access restrictions.",
-        `<div id="staff-list"><p class="muted">Loading active staff by branch…</p></div>`
-      )}
+      <span class="category-tag">People, accountability & access</span>
+      <h2 class="page-heading">Staff Profiles & Responsibilities</h2>
+      ${panel("AUTHORIZED PERSONNEL DIRECTORY","Staff profile register","Personal information is shown only as available in the employee record and according to database permissions.",`<div id="staff-list"><p class="muted">Loading staff profiles…</p></div>`)}
+      ${panel("ROLE RESPONSIBILITIES","Who is responsible for what","Use this directory to understand each job title's expected duties. Actual permissions remain controlled by assigned system roles.",`
+        <div class="responsibility-grid">
+          <article class="responsibility-card"><h3>Bank / Branch Manager</h3><p>Leads branch performance and supervises staff.</p><ul><li>Review daily cash and transaction reports</li><li>Approve transactions and account requests within authority</li><li>Monitor customer service, controls and compliance</li><li>Review staff attendance and escalate incidents</li></ul></article>
+          <article class="responsibility-card"><h3>Teller / Cashier</h3><p>Handles authorized customer cash services.</p><ul><li>Verify customer identity and account details</li><li>Process deposits and withdrawals within limits</li><li>Issue receipts and balance cash at shift end</li><li>Report shortages, suspicious activity and errors</li></ul></article>
+          <article class="responsibility-card"><h3>Loans Officer</h3><p>Manages loan applications and borrower follow-up.</p><ul><li>Collect and verify loan application documents</li><li>Assess affordability and repayment capacity</li><li>Track instalments, arrears and follow-up actions</li><li>Never approve their own restricted applications</li></ul></article>
+          <article class="responsibility-card"><h3>Accountant / Finance Officer</h3><p>Maintains accurate financial records and reconciliations.</p><ul><li>Review ledger entries and trial balances</li><li>Reconcile cash, bank and customer balances</li><li>Prepare periodic financial reports</li><li>Investigate differences and preserve audit trails</li></ul></article>
+          <article class="responsibility-card"><h3>Customer Service Officer</h3><p>Supports customers and maintains service records.</p><ul><li>Help with onboarding and account enquiries</li><li>Check application completeness and documentation</li><li>Escalate complaints and suspicious requests</li><li>Protect customer information and confidentiality</li></ul></article>
+          <article class="responsibility-card"><h3>Compliance / Internal Auditor</h3><p>Independently checks compliance and control effectiveness.</p><ul><li>Review transaction samples and audit trails</li><li>Monitor KYC/AML and reporting obligations</li><li>Document findings and follow up corrective actions</li><li>Maintain independence from transactions audited</li></ul></article>
+          <article class="responsibility-card"><h3>System Administrator</h3><p>Maintains secure user access and technical operations.</p><ul><li>Provision and disable staff access appropriately</li><li>Maintain settings, backups and monitoring</li><li>Apply least-privilege access and review role changes</li><li>Never share credentials or bypass financial approvals</li></ul></article>
+          <article class="responsibility-card"><h3>Operations / Branch Supervisor</h3><p>Coordinates daily work and operational controls.</p><ul><li>Check opening and closing procedures</li><li>Monitor pending requests and exception queues</li><li>Coordinate staff schedules and handovers</li><li>Escalate incidents and unresolved differences</li></ul></article>
+        </div>
+        <p class="muted">Responsibilities are guidance, not a substitute for approved HR policies, regulatory requirements, or the permissions configured in the software.</p>`)}
     `;
     if(db){
       Promise.all([
-        db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active").eq("is_active",true).order("full_name"),
+        db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active,sex,date_of_birth,national_id,photo_url,employment_status,job_title,start_date").order("full_name"),
         db.from("branches").select("id,branch_name").eq("is_active",true),
         db.from("staff_roles").select("id,role_code,role_name")
       ]).then(([staffResult,branchResult,roleResult])=>{
         const listEl=document.getElementById("staff-list");
         if(!listEl)return;
         const failed=[staffResult,branchResult,roleResult].find(x=>x.error);
-        if(failed){listEl.innerHTML='<p class="muted">Staff directory could not be loaded: '+esc(failed.error.message)+'</p>';return;}
+        if(failed){listEl.innerHTML='<p class="muted">Staff profile details could not be loaded. Apply the staff profile database migration and verify staff-directory permissions. Details: '+esc(failed.error.message)+'</p>';return;}
         const branches=new Map((branchResult.data||[]).map(b=>[b.id,b.branch_name]));
-        const roles=new Map((roleResult.data||[]).map(r=>[r.id,r.role_name||r.role_code]));
-        const staff=staffResult.data||[];
-        if(!staff.length){listEl.innerHTML='<p class="muted">No active employee profiles have been registered.</p>';return;}
-        const grouped={};
-        staff.forEach(s=>{const branch=branches.get(s.home_branch_id)||"Branch not assigned";(grouped[branch] ||= []).push(s);});
-        listEl.innerHTML=Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([branch,people])=>
-          '<h3>'+esc(branch)+' · '+people.length+' active staff</h3>'+
-          people.map(s=>'<div class="list-item"><div><strong>'+esc(s.full_name||"Name not provided")+'</strong> ('+esc(s.employee_number||"No employee number")+')<br><span class="muted">'+esc(s.work_email||"No email")+' · '+esc(s.phone_number||"No phone")+'</span></div><span class="badge-role">'+esc(roles.get(s.role_id)||"Role not assigned")+'</span></div>').join("")
-        ).join("");
+        const roles=new Map((roleResult.data||[]).map(r=>[r.id,{name:r.role_name||r.role_code,code:r.role_code}]));
+        const people=staffResult.data||[];
+        if(!people.length){listEl.innerHTML='<p class="muted">No employee profiles are visible to your account.</p>';return;}
+        const today=new Date();
+        const ageOf=d=>{if(!d)return "Not recorded";const born=new Date(d+"T00:00:00");let age=today.getFullYear()-born.getFullYear();if(today.getMonth()<born.getMonth()||(today.getMonth()===born.getMonth()&&today.getDate()<born.getDate()))age--;return age>=0&&age<120?age+" years":"Check date";};
+        const safePhoto=url=>url&&/^https:\/\//i.test(url)?'<img class="staff-photo" loading="lazy" alt="Staff profile photo" src="'+esc(url)+'">':'<div class="staff-photo-placeholder" aria-label="No profile photo"><span>👤</span></div>';
+        const sensitive=window.currentEmployeeRole&&["system_admin","bank_admin","hr_manager"].includes(window.currentEmployeeRole);
+        listEl.innerHTML=people.map(s=>{
+          const role=roles.get(s.role_id)||{name:"Role not assigned",code:""};
+          const status=s.employment_status|| (s.is_active?"Active":"Inactive");
+          const details=[
+            ["Sex",s.sex||"Not recorded"],["Age",ageOf(s.date_of_birth)],["Employee ID",s.employee_number||"Not assigned"],
+            ["National ID",sensitive?(s.national_id||"Not recorded"):(s.national_id?"Restricted":"Not recorded")],
+            ["Date of birth",s.date_of_birth||"Not recorded"],["Phone",s.phone_number||"Not recorded"],
+            ["Work email",s.work_email||"Not recorded"],["Branch",branches.get(s.home_branch_id)||"Not assigned"],
+            ["Job title",s.job_title||role.name||"Not assigned"],["Employment status",status],["Start date",s.start_date||"Not recorded"]
+          ];
+          return '<div class="staff-card">'+safePhoto(s.photo_url)+'<div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>'+esc(s.full_name||"Name not provided")+'</strong><span class="badge-role">'+esc(role.name)+'</span><span class="staff-status">'+esc(status)+'</span></div><div class="staff-detail-grid">'+details.map(([label,value])=>'<div class="staff-detail"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>').join("")+'</div></div></div>';
+        }).join("");
       }).catch(()=>{
         const listEl=document.getElementById("staff-list");
-        if(listEl)listEl.innerHTML='<p class="muted">A connection error prevented the staff directory from loading.</p>';
+        if(listEl)listEl.innerHTML='<p class="muted">A connection error prevented staff profiles from loading.</p>';
       });
     }else{
       const listEl=document.getElementById("staff-list");
-      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No sample staff are displayed.</p>';
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No sample profiles are displayed.</p>';
     }
   }
   else if (pageName === "Customers") {
@@ -1200,13 +1221,66 @@ window.showAttendanceDeviceHelp = function() {
   help.textContent = messages[select.value] || messages.generic;
 };
 
+
+const ZFS_FONTS = ["Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito Sans","Source Sans 3","PT Sans","Ubuntu","Raleway","Merriweather","Playfair Display","Lora","Nunito","Work Sans","DM Sans","Manrope","Fira Sans","IBM Plex Sans","Roboto Slab","Oswald","Quicksand","Cabin","Karla"];
+function applyAppearance() {
+  const themePicker=document.getElementById("theme-picker");
+  const fontPicker=document.getElementById("font-picker");
+  let theme="emerald",font="Inter";
+  try { theme=localStorage.getItem("zfs-theme")||theme; font=localStorage.getItem("zfs-font")||font; } catch(e) {}
+  const validThemes=["emerald","ocean","midnight","light","violet","teal","burgundy"];
+  if(!validThemes.includes(theme))theme="emerald";
+  if(!ZFS_FONTS.includes(font))font="Inter";
+  document.body.dataset.theme=theme;
+  document.documentElement.style.setProperty("--font-family",'"'+font+'", sans-serif');
+  if(themePicker)themePicker.value=theme;
+  if(fontPicker)fontPicker.value=font;
+}
+function initAppearanceControls() {
+  applyAppearance();
+  const themePicker=document.getElementById("theme-picker");
+  const fontPicker=document.getElementById("font-picker");
+  if(themePicker)themePicker.addEventListener("change",()=>{document.body.dataset.theme=themePicker.value;try{localStorage.setItem("zfs-theme",themePicker.value);}catch(e){}});
+  if(fontPicker)fontPicker.addEventListener("change",()=>{document.documentElement.style.setProperty("--font-family",'"'+fontPicker.value+'", sans-serif');try{localStorage.setItem("zfs-font",fontPicker.value);}catch(e){}});
+}
+
+async function loadCurrentEmployeeGreeting() {
+  if(!db)return;
+  try {
+    const {data:{user}}=await db.auth.getUser();
+    if(!user)return;
+    const {data,error}=await db.from("employee_profiles").select("full_name,role_id").eq("user_id",user.id).maybeSingle();
+    if(error||!data)return;
+    window.currentEmployeeName=data.full_name||"";
+    const {data:role}=await db.from("staff_roles").select("role_code").eq("id",data.role_id).maybeSingle();
+    window.currentEmployeeRole=role?.role_code||"";
+    const userEl=document.getElementById("signed-in-user");
+    if(userEl)userEl.textContent=window.currentEmployeeName||"Zivamuntuyo Staff";
+    setWelcomeMessage();
+  } catch(e) {}
+}
+
+function setWelcomeMessage() {
+  const title=document.getElementById("welcome-title");
+  const message=document.getElementById("welcome-message");
+  if(!title||!message)return;
+  const hour=Number(new Intl.DateTimeFormat("en-GB",{hour:"2-digit",hourCycle:"h23",timeZone:"Africa/Kampala"}).format(new Date()));
+  const greeting=hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
+  const name=(window.currentEmployeeName||"").trim();
+  title.textContent=greeting+(name?", "+name:"");
+  message.textContent="Welcome to Zivamuntuyo Financial Services. Review branch activity, customer accounts, staffing, savings, loans and financial controls from one secure workspace.";
+}
+
 function initApp() {
+  initAppearanceControls();
+  loadCurrentEmployeeGreeting();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', (e) => {
       window.switchPage(e.currentTarget.dataset.page);
     });
   });
   window.switchPage("Dashboard");
+  setTimeout(setWelcomeMessage,100);
 }
 
 if (document.readyState === 'loading') {
