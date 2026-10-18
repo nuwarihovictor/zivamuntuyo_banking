@@ -86,7 +86,7 @@ declare
   v_duplicate_count integer;
 begin
   if v_user is null then raise exception 'Sign-in required'; end if;
-  if v_role not in ('system_admin','bank_admin','branch_manager','accountant','teller') then
+  if v_role is null or v_role not in ('system_admin','bank_admin','branch_manager','accountant','teller') then
     raise exception 'Your role cannot process institutional payroll';
   end if;
   if not public.current_employee_can_transact_in_branch(p_branch_id) then
@@ -155,9 +155,9 @@ begin
   select id into v_deposit_account from public.ledger_accounts
    where ledger_code='2000' and currency_code='UGX' and is_active and branch_id is null;
   select id into v_income_account from public.ledger_accounts
-   where ledger_code='4000' and currency_code='UGX' and is_active and branch_id is null;
+   where ledger_code='4400' and currency_code='UGX' and is_active and branch_id is null;
   if v_deposit_account is null or v_income_account is null then
-    raise exception 'General-ledger accounts 2000 (customer deposits) and 4000 (commission income) must be configured';
+    raise exception 'General-ledger accounts 2000 (customer deposits) and 4400 (institutional payroll commission income) must be configured';
   end if;
 
   insert into public.institution_payroll_batches
