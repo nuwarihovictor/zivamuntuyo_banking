@@ -91,3 +91,21 @@ Ask the supplier for a photo of the device label or its exact manufacturer/model
 ## Current state
 
 USB is the intended connection style, but the hardware model is not selected. No USB scan, Windows service, fingerprint matching, or official attendance event ingestion is active. Do not mark this connector as compatible until tests pass with the real hardware on both Windows 10 and Windows 11.
+
+
+## Multi-reader rollout plan
+
+The planned purchase is **several USB readers**, potentially for multiple staff computers and branches. The design must treat each physical reader as a separately registered device while keeping attendance records in one central system.
+
+1. **Pilot one unit first.** Purchase or borrow one exact model/SKU and validate the official driver, SDK, enrollment, matching, Windows 10, and Windows 11 before ordering the remaining units.
+2. **Standardize the fleet.** Prefer the same exact model and hardware revision across sites to reduce driver, SDK, support, and training differences. If mixed models are unavoidable, maintain a tested adapter per model family.
+3. **Register each physical reader separately.** Store a unique server-issued device ID, serial/device identifier where available, assigned branch, workstation label, enabled/disabled state, connector version, and last-seen/last-sync timestamps. Never trust a device ID supplied only by a browser.
+4. **Control branch assignment.** An authorized administrator assigns each reader to a branch. A device must not submit events for another branch unless an explicit authorized reassignment has been recorded and audited.
+5. **Enroll staff once in the central identity workflow.** Avoid enrolling the same employee independently on every workstation where possible. Confirm the vendor SDK's supported template portability and security model first; do not assume templates from different readers or SDK versions are interchangeable.
+6. **Plan installation and support.** Keep a device inventory with serial/SKU, workstation, branch, installation date, driver/SDK version, warranty, and test status. Provide a documented replacement, revocation, and reassignment process.
+7. **Pilot before bulk purchase.** Test several simultaneous readers, same-person rapid scans at different stations, network loss/recovery, revoked devices, branch reassignment, and duplicate/out-of-order events. Confirm server-side idempotency prevents duplicate official attendance.
+8. **Keep manual fallback auditable.** If a reader or workstation fails, an authorized supervisor may record a clearly labelled manual correction with reason and audit trail; it must never be labelled fingerprint-verified.
+
+### Bulk-purchase gate
+
+Do not order the full batch until one unit has passed the Windows 10 and Windows 11 test matrix and the organization has confirmed the exact SKU, genuine supply source, SDK/API distribution rights, warranty/returns, and expected quantity by branch. Official vendor driver/SDK pages establish stated OS support, not compatibility with this unfinished application.
