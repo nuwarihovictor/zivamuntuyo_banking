@@ -109,3 +109,15 @@ The planned purchase is **several USB readers**, potentially for multiple staff 
 ### Bulk-purchase gate
 
 Do not order the full batch until one unit has passed the Windows 10 and Windows 11 test matrix and the organization has confirmed the exact SKU, genuine supply source, SDK/API distribution rights, warranty/returns, and expected quantity by branch. Official vendor driver/SDK pages establish stated OS support, not compatibility with this unfinished application.
+
+
+## Branch deployment assumption
+
+The current rollout assumption is **one USB fingerprint reader per branch**. Branch count and final deployment locations still need confirmation against the active branch register.
+
+- Allocate one reader to each confirmed active branch, with the head office treated according to the organization's decision on whether it also needs a reader.
+- Register every reader with a unique device ID and bind it to one authorized branch and workstation. Record serial number, model/SKU, driver/SDK version, installer version, and test status in the device inventory.
+- All devices send attendance events to the same central attendance service. Branch-level permissions and server-side validation must prevent a device assigned to one branch from creating events for another branch.
+- Pilot one reader at one location first. After the exact model passes the Windows 10 and Windows 11 test matrix, repeat a controlled installation and acceptance checklist for each branch before enabling official attendance writes.
+- Confirm branch count, whether Butare head office requires its own reader, network reliability at each location, and whether a branch has a Windows 10/11 workstation before calculating the final purchase quantity.
+- The one-reader-per-branch plan is a deployment requirement only; it does not mean fingerprint integration is already implemented or hardware compatibility is verified.
