@@ -863,31 +863,34 @@ window.handleCustomerSubmit = async function(e) {
 
 window.handleAccountSubmit = async function(e) {
   e.preventDefault();
-  const form = e.target;
-  const feedback = document.getElementById("acc-feedback");
-  if (feedback) feedback.textContent = "Processing account application...";
-  if (!db) { if (feedback) feedback.textContent = "Database connection is unavailable. No account was created."; return; }
-
-  const formData = new FormData(form);
-  const payload = {
-    customer_id: String(formData.get("customer_id")||"").trim(),
-    branch_id: formData.get("branch_id"),
-    account_type_id: formData.get("account_type_id"),
-    product_type: formData.get("product_type") || "savings",
-    currency_code: formData.get("currency_code") || "UGX",
-    account_number: "ACC-" + Math.floor(10000000 + Math.random() * 90000000),
-    status: "pending_approval",
-    balance: 0.00
-  };
-
-  const { error } = await db.from("bank_accounts").insert([payload]);
-  if (error) {
-    if (feedback) feedback.textContent = "Error: " + error.message;
-  } else {
-    if (feedback) feedback.textContent = "Account request submitted. Confirm the approval workflow before activating the account.";
-    form.reset();
-    setTimeout(() => window.switchPage("Accounts"), 1200);
+  const form=e.target;
+  const feedback=document.getElementById("acc-feedback");
+  if(!db){if(feedback)feedback.textContent="Database connection unavailable. No account request was submitted.";return;}
+  const formData=new FormData(form);
+  const customerId=String(formData.get("customer_id")||"").trim();
+  const branchId=String(formData.get("branch_id")||"").trim();
+  const accountTypeId=String(formData.get("account_type_id")||"").trim();
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)){
+    if(feedback)feedback.textContent="Enter a valid customer UUID.";return;
   }
+  if(!branchId||!accountTypeId){if(feedback)feedback.textContent="Choose a branch and account ownership type.";return;}
+  const button=form.querySelector('button[type="submit"]');
+  if(button)button.disabled=true;
+  if(feedback)feedback.textContent="Submitting account request for approval…";
+  try{
+    const {data,error}=await db.rpc("create_bank_account_request",{
+      p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
+      p_product_type:formData.get("product_type")||"savings",
+      p_currency_code:formData.get("currency_code")||"UGX"
+    });
+    if(error){if(feedback)feedback.textContent="Account request not submitted: "+error.message;return;}
+    const result=Array.isArray(data)?data[0]:data;
+    if(feedback)feedback.textContent="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval");
+    form.reset();
+    setTimeout(()=>window.switchPage("Accounts"),1200);
+  }catch(err){
+    if(feedback)feedback.textContent="Account request failed: "+(err?.message||"Unexpected error");
+  }finally{if(button)button.disabled=false;}
 };
 
 window.handleTransaction = async function(e) {
