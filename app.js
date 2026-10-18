@@ -46,8 +46,10 @@ window.switchPage = function(pageName) {
         "Live general-ledger overview",
         "Charts use posted journal entries only. Amounts stay separated by currency, and no sample figures are displayed.",
         `<div class="form-grid">
-           <label>Branch UUID (optional; limited to your authorized branch scope)
-             <input id="dashboard-branch-id" type="text" placeholder="All authorized branches">
+           <label>Branch filter
+             <select id="dashboard-branch-id">
+               <option value="">All authorized branches</option>
+             </select>
            </label>
            <button type="button" class="secondary" onclick="loadDashboardCharts();loadBranchPortfolioSummary()">Refresh dashboard</button>
          </div>
@@ -87,8 +89,19 @@ window.switchPage = function(pageName) {
          <p class="muted">Charts are operational summaries, not audited financial statements. A balanced total does not prove all transactions have been recorded.</p>`
       )}
     `;
+    window.loadDashboardBranchOptions();
     window.loadDashboardCharts();
-    window.loadBranchPortfolioSummary();
+    window.loadDashboardBranchOptions = async function() {
+  const select=document.getElementById("dashboard-branch-id");
+  if(!select||!db)return;
+  const {data,error}=await db.from("branches").select("id,branch_name,is_head_office").eq("is_active",true).order("is_head_office",{ascending:false}).order("branch_name");
+  if(error)return;
+  const previous=select.value;
+  select.innerHTML='<option value="">All authorized branches</option>'+(data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+(b.is_head_office?' · Main branch':' · Outreach')+'</option>').join("");
+  if((data||[]).some(b=>b.id===previous))select.value=previous;
+};
+
+window.loadBranchPortfolioSummary();
   } 
   else if (pageName === "Branches") {
     c.innerHTML = `
