@@ -328,7 +328,45 @@ window.switchPage = function(pageName) {
            <li>Store attendance events and device identifiers, not raw fingerprint images.</li>
            <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
          </ul>
-         <p class="muted">Select a family above to see the intended integration path. This is a compatibility plan, not a claim that every model has been tested.</p>
+         <hr>
+         <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
+         <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. These settings are currently a preview and are not yet saved to the database.</p>
+         <div class="notice-box"><strong>Manager configuration</strong><br>Use the fields below to plan the schedule. Saving official rules will require a manager-authorized database action and an audit trail.</div>
+         <form id="attendance-policy-form" onsubmit="previewAttendancePolicy(event)">
+           <div class="grid-2">
+             <label>Standard clock-in time<input id="attendance-start" type="time" value="08:30" required></label>
+             <label>Standard clock-out time<input id="attendance-end" type="time" value="17:00" required></label>
+             <label>Late-arrival grace period (minutes)<input id="attendance-grace" type="number" min="0" max="180" value="5" required></label>
+             <label>Unpaid break duration (minutes)<input id="attendance-break-minutes" type="number" min="0" max="240" value="60" required></label>
+             <label>Break starts (optional)<input id="attendance-break-start" type="time" value="13:00"></label>
+             <label>Break ends (optional)<input id="attendance-break-end" type="time" value="14:00"></label>
+             <label>Overtime policy<select id="attendance-overtime"><option value="yes" selected>Manager approval required</option><option value="no">Record only</option></select></label>
+             <label>Timezone<select id="attendance-timezone"><option value="Africa/Kampala" selected>Africa/Kampala (Uganda)</option><option value="UTC">UTC</option></select></label>
+           </div>
+           <fieldset class="attendance-days">
+             <legend><strong>Working days</strong></legend>
+             <label><input type="checkbox" name="attendance-day" value="Monday" checked> Monday</label>
+             <label><input type="checkbox" name="attendance-day" value="Tuesday" checked> Tuesday</label>
+             <label><input type="checkbox" name="attendance-day" value="Wednesday" checked> Wednesday</label>
+             <label><input type="checkbox" name="attendance-day" value="Thursday" checked> Thursday</label>
+             <label><input type="checkbox" name="attendance-day" value="Friday" checked> Friday</label>
+             <label><input type="checkbox" name="attendance-day" value="Saturday"> Saturday</label>
+             <label><input type="checkbox" name="attendance-day" value="Sunday"> Sunday</label>
+           </fieldset>
+           <div class="form-grid">
+             <button type="submit" class="primary">Preview schedule & timesheet rules</button>
+             <button type="button" class="secondary" onclick="resetAttendancePolicy()">Reset to defaults</button>
+           </div>
+         </form>
+         <div id="attendance-policy-feedback" class="notice-box" aria-live="polite">Default preview: 08:30–17:00, 60-minute break, Monday–Friday. Net scheduled work: 7 hours 30 minutes per day.</div>
+         <h3 style="margin:18px 0 8px;">Timesheets & attendance exceptions</h3>
+         <div class="grid-2">
+           <div class="metric-card"><strong>Daily timesheet</strong><p class="muted">First clock-in, last clock-out, break time, net worked hours, late minutes, early departure and overtime.</p></div>
+           <div class="metric-card"><strong>Manager corrections</strong><p class="muted">Require a reason, original and corrected times, who changed it, when it changed, and approval history.</p></div>
+           <div class="metric-card"><strong>Absence & leave</strong><p class="muted">Track absent days, approved leave, public holidays, rest days and missing punches separately.</p></div>
+           <div class="metric-card"><strong>Payroll export</strong><p class="muted">Approved timesheets can later feed payroll summaries, with overtime and deductions shown separately.</p></div>
+         </div>
+         <p class="muted">This is a setup and rules preview: fingerprint capture, official attendance records, secure manager-only saving and payroll integration are not enabled yet.</p>
          <p><a href="https://github.com/nuwarihovictor/zivamuntuyo_banking/blob/main/docs/attendance-device-compatibility.md" target="_blank" rel="noopener noreferrer">Read device compatibility and implementation plan</a></p>`
       )}
     `;
@@ -882,6 +920,31 @@ window.printTestReceipt = function() {
     <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script>
     </body></html>`);
   printWindow.document.close();
+};
+
+window.previewAttendancePolicy = function(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const read = id => document.getElementById(id);
+  const start = read("attendance-start").value, end = read("attendance-end").value;
+  const breakMinutes = Number(read("attendance-break-minutes").value || 0), grace = Number(read("attendance-grace").value || 0);
+  const feedback = read("attendance-policy-feedback");
+  const days = Array.from(document.querySelectorAll('input[name="attendance-day"]:checked')).map(el => el.value);
+  if (!start || !end || end <= start) { feedback.textContent = "Clock-out must be later than clock-in. Please correct the times."; return; }
+  const toMinutes = t => { const p=t.split(":").map(Number); return p[0]*60+p[1]; };
+  const span=toMinutes(end)-toMinutes(start);
+  if (breakMinutes>span) { feedback.textContent="Break duration cannot exceed the scheduled shift length."; return; }
+  const breakStart=read("attendance-break-start").value, breakEnd=read("attendance-break-end").value;
+  if ((breakStart&&!breakEnd)||(!breakStart&&breakEnd)||(breakStart&&breakEnd&&breakEnd<=breakStart)) { feedback.textContent="Enter both break times, and ensure break end is later than break start."; return; }
+  const net=span-breakMinutes, fmt=mins=>Math.floor(mins/60)+" hour(s) "+(mins%60)+" minute(s)";
+  feedback.textContent="Preview only — "+start+" to "+end+"; break "+breakMinutes+" min; net scheduled work "+fmt(net)+" per day; grace period "+grace+" min; working days: "+(days.length?days.join(", "):"none selected")+"; overtime: "+(read("attendance-overtime").value==="yes"?"manager approval required":"record only")+"; timezone: "+read("attendance-timezone").value+". This has not been saved.";
+};
+window.resetAttendancePolicy = function() {
+  const defaults={"attendance-start":"08:30","attendance-end":"17:00","attendance-grace":"5","attendance-break-minutes":"60","attendance-break-start":"13:00","attendance-break-end":"14:00"};
+  Object.entries(defaults).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=value;});
+  document.querySelectorAll('input[name="attendance-day"]').forEach(el=>{el.checked=["Monday","Tuesday","Wednesday","Thursday","Friday"].includes(el.value);});
+  const ot=document.getElementById("attendance-overtime");if(ot)ot.value="yes";
+  const tz=document.getElementById("attendance-timezone");if(tz)tz.value="Africa/Kampala";
+  const feedback=document.getElementById("attendance-policy-feedback");if(feedback)feedback.textContent="Reset preview: 08:30–17:00, 60-minute break, Monday–Friday. Net scheduled work: 7 hours 30 minutes per day. Not saved.";
 };
 
 window.showAttendanceDeviceHelp = function() {
