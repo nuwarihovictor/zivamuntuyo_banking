@@ -53,6 +53,14 @@ window.switchPage = function(pageName) {
          </div>
          <div id="dashboard-feedback" class="muted" aria-live="polite">Loading live accounting data…</div>
          <div id="dashboard-kpis" class="grid-2"></div>
+         <h3 style="margin-top:22px;">Branch portfolio and account counts</h3>
+         <p class="muted">Shows accounts, customers, active staff, loans, loan principal and recorded transactions for each authorized branch.</p>
+         <div id="branch-portfolio-feedback" class="muted" aria-live="polite">Loading branch counts…</div>
+         <div id="branch-portfolio-summary"></div>
+         <h3 style="margin-top:18px;">Account counts by branch and account type</h3>
+         <div id="branch-account-type-counts"></div>
+         <h3 style="margin-top:18px;">Loans by branch and status</h3>
+         <div id="branch-loan-status-counts"></div>
          <label>Chart currency <select id="dashboard-chart-currency" onchange="renderDashboardAnalyticsCharts()"></select></label>
          <div class="grid-2 dashboard-chart-grid">
            <div class="metric-card dashboard-chart-card">
@@ -80,6 +88,7 @@ window.switchPage = function(pageName) {
       )}
     `;
     window.loadDashboardCharts();
+    window.loadBranchPortfolioSummary();
   } 
   else if (pageName === "Branches") {
     c.innerHTML = `
@@ -326,7 +335,34 @@ window.switchPage = function(pageName) {
         <div id="transaction-monitor-list"></div>`
       )}
     `;
-    window.loadTransactionMonitor();
+    window.loadBranchPortfolioSummary = async function() {
+  const feedback=document.getElementById("branch-portfolio-feedback");
+  const summary=document.getElementById("branch-portfolio-summary");
+  const accountTypes=document.getElementById("branch-account-type-counts");
+  const loanStatuses=document.getElementById("branch-loan-status-counts");
+  if(!feedback||!summary||!accountTypes||!loanStatuses)return;
+  const branchInput=document.getElementById("dashboard-branch-id");
+  const branchId=branchInput?branchInput.value.trim():"";
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){
+    feedback.textContent="Enter a valid branch UUID or leave the field blank.";return;
+  }
+  if(!db){feedback.textContent="Database connection unavailable.";return;}
+  feedback.textContent="Loading branch portfolio…";summary.innerHTML=accountTypes.innerHTML=loanStatuses.innerHTML="";
+  const {data,error}=await db.rpc("list_branch_portfolio_summary",{p_branch_id:branchId||null});
+  if(error){feedback.textContent="Branch counts need the list_branch_portfolio_summary SQL function installed. Details: "+error.message;return;}
+  const rows=data||[];
+  const branchRows=rows.filter(r=>r.metric_type==="branch_summary");
+  const typeRows=rows.filter(r=>r.metric_type==="account_type"&&Number(r.account_count||0)>0);
+  const loanRows=rows.filter(r=>r.metric_type==="loan_status"&&Number(r.loan_count||0)>0);
+  if(!branchRows.length){feedback.textContent="No active branches are visible in your authorized scope.";return;}
+  const num=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+  summary.innerHTML='<div class="grid-2">'+branchRows.map(r=>'<div class="metric-card"><h3>'+esc(r.branch_name)+'</h3><div class="metric-val">'+num(r.account_count)+' <span class="muted">accounts</span></div><div class="muted">Customers: '+num(r.customer_count)+' · Active staff: '+num(r.staff_count)+'</div><div class="muted">Loans: '+num(r.loan_count)+' · Principal total: UGX '+num(r.loan_principal_total)+'</div><div class="muted">Transactions: '+num(r.transaction_count)+' · Completed/posted amount: UGX '+num(r.transaction_amount_total)+'</div></div>').join("")+'</div>';
+  accountTypes.innerHTML=typeRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Account type</th><th>Accounts</th></tr></thead><tbody>'+typeRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.account_type||"Unclassified")+'</td><td>'+num(r.account_count)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No bank accounts have been recorded by account type yet.</p>';
+  loanStatuses.innerHTML=loanRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Loan status</th><th>Loans</th><th>Principal</th></tr></thead><tbody>'+loanRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.status||"Unspecified")+'</td><td>'+num(r.loan_count)+'</td><td>UGX '+num(r.loan_principal_total)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No loans have been recorded yet.</p>';
+  feedback.textContent="Branch portfolio loaded from database records. Zero counts mean no records are currently registered; savings products are not yet separately classified in the database.";
+};
+
+window.loadTransactionMonitor();
   }
   else if (pageName === "Attendance") {
     c.innerHTML = `
