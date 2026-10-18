@@ -748,6 +748,15 @@ window.loadAttendancePolicy();
     fsChange("account");
   }
 
+  else if (pageName === "Payroll") {
+    c.innerHTML = '<span class="category-tag">Institutional banking · bulk salary payments</span><h2 class="page-heading">Institutional Payroll</h2><p class="page-intro">Pay salaries from an institution account in one controlled batch. Each employee is charged a flat UGX 1,000 commission on the payment date; the remaining salary is credited to their own active UGX account.</p>' +
+      panel("PAYROLL FUNDING","Select the institution account","The account must have enough available balance for the full gross payroll.",'<div class="form-grid"><label>Institution funding account *<select id="payroll-source-account" required><option value="">Loading active UGX accounts…</option></select></label><label>Payroll reference *<input id="payroll-reference" required minlength="4" placeholder="e.g. SCHOOL-OCT-2026"></label><label>Payment date *<input id="payroll-date" type="date" required></label></div><p id="payroll-account-feedback" class="muted" aria-live="polite">Loading active accounts…</p>') +
+      panel("EMPLOYEE SALARY LIST","Paste or enter payroll rows","Use one employee per line in this format: account number | employee name | gross salary | employee number (optional). The account number must match an active UGX account in the same branch.",'<label>Employee payroll rows *<textarea id="payroll-rows" rows="9" placeholder="0012345678 | Amina N. | 500000 | EMP-001&#10;0012345679 | David K. | 420000 | EMP-002" required></textarea></label><p class="muted">Commission is fixed at UGX 1,000 per employee. Gross salary must exceed UGX 1,000. Duplicate accounts, invalid accounts, future dates and insufficient funding are rejected.</p><div class="button-row"><button type="button" class="primary" onclick="previewInstitutionPayroll()">Preview payroll totals</button><button type="button" class="primary" onclick="processInstitutionPayroll()">Confirm &amp; pay salaries</button></div><div id="payroll-preview" class="panel" aria-live="polite"><p class="muted">Preview totals before confirming payment.</p></div><p id="payroll-feedback" class="muted" aria-live="polite"></p>') +
+      panel("POSTED PAYROLL RECEIPT","Batch confirmation","Print the summary after a successful posting.",'<div id="payroll-receipt" class="receipt-preview"><p class="muted">No payroll has been posted in this session.</p></div><button type="button" class="secondary" onclick="printInstitutionPayrollReceipt()">Print payroll summary</button>');
+    const dateEl=document.getElementById("payroll-date"); if(dateEl)dateEl.value=new Date().toLocaleDateString("en-CA");
+    window.loadInstitutionPayrollAccounts();
+  }
+
   else if (pageName === "Performance") {
     c.innerHTML = '<span class="category-tag">Management accounts · recorded activity</span><h2 class="page-heading">Bank Performance</h2><p class="page-intro">Recorded income, expenses, operating surplus or deficit, non-withdrawable share capital, restricted reserves and cash movement. These management figures are not an audited profit-and-loss statement.</p>' +
       panel("PERIOD & BRANCH FILTERS","Review performance","Choose a branch and period.",'<div class="form-grid performance-filters"><label>Branch<select id="performance-branch"><option value="">All authorized branches</option></select></label><label>From date<input type="date" id="performance-start"></label><label>To date<input type="date" id="performance-end"></label><button type="button" class="primary" onclick="loadBankPerformance()">Refresh performance</button></div><p id="performance-feedback" class="muted" aria-live="polite">Loading…</p>') +
@@ -1867,6 +1876,83 @@ function setWelcomeMessage() {
   title.textContent=greeting+(name?", "+name:"");
   message.textContent="Welcome to Zivamuntuyo Financial Services. Review branch activity, customer accounts, staffing, savings, loans and financial controls from one secure workspace.";
 }
+
+window.payrollAccounts = [];
+window.loadInstitutionPayrollAccounts = async function(){
+  const select=document.getElementById("payroll-source-account"), feedback=document.getElementById("payroll-account-feedback");
+  if(!select||!db)return;
+  try{
+    const {data,error}=await db.from("bank_accounts").select("id,account_number,branch_id,currency_code,status,balance").eq("status","active").eq("currency_code","UGX").order("account_number");
+    if(error)throw error;
+    window.payrollAccounts=data||[];
+    select.innerHTML='<option value="">Choose institution account…</option>'+window.payrollAccounts.map(a=>'<option value="'+a.id+'">'+a.account_number+' · available UGX '+Number(a.balance||0).toLocaleString("en-UG")+'</option>').join("");
+    if(feedback)feedback.textContent=window.payrollAccounts.length+" active UGX accounts available to authorized branch access. Choose the institution funding account.";
+  }catch(err){if(feedback)feedback.textContent="Could not load accounts: "+(err?.message||"Unexpected error");}
+};
+window.getInstitutionPayrollDraft = function(){
+  const source=document.getElementById("payroll-source-account")?.value||"";
+  const reference=document.getElementById("payroll-reference")?.value.trim()||"";
+  const date=document.getElementById("payroll-date")?.value||"";
+  const raw=document.getElementById("payroll-rows")?.value||"";
+  const accounts=window.payrollAccounts||[];
+  const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const items=[];
+  for(let i=0;i<lines.length;i++){
+    const parts=lines[i].split("|").map(x=>x.trim());
+    if(parts.length<3||!parts[0]||!parts[1]||!parts[2])throw new Error("Line "+(i+1)+": use account number | employee name | gross salary | employee number (optional).");
+    const account=accounts.find(a=>a.account_number===parts[0]);
+    if(!account)throw new Error("Line "+(i+1)+": account number "+parts[0]+" was not found among active UGX accounts available to you.");
+    const amount=Number(parts[2].replace(/,/g,""));
+    if(!Number.isFinite(amount)||amount<=1000)throw new Error("Line "+(i+1)+": gross salary must be a number greater than UGX 1,000.");
+    items.push({account_id:account.id,employee_name:parts[1],gross_salary:Math.round(amount*100)/100,employee_reference:parts[3]||null});
+  }
+  if(!source)throw new Error("Select the institution funding account.");
+  if(reference.length<4)throw new Error("Enter a payroll reference with at least 4 characters.");
+  if(!date)throw new Error("Select the payroll payment date.");
+  if(!items.length)throw new Error("Enter at least one employee salary row.");
+  const duplicate=items.find((x,i)=>items.findIndex(y=>y.account_id===x.account_id)!==i);
+  if(duplicate)throw new Error("Duplicate employee account: "+duplicate.employee_name+". Each account can appear only once per payroll.");
+  const gross=items.reduce((s,x)=>s+x.gross_salary,0), commission=items.length*1000;
+  return {source,reference,date,items,gross,commission,net:gross-commission};
+};
+window.previewInstitutionPayroll = function(){
+  const preview=document.getElementById("payroll-preview"),feedback=document.getElementById("payroll-feedback");
+  try{
+    const d=window.getInstitutionPayrollDraft();
+    preview.innerHTML='<h3>Payroll preview — not yet paid</h3><div class="performance-summary-grid"><div class="metric-card"><span>Employees</span><strong>'+d.items.length.toLocaleString("en-UG")+'</strong></div><div class="metric-card"><span>Gross payroll</span><strong>UGX '+d.gross.toLocaleString("en-UG")+'</strong></div><div class="metric-card"><span>Bank commission</span><strong>UGX '+d.commission.toLocaleString("en-UG")+'</strong></div><div class="metric-card"><span>Employee net total</span><strong>UGX '+d.net.toLocaleString("en-UG")+'</strong></div></div><p>Reference: '+d.reference+' · Date: '+d.date+'</p><p class="muted">Preview only. Balances will change only after you confirm and the database accepts the full batch.</p>';
+    if(feedback)feedback.textContent="Check the totals and employee list, then confirm to post the batch.";
+  }catch(err){if(preview)preview.textContent="Cannot preview: "+(err?.message||"Invalid payroll");if(feedback)feedback.textContent=err?.message||"Invalid payroll";}
+};
+window.processInstitutionPayroll = async function(){
+  const feedback=document.getElementById("payroll-feedback"), buttons=document.querySelectorAll('#main-content button[onclick="processInstitutionPayroll()"]');
+  try{
+    if(!db)throw new Error("Database connection is not ready.");
+    const d=window.getInstitutionPayrollDraft();
+    if(!window.confirm("POST payroll "+d.reference+"?\nEmployees: "+d.items.length+"\nGross debit: UGX "+d.gross.toLocaleString("en-UG")+"\nCommission income: UGX "+d.commission.toLocaleString("en-UG")+"\nEmployee accounts credited: UGX "+d.net.toLocaleString("en-UG")+"\n\nThis action changes account balances and cannot be undone from this screen."))return;
+    buttons.forEach(b=>{b.disabled=true;b.textContent="Posting payroll…";});
+    if(feedback)feedback.textContent="Submitting the complete payroll for atomic posting…";
+    const source=window.payrollAccounts.find(a=>a.id===d.source);
+    if(!source)throw new Error("Please reload the account list and select the institution account again.");
+    const {data,error}=await db.rpc("process_institution_payroll",{p_branch_id:source.branch_id,p_institution_account_id:d.source,p_payroll_reference:d.reference,p_payroll_date:d.date,p_items:d.items});
+    if(error)throw error;
+    const result=data||{};
+    const summary="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nINSTITUTIONAL PAYROLL RECEIPT\nReference: "+result.payroll_reference+"\nDate: "+result.payroll_date+"\nBatch: "+result.batch_id+"\nEmployees paid: "+result.employee_count+"\nGross payroll: UGX "+Number(result.gross_total).toLocaleString("en-UG")+"\nCommission (UGX 1,000 each): UGX "+Number(result.commission_total).toLocaleString("en-UG")+"\nTotal credited to employee accounts: UGX "+Number(result.net_total).toLocaleString("en-UG")+"\nStatus: POSTED\nGeneral ledger journal: "+result.journal_id;
+    const receipt=document.getElementById("payroll-receipt");if(receipt){receipt.textContent=summary;receipt.dataset.summary=summary;}
+    const preview=document.getElementById("payroll-preview");if(preview)preview.textContent=summary;
+    if(feedback)feedback.textContent="Payroll successfully posted. Employee accounts have been credited and commission income recorded. Print the payroll summary for the institution.";
+    const rows=document.getElementById("payroll-rows");if(rows)rows.value="";
+    await window.loadInstitutionPayrollAccounts();
+  }catch(err){if(feedback)feedback.textContent="Payroll was not confirmed: "+(err?.message||"Unexpected error");}
+  finally{buttons.forEach(b=>{b.disabled=false;b.textContent="Confirm & pay salaries";});}
+};
+window.printInstitutionPayrollReceipt = function(){
+  const receipt=document.getElementById("payroll-receipt"), summary=receipt?.dataset.summary||"";
+  if(!summary){alert("Post a payroll first. No receipt is available to print.");return;}
+  const win=window.open("","_blank","width=800,height=700");
+  if(!win){alert("Allow pop-ups to print the payroll receipt.");return;}
+  win.document.write("<!doctype html><html><head><title>Institutional Payroll Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>POSTED · UGX</div><pre>"+summary.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><p>Keep this receipt with the institution payroll records.</p><script>window.onload=function(){window.print();};<\/script></body></html>");
+  win.document.close();
+};
 
 function initApp() {
   initAppearanceControls();
