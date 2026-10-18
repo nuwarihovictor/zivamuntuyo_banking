@@ -34,7 +34,7 @@ function staffModuleTabs(active){
 
 window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
-    if (btn.dataset.page === pageName) {
+    if (btn.dataset.page === pageName || (btn.dataset.page === "Staff" && ["Staff","Attendance","StaffChat"].includes(pageName))) {
       btn.classList.add('active');
     } else {
       btn.classList.remove('active');
