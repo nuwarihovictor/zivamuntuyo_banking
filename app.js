@@ -976,6 +976,45 @@ window.renderDashboardAnalyticsCharts=function(){
   ]},options:{...common,indexAxis:"y",scales:{x:moneyAxis}}});
   dashboardAccountTypeChart=makeChart("dashboard-account-types",{type:"doughnut",data:{labels:types.map(r=>r.ledger_type||"Unclassified"),datasets:[{label:"Absolute net movement",data:types.map(r=>Math.abs(Number(r.debit_total||0)-Number(r.credit_total||0)))}]},options:common});
 };
+
+window.loadPerformanceBranchOptions=async function(){
+ const sel=document.getElementById("performance-branch");if(!sel||!db)return;
+ const {data,error}=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+ if(error){sel.innerHTML='<option value="">Branch list unavailable</option>';return;}
+ const selected=sel.value;sel.innerHTML='<option value="">All authorized branches</option>'+(data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+ if(selected)sel.value=selected;
+};
+window.loadBankPerformance=async function(){
+ const feedback=document.getElementById("performance-feedback"),summary=document.getElementById("performance-summary"),categories=document.getElementById("performance-categories"),monthly=document.getElementById("performance-monthly"),activity=document.getElementById("performance-activity");
+ if(!feedback||!summary||!categories||!monthly||!activity||!db)return;
+ const branch=document.getElementById("performance-branch")?.value||null,start=document.getElementById("performance-start")?.value||null,end=document.getElementById("performance-end")?.value||null;
+ if(start&&end&&start>end){feedback.textContent="Start date must not be after end date.";return;}
+ feedback.textContent="Loading recorded activity…";summary.innerHTML="";categories.innerHTML="";monthly.innerHTML="";activity.innerHTML="";
+ const {data,error}=await db.rpc("get_financial_performance",{p_branch_id:branch,p_start_date:start,p_end_date:end});
+ if(error){feedback.textContent="Performance report unavailable: "+error.message;return;}
+ const d=Array.isArray(data)?data[0]:data;if(!d){feedback.textContent="No report data returned.";return;}
+ const money=n=>"UGX "+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+ const metric=(title,value,sub,cls)=>'<div class="performance-metric '+cls+'"><span>'+esc(title)+'</span><strong>'+esc(money(value))+'</strong><small>'+esc(sub)+'</small></div>';
+ summary.innerHTML=metric("Recorded income",d.income_total,"Fees, interest and penalties","income")+metric("Recorded expenses",d.expense_total,"Recorded operating costs","expense")+metric(Number(d.operating_surplus||0)<0?"Operating deficit":"Operating surplus",Math.abs(Number(d.operating_surplus||0)),Number(d.operating_surplus||0)<0?"Income less expenses is negative":"Income less expenses is positive",Number(d.operating_surplus||0)<0?"loss":"surplus")+metric("Non-withdrawable share capital",d.share_capital_total,"Retained share funds; not profit","capital")+metric("Restricted security reserve",d.restricted_reserve_total,"Customer-linked reserve movements","reserve")+metric("Net cash movement",Number(d.cash_in_total||0)-Number(d.cash_out_total||0),"Cash in "+money(d.cash_in_total)+" · out "+money(d.cash_out_total),"cash");
+ const labels={share_capital:"Share capital (non-withdrawable)",account_opening_fees:"Account-opening package fees",loan_processing_fee:"Loan-processing form fees",replacement_cheque_book:"Replacement cheque books",replacement_transaction_logbook:"Replacement transaction log books",account_security_fee:"Monthly account security charges",security_reserve:"Restricted security reserve/top-ups",loan_interest_income:"Loan interest income",late_loan_penalty:"Late loan-payment penalties",other_income:"Other income",operating_expense:"Operating expenses"};
+ const rows=d.by_category||[];categories.innerHTML=rows.length?'<div class="table-scroll"><table class="data-table"><thead><tr><th>Category</th><th>Classification</th><th>Amount</th><th>Cash in</th><th>Cash out</th><th>Entries</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(labels[x.category]||x.category)+'</td><td>'+esc(x.profit_loss_type)+'</td><td>'+money(x.amount)+'</td><td>'+money(x.cash_in)+'</td><td>'+money(x.cash_out)+'</td><td>'+Number(x.count||0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No financial activity is recorded for the selected period.</p>';
+ const months=d.monthly_trend||[];monthly.innerHTML=months.length?'<div class="table-scroll"><table class="data-table"><thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Surplus / deficit</th><th>Share capital</th></tr></thead><tbody>'+months.map(x=>'<tr><td>'+esc(x.month)+'</td><td>'+money(x.income)+'</td><td>'+money(x.expenses)+'</td><td class="'+(Number(x.surplus)<0?"performance-negative":"")+'">'+(Number(x.surplus)<0?"−":"")+money(Math.abs(Number(x.surplus||0)))+'</td><td>'+money(x.share_capital)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No monthly trend data for this period.</p>';
+ let query=db.from("financial_activity_ledger").select("event_date,category,profit_loss_type,amount,cash_in,cash_out,description,receipt_number,branch_id,source_table,created_at").order("created_at",{ascending:false}).limit(50);
+ if(branch)query=query.eq("branch_id",branch);if(start)query=query.gte("event_date",start);if(end)query=query.lte("event_date",end);
+ const {data:events,error:eventError}=await query;
+ activity.innerHTML=eventError?'<p class="muted">Recent activity could not load: '+esc(eventError.message)+'</p>':(events||[]).length?'<div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Classification</th><th>Amount</th><th>Receipt / source</th></tr></thead><tbody>'+(events||[]).map(x=>'<tr><td>'+esc(x.event_date)+'</td><td>'+esc(x.description)+'</td><td>'+esc(labels[x.category]||x.category)+'</td><td>'+esc(x.profit_loss_type)+'</td><td>'+money(x.amount)+'</td><td>'+esc(x.receipt_number||x.source_table||"—")+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No recorded activity in the selected period.</p>';
+ feedback.textContent="Loaded "+Number(d.event_count||0)+" recorded entries. Figures exclude unrecorded activity and do not replace the general-ledger trial balance.";
+};
+window.handleFinancialActivitySubmit=async function(e){
+ e.preventDefault();const f=e.target,feedback=document.getElementById("performance-entry-feedback"),button=f.querySelector('button[type="submit"]');if(button)button.disabled=true;
+ try{const branch=document.getElementById("performance-branch")?.value;if(!branch)throw new Error("Choose a branch first so the entry is assigned correctly.");
+ const category=f.category.value;if(category==="operating_expense"&&!(["system_admin","bank_admin","branch_manager","accountant","general_manager"].includes(String(window.currentEmployeeRole||""))))throw new Error("Your role cannot record operating expenses.");
+ const {data,error}=await db.rpc("record_financial_activity",{p_branch_id:branch,p_category:category,p_amount:Number(f.amount.value),p_description:f.description.value.trim(),p_receipt_number:f.receipt_number.value.trim()||null,p_customer_id:null,p_loan_application_id:null,p_event_date:f.event_date.value||null});
+ if(error)throw error;const x=Array.isArray(data)?data[0]:data;if(feedback)feedback.textContent="Financial activity recorded: "+category.replaceAll("_"," ")+" · UGX "+Number(x.amount).toLocaleString()+". Reference "+(x.receipt_number||x.id)+".";
+ const chosenBranch=branch;f.reset();document.getElementById("performance-branch").value=chosenBranch;await window.loadBankPerformance();
+ }catch(err){if(feedback)feedback.textContent="Entry not recorded: "+err.message;}finally{if(button)button.disabled=false;}
+};
+
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
   const summary = document.getElementById("reports-summary");
