@@ -642,17 +642,29 @@ window.loadAttendancePolicy();
       <h2 class="page-heading">Team Chat</h2>
       ${staffModuleTabs("StaffChat")}
       ${panel(
-        "TEAM MESSAGES",
+        "SECURE STAFF MESSAGES",
         "Internal staff communication",
-        "Messaging is not connected to a database yet; this page does not send or store messages.",
-        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
-         <label>Message preview
-           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
-         </label>
-         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
-         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
+        "Messages are saved securely. Choose bank-wide chat or a branch channel you are authorized to access.",
+        `<div class="form-grid">
+           <label>Conversation
+             <select id="staff-chat-branch" onchange="window.loadStaffChat()">
+               <option value="">Bank-wide messages</option>
+             </select>
+           </label>
+           <div style="display:flex;align-items:end"><button type="button" class="secondary" onclick="window.loadStaffChat()">Refresh messages</button></div>
+         </div>
+         <p id="staff-chat-feedback" class="muted" role="status" aria-live="polite">Loading secure messages…</p>
+         <div id="staff-chat-messages" class="staff-chat-messages" aria-live="polite"></div>
+         <form id="staff-chat-form" onsubmit="window.sendStaffChatMessage(event)" style="margin-top:16px">
+           <label>Write a message
+             <textarea id="staff-chat-input" rows="3" maxlength="1000" required placeholder="Share an update with authorized staff…"></textarea>
+           </label>
+           <button type="submit" class="primary">Send message</button>
+         </form>
+         <p class="muted">Messages are visible to staff with access to the selected channel. Do not share passwords, PINs, customer secrets, or full account credentials in chat.</p>`
       )}
     `;
+    window.loadStaffChat();
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
@@ -1745,13 +1757,70 @@ document.addEventListener("click", function(event) {
   if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
 });
 
-window.previewStaffMessage = function() {
-  const input = document.getElementById("chat-preview");
-  const output = document.getElementById("chat-preview-result");
-  if (!input || !output) return;
-  output.textContent = input.value.trim()
-    ? "Draft preview only: " + input.value.trim()
-    : "Enter a message to preview. Nothing has been sent or saved.";
+window.loadStaffChat = async function() {
+  const feedback = document.getElementById("staff-chat-feedback");
+  const list = document.getElementById("staff-chat-messages");
+  const selector = document.getElementById("staff-chat-branch");
+  if (!feedback || !list || !selector) return;
+  if (!db) {
+    feedback.textContent = "Database connection unavailable. Messages were not loaded.";
+    return;
+  }
+  feedback.textContent = "Loading messages…";
+  try {
+    const [branchResult, messageResult] = await Promise.all([
+      db.from("branches").select("id,branch_name").eq("is_active", true).order("branch_name"),
+      db.rpc("list_staff_messages", {
+        p_branch_id: selector.value || null,
+        p_limit: 100
+      })
+    ]);
+    if (branchResult.error) {
+      feedback.textContent = "Branch channels could not be loaded: " + branchResult.error.message;
+      return;
+    }
+    const currentValue = selector.value;
+    selector.innerHTML = '<option value="">Bank-wide messages</option>' +
+      (branchResult.data || []).map(b => '<option value="' + esc(b.id) + '">' + esc(b.branch_name) + '</option>').join("");
+    if ([...selector.options].some(o => o.value === currentValue)) selector.value = currentValue;
+    if (messageResult.error) {
+      feedback.textContent = "Messages could not be loaded: " + messageResult.error.message;
+      list.innerHTML = "";
+      return;
+    }
+    const messages = (messageResult.data || []).slice().reverse();
+    list.innerHTML = messages.map(m => {
+      const sender = m.sender_name || m.sender_employee_number || "Staff member";
+      const time = m.created_at ? new Date(m.created_at).toLocaleString() : "";
+      return '<article class="list-item staff-chat-message"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>' +
+        esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 0">' +
+        esc(m.message_text) + '</p></article>';
+    }).join("") || '<p class="muted">No messages in this conversation yet. You can send the first message.</p>';
+    feedback.textContent = messages.length + " message" + (messages.length === 1 ? "" : "s") + " loaded. Use Refresh messages to check for new replies.";
+  } catch (error) {
+    feedback.textContent = "A connection error prevented messages from loading.";
+  }
+};
+
+window.sendStaffChatMessage = async function(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const input = document.getElementById("staff-chat-input");
+  const feedback = document.getElementById("staff-chat-feedback");
+  const selector = document.getElementById("staff-chat-branch");
+  const message = input ? input.value.trim() : "";
+  if (!db || !form.reportValidity() || !message) return;
+  if (feedback) feedback.textContent = "Sending message…";
+  const { error } = await db.rpc("send_staff_message", {
+    p_message: message,
+    p_branch_id: selector && selector.value ? selector.value : null
+  });
+  if (error) {
+    if (feedback) feedback.textContent = "Message was not sent: " + error.message;
+    return;
+  }
+  input.value = "";
+  await window.loadStaffChat();
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
