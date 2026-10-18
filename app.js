@@ -1345,7 +1345,7 @@ window.searchAccountOpeningCustomers = async function(input) {
   if(!db){results.textContent="Database connection unavailable.";return;}
   results.textContent="Searching customers you can access…";
   try{
-    const safeTerm=term.replace(/[\\%_]/g,"\\\\const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").ilike("full_name","%"+term.replace(/[%_]/g,"\\window.handleAccountSubmit = async function(e) {")+"%").limit(10);");\n    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safeTerm+"%,customer_number.ilike.%"+safeTerm+"%").limit(10);
+    const safeTerm=term.replace(/[\\%_]/g, "\\$&");
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     const rows=(data||[]).filter(row=>["active","approved"].includes(String(row.status||"").toLowerCase()));
     if(!rows.length){results.textContent="No matching active or approved customer found in records you can access.";return;}
@@ -1516,7 +1516,7 @@ window.searchLoanCustomers = async function(input) {
   results.textContent="Searching customers available to your staff account…";
   try{
     const safe=term.replace(/[,%_]/g," ");
-    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safe+"%,customer_number.ilike.%"+safe+"%").in("status",["active","approved"]).limit(12);
+    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safeTerm+"%,customer_number.ilike.%"+safeTerm+"%").limit(10);
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     if(!data?.length){results.textContent="No active or approved matching customers found.";return;}
     results.innerHTML=data.map((x,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(x.full_name||"Customer")+'</strong><span>'+esc(x.customer_number||"No customer number")+'</span><small>'+esc(x.phone_number||"")+'</small></button>').join("");
