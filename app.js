@@ -404,11 +404,40 @@ window.switchPage = function(pageName) {
            <div class="metric-card"><strong>Payroll export</strong><p class="muted">Approved timesheets can later feed payroll summaries, with overtime and deductions shown separately.</p></div>
          </div>
          <p class="muted">Schedule saving is available after the SQL setup is installed. Fingerprint capture, official attendance event capture, manager correction workflow and payroll integration are separate steps and are not enabled yet.</p>
+         <h3 style="margin:18px 0 8px;">Recorded timesheets</h3>
+         <div class="form-grid">
+           <label>From date<input type="date" id="timesheet-from"></label>
+           <label>To date<input type="date" id="timesheet-to"></label>
+           <label>Branch UUID (optional)<input type="text" id="timesheet-branch" placeholder="All authorized branches"></label>
+           <button type="button" class="secondary" onclick="loadStaffTimesheets()">Load timesheets</button>
+         </div>
+         <p id="timesheet-feedback" class="muted" aria-live="polite">Timesheets require the database SQL setup and recorded attendance events.</p>
+         <div id="timesheet-list"></div>
          <p><a href="https://github.com/nuwarihovictor/zivamuntuyo_banking/blob/main/docs/attendance-device-compatibility.md" target="_blank" rel="noopener noreferrer">Read device compatibility and implementation plan</a></p>`
       )}
     `;
     window.showAttendanceDeviceHelp();
-    window.loadAttendancePolicy();
+    window.loadStaffTimesheets = async function() {
+  const feedback=document.getElementById("timesheet-feedback");
+  const list=document.getElementById("timesheet-list");
+  if(!feedback||!list)return;
+  const from=document.getElementById("timesheet-from")?.value;
+  const to=document.getElementById("timesheet-to")?.value;
+  const branch=document.getElementById("timesheet-branch")?.value.trim()||"";
+  if(!from||!to||to<from){feedback.textContent="Choose a valid from/to date range.";return;}
+  if(branch&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branch)){feedback.textContent="Enter a valid branch UUID or leave it blank.";return;}
+  if(!db){feedback.textContent="Database connection unavailable.";return;}
+  feedback.textContent="Loading recorded timesheets…";list.innerHTML="";
+  const {data,error}=await db.rpc("list_staff_timesheets",{p_from_date:from,p_to_date:to,p_branch_id:branch||null,p_limit:200});
+  if(error){feedback.textContent="Timesheets require list_staff_timesheets.sql and attendance_policies.sql installed in Supabase. Details: "+error.message;return;}
+  if(!data||!data.length){feedback.textContent="No recorded attendance entries in this date range. Missing/absent staff with no attendance row are not inferred by this report.";return;}
+  feedback.textContent="Showing "+data.length+" recorded attendance rows. Review missing punches before payroll approval.";
+  list.innerHTML=data.map(r=>{
+    const mins=n=>n===null||n===undefined?"—":Math.floor(Number(n)/60)+"h "+(Number(n)%60)+"m";
+    return '<div class="list-item"><div><strong>'+esc(r.employee_name||"Staff member")+' · '+esc(r.work_date||"")+'</strong><br><span class="muted">'+esc(r.branch_name||"")+' · '+esc(r.employee_number||"")+'</span><br><span>In: '+esc(r.clock_in_at||"Missing")+' | Out: '+esc(r.clock_out_at||"Missing")+'</span><br><span>Worked: '+mins(r.worked_minutes)+' · Late: '+mins(r.late_minutes)+' · Early: '+mins(r.early_departure_minutes)+' · Overtime: '+mins(r.overtime_minutes)+'</span></div><span class="badge-role">'+esc(r.missing_punch?"Missing punch":(r.attendance_status||"recorded"))+'</span></div>';
+  }).join("");
+};
+window.loadAttendancePolicy();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
