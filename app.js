@@ -91,15 +91,7 @@ window.switchPage = function(pageName) {
     `;
     window.loadDashboardBranchOptions();
     window.loadDashboardCharts();
-    window.loadDashboardBranchOptions = async function() {
-  const select=document.getElementById("dashboard-branch-id");
-  if(!select||!db)return;
-  const {data,error}=await db.from("branches").select("id,branch_name,is_head_office").eq("is_active",true).order("is_head_office",{ascending:false}).order("branch_name");
-  if(error)return;
-  const previous=select.value;
-  select.innerHTML='<option value="">All authorized branches</option>'+(data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+(b.is_head_office?' · Main branch':' · Outreach')+'</option>').join("");
-  if((data||[]).some(b=>b.id===previous))select.value=previous;
-};
+
 
 window.loadBranchPortfolioSummary();
   } 
@@ -386,32 +378,7 @@ window.loadBranchPortfolioSummary();
         <div id="transaction-monitor-list"></div>`
       )}
     `;
-    window.loadBranchPortfolioSummary = async function() {
-  const feedback=document.getElementById("branch-portfolio-feedback");
-  const summary=document.getElementById("branch-portfolio-summary");
-  const accountTypes=document.getElementById("branch-account-type-counts");
-  const loanStatuses=document.getElementById("branch-loan-status-counts");
-  if(!feedback||!summary||!accountTypes||!loanStatuses)return;
-  const branchInput=document.getElementById("dashboard-branch-id");
-  const branchId=branchInput?branchInput.value.trim():"";
-  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){
-    feedback.textContent="Enter a valid branch UUID or leave the field blank.";return;
-  }
-  if(!db){feedback.textContent="Database connection unavailable.";return;}
-  feedback.textContent="Loading branch portfolio…";summary.innerHTML=accountTypes.innerHTML=loanStatuses.innerHTML="";
-  const {data,error}=await db.rpc("list_branch_portfolio_summary",{p_branch_id:branchId||null});
-  if(error){feedback.textContent="Branch counts need the list_branch_portfolio_summary SQL function installed. Details: "+error.message;return;}
-  const rows=data||[];
-  const branchRows=rows.filter(r=>r.metric_type==="branch_summary");
-  const typeRows=rows.filter(r=>r.metric_type==="account_type"&&Number(r.account_count||0)>0);
-  const loanRows=rows.filter(r=>r.metric_type==="loan_status"&&Number(r.loan_count||0)>0);
-  if(!branchRows.length){feedback.textContent="No active branches are visible in your authorized scope.";return;}
-  const num=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
-  summary.innerHTML='<div class="grid-2">'+branchRows.map(r=>'<div class="metric-card"><h3>'+esc(r.branch_name)+'</h3><div class="metric-val">'+num(r.account_count)+' <span class="muted">accounts</span></div><div class="muted">Customers: '+num(r.customer_count)+' · Active staff: '+num(r.staff_count)+'</div><div class="muted">Loans: '+num(r.loan_count)+' · Loan principal total: '+num(r.loan_principal_total)+'</div><div class="muted">Transactions: '+num(r.transaction_count)+'</div></div>').join("")+'</div>';
-  accountTypes.innerHTML=typeRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Account product</th><th>Accounts</th></tr></thead><tbody>'+typeRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.account_type||"Unclassified")+'</td><td>'+num(r.account_count)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No bank accounts have been recorded by account type yet.</p>';
-  loanStatuses.innerHTML=loanRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Loan status</th><th>Loans</th><th>Principal</th></tr></thead><tbody>'+loanRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.status||"Unspecified")+'</td><td>'+num(r.loan_count)+'</td><td>UGX '+num(r.loan_principal_total)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No loans have been recorded yet.</p>';
-  feedback.textContent="Branch portfolio loaded from database records. Zero counts mean no records are currently registered. Account products are classified separately; loan records do not yet store a currency code.";
-};
+
 
 window.loadTransactionMonitor();
   }
@@ -511,26 +478,7 @@ window.loadTransactionMonitor();
     const timesheetToInput = document.getElementById("timesheet-to");
     if (timesheetFromInput && !timesheetFromInput.value) timesheetFromInput.value = timesheetFromDate;
     if (timesheetToInput && !timesheetToInput.value) timesheetToInput.value = timesheetToDate;
-    window.loadStaffTimesheets = async function() {
-  const feedback=document.getElementById("timesheet-feedback");
-  const list=document.getElementById("timesheet-list");
-  if(!feedback||!list)return;
-  const from=document.getElementById("timesheet-from")?.value;
-  const to=document.getElementById("timesheet-to")?.value;
-  const branch=document.getElementById("timesheet-branch")?.value.trim()||"";
-  if(!from||!to||to<from){feedback.textContent="Choose a valid from/to date range.";return;}
-  if(branch&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branch)){feedback.textContent="Enter a valid branch UUID or leave it blank.";return;}
-  if(!db){feedback.textContent="Database connection unavailable.";return;}
-  feedback.textContent="Loading recorded timesheets…";list.innerHTML="";
-  const {data,error}=await db.rpc("list_staff_timesheets",{p_from_date:from,p_to_date:to,p_branch_id:branch||null,p_limit:200});
-  if(error){feedback.textContent="Timesheets require list_staff_timesheets.sql and attendance_policies.sql installed in Supabase. Details: "+error.message;return;}
-  if(!data||!data.length){feedback.textContent="No recorded attendance entries in this date range. Missing/absent staff with no attendance row are not inferred by this report.";return;}
-  feedback.textContent="Showing "+data.length+" recorded attendance rows. Review missing punches before payroll approval.";
-  list.innerHTML=data.map(r=>{
-    const mins=n=>n===null||n===undefined?"—":Math.floor(Number(n)/60)+"h "+(Number(n)%60)+"m";
-    return '<div class="list-item"><div><strong>'+esc(r.employee_name||"Staff member")+' · '+esc(r.work_date||"")+'</strong><br><span class="muted">'+esc(r.branch_name||"")+' · '+esc(r.employee_number||"")+'</span><br><span>In: '+esc(r.clock_in_at||"Missing")+' | Out: '+esc(r.clock_out_at||"Missing")+'</span><br><span>Worked: '+mins(r.worked_minutes)+' · Late: '+mins(r.late_minutes)+' · Early: '+mins(r.early_departure_minutes)+' · Overtime: '+mins(r.overtime_minutes)+'</span></div><span class="badge-role">'+esc(r.missing_punch?"Missing punch":(r.attendance_status||"recorded"))+'</span></div>';
-  }).join("");
-};
+
 window.loadAttendancePolicy();
   }
   else if (pageName === "StaffChat") {
@@ -636,7 +584,56 @@ window.loadAttendancePolicy();
          <p class="muted">Income statement and balance sheet classifications require a reviewed chart of accounts. No estimates or demo figures are displayed.</p>`
       )}
     `;
-    window.loadTransactionMonitor = async function() {
+
+
+window.loadFinancialReports();
+  }
+  else {
+    c.innerHTML = `
+      <span class="category-tag">System Module</span>
+      <h2 class="page-heading">${pageName}</h2>
+      ${panel(pageName, "Module Active", "Section operational.", `<p class="muted">Module ready for commercial operations.</p>`)}
+    `;
+  }
+}
+window.loadDashboardBranchOptions = async function() {
+  const select=document.getElementById("dashboard-branch-id");
+  if(!select||!db)return;
+  const {data,error}=await db.from("branches").select("id,branch_name,is_head_office").eq("is_active",true).order("is_head_office",{ascending:false}).order("branch_name");
+  if(error)return;
+  const previous=select.value;
+  select.innerHTML='<option value="">All authorized branches</option>'+(data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+(b.is_head_office?' · Main branch':' · Outreach')+'</option>').join("");
+  if((data||[]).some(b=>b.id===previous))select.value=previous;
+};
+
+window.loadBranchPortfolioSummary = async function() {
+  const feedback=document.getElementById("branch-portfolio-feedback");
+  const summary=document.getElementById("branch-portfolio-summary");
+  const accountTypes=document.getElementById("branch-account-type-counts");
+  const loanStatuses=document.getElementById("branch-loan-status-counts");
+  if(!feedback||!summary||!accountTypes||!loanStatuses)return;
+  const branchInput=document.getElementById("dashboard-branch-id");
+  const branchId=branchInput?branchInput.value.trim():"";
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){
+    feedback.textContent="Enter a valid branch UUID or leave the field blank.";return;
+  }
+  if(!db){feedback.textContent="Database connection unavailable.";return;}
+  feedback.textContent="Loading branch portfolio…";summary.innerHTML=accountTypes.innerHTML=loanStatuses.innerHTML="";
+  const {data,error}=await db.rpc("list_branch_portfolio_summary",{p_branch_id:branchId||null});
+  if(error){feedback.textContent="Branch counts need the list_branch_portfolio_summary SQL function installed. Details: "+error.message;return;}
+  const rows=data||[];
+  const branchRows=rows.filter(r=>r.metric_type==="branch_summary");
+  const typeRows=rows.filter(r=>r.metric_type==="account_type"&&Number(r.account_count||0)>0);
+  const loanRows=rows.filter(r=>r.metric_type==="loan_status"&&Number(r.loan_count||0)>0);
+  if(!branchRows.length){feedback.textContent="No active branches are visible in your authorized scope.";return;}
+  const num=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+  summary.innerHTML='<div class="grid-2">'+branchRows.map(r=>'<div class="metric-card"><h3>'+esc(r.branch_name)+'</h3><div class="metric-val">'+num(r.account_count)+' <span class="muted">accounts</span></div><div class="muted">Customers: '+num(r.customer_count)+' · Active staff: '+num(r.staff_count)+'</div><div class="muted">Loans: '+num(r.loan_count)+' · Loan principal total: '+num(r.loan_principal_total)+'</div><div class="muted">Transactions: '+num(r.transaction_count)+'</div></div>').join("")+'</div>';
+  accountTypes.innerHTML=typeRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Account product</th><th>Accounts</th></tr></thead><tbody>'+typeRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.account_type||"Unclassified")+'</td><td>'+num(r.account_count)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No bank accounts have been recorded by account type yet.</p>';
+  loanStatuses.innerHTML=loanRows.length?'<div class="table-responsive"><table class="data-table"><thead><tr><th>Branch</th><th>Loan status</th><th>Loans</th><th>Principal</th></tr></thead><tbody>'+loanRows.map(r=>'<tr><td>'+esc(r.branch_name)+'</td><td>'+esc(r.status||"Unspecified")+'</td><td>'+num(r.loan_count)+'</td><td>UGX '+num(r.loan_principal_total)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No loans have been recorded yet.</p>';
+  feedback.textContent="Branch portfolio loaded from database records. Zero counts mean no records are currently registered. Account products are classified separately; loan records do not yet store a currency code.";
+};
+
+window.loadTransactionMonitor = async function() {
   const feedback=document.getElementById("transaction-monitor-feedback");
   const list=document.getElementById("transaction-monitor-list");
   if(!feedback||!list)return;
@@ -659,16 +656,27 @@ window.loadAttendancePolicy();
   }).join("");
 };
 
-window.loadFinancialReports();
-  }
-  else {
-    c.innerHTML = `
-      <span class="category-tag">System Module</span>
-      <h2 class="page-heading">${pageName}</h2>
-      ${panel(pageName, "Module Active", "Section operational.", `<p class="muted">Module ready for commercial operations.</p>`)}
-    `;
-  }
-}
+window.loadStaffTimesheets = async function() {
+  const feedback=document.getElementById("timesheet-feedback");
+  const list=document.getElementById("timesheet-list");
+  if(!feedback||!list)return;
+  const from=document.getElementById("timesheet-from")?.value;
+  const to=document.getElementById("timesheet-to")?.value;
+  const branch=document.getElementById("timesheet-branch")?.value.trim()||"";
+  if(!from||!to||to<from){feedback.textContent="Choose a valid from/to date range.";return;}
+  if(branch&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branch)){feedback.textContent="Enter a valid branch UUID or leave it blank.";return;}
+  if(!db){feedback.textContent="Database connection unavailable.";return;}
+  feedback.textContent="Loading recorded timesheets…";list.innerHTML="";
+  const {data,error}=await db.rpc("list_staff_timesheets",{p_from_date:from,p_to_date:to,p_branch_id:branch||null,p_limit:200});
+  if(error){feedback.textContent="Timesheets require list_staff_timesheets.sql and attendance_policies.sql installed in Supabase. Details: "+error.message;return;}
+  if(!data||!data.length){feedback.textContent="No recorded attendance entries in this date range. Missing/absent staff with no attendance row are not inferred by this report.";return;}
+  feedback.textContent="Showing "+data.length+" recorded attendance rows. Review missing punches before payroll approval.";
+  list.innerHTML=data.map(r=>{
+    const mins=n=>n===null||n===undefined?"—":Math.floor(Number(n)/60)+"h "+(Number(n)%60)+"m";
+    return '<div class="list-item"><div><strong>'+esc(r.employee_name||"Staff member")+' · '+esc(r.work_date||"")+'</strong><br><span class="muted">'+esc(r.branch_name||"")+' · '+esc(r.employee_number||"")+'</span><br><span>In: '+esc(r.clock_in_at||"Missing")+' | Out: '+esc(r.clock_out_at||"Missing")+'</span><br><span>Worked: '+mins(r.worked_minutes)+' · Late: '+mins(r.late_minutes)+' · Early: '+mins(r.early_departure_minutes)+' · Overtime: '+mins(r.overtime_minutes)+'</span></div><span class="badge-role">'+esc(r.missing_punch?"Missing punch":(r.attendance_status||"recorded"))+'</span></div>';
+  }).join("");
+};
+
 
 let dashboardMonthlyChart = null;
 let dashboardDepositWithdrawalChart = null;
