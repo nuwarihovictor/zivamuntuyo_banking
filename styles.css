@@ -515,3 +515,19 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 @media(max-width:420px){.vicline-settings-footer{align-items:flex-start;flex-direction:column}.vicline-settings-footer span{line-height:1.5}.vicline-conversation-item{width:132px;min-width:132px;flex-basis:132px}.vicline-list-avatar{width:32px;height:32px;flex-basis:32px}}
 
 .vicline-settings-panel[hidden]{display:none!important}
+
+/* Excel-style member and bank-account registers */
+.register-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.register-toolbar label{display:grid;gap:6px;flex:1 1 220px;min-width:180px;color:var(--muted);font-size:12px;font-weight:700}
+.register-toolbar input,.register-toolbar select{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface,#fff);color:var(--ink);font:inherit;font-weight:400}
+.register-toolbar button{min-height:40px;white-space:nowrap}
+.register-data-table{width:100%;min-width:1120px;border-collapse:collapse;font-size:12px;background:var(--surface,#fff)}
+.register-data-table th{position:sticky;top:0;z-index:1;background:#edf3ef;color:#264c3d;font-weight:800;text-align:left;white-space:nowrap}
+.register-data-table th,.register-data-table td{padding:10px 12px;border:1px solid var(--line);vertical-align:top;line-height:1.45}
+.register-data-table tbody tr:nth-child(even){background:rgba(7,59,43,.025)}
+.register-data-table tbody tr:hover{background:rgba(203,168,90,.10)}
+.register-data-table td{max-width:260px;overflow-wrap:anywhere}
+.register-data-table td:nth-child(1),.register-data-table td:nth-child(2){font-weight:650}
+.register-privacy-note{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+#customer-register-count,#account-register-count{margin:8px 0;color:var(--muted);font-size:12px}
+@media(max-width:640px){.register-toolbar{align-items:stretch;flex-direction:column}.register-toolbar label{min-width:0;width:100%}.register-toolbar button{white-space:normal;width:100%}.register-data-table{font-size:11px}.register-data-table th,.register-data-table td{padding:8px}}
