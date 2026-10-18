@@ -42,6 +42,12 @@ BEGIN
   IF v_role IS NULL THEN
     RAISE EXCEPTION 'Active staff access required';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep
+    WHERE ep.user_id = auth.uid() AND ep.is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Active employee profile required';
+  END IF;
   IF p_limit IS NULL OR p_limit < 1 OR p_limit > 200 THEN
     RAISE EXCEPTION 'Message limit must be between 1 and 200';
   END IF;
