@@ -51,12 +51,11 @@ BEGIN
   SELECT 'branch_summary'::text,bc.id,bc.branch_name,NULL::text,bc.accounts,bc.customers,bc.staff,bc.loans,bc.principal,bc.tx_count,bc.tx_amount,NULL::text
   FROM branch_counts bc
   UNION ALL
-  SELECT 'account_type'::text,vb.id,vb.branch_name,COALESCE(at.type_name,'Unclassified'),
+  SELECT 'account_type'::text,vb.id,vb.branch_name,COALESCE(ba.product_type,'Unclassified'),
          COUNT(ba.id)::bigint,0::bigint,0::bigint,0::bigint,0::numeric,0::bigint,0::numeric,NULL::text
   FROM visible_branches vb
   LEFT JOIN public.bank_accounts ba ON ba.branch_id=vb.id
-  LEFT JOIN public.account_types at ON at.id=ba.account_type_id
-  GROUP BY vb.id,vb.branch_name,COALESCE(at.type_name,'Unclassified')
+  GROUP BY vb.id,vb.branch_name,COALESCE(ba.product_type,'Unclassified')
   UNION ALL
   SELECT 'loan_status'::text,vb.id,vb.branch_name,'Loans',0::bigint,0::bigint,0::bigint,
          COUNT(l.id)::bigint,COALESCE(SUM(l.principal_amount),0)::numeric,0::bigint,0::numeric,
