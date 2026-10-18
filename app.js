@@ -5,34 +5,33 @@ const pages=["Overview","Customers","Accounts","Transactions","Loans","Accountin
 let user=null,profile=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-$("year").textContent=new Date().getFullYear();
-$("nav").innerHTML=pages.map((p,i)=>`<button class="nav ${i===0?"active":""}" data-page="${p}">${["◈","♙","▣","⇄","▤","▦","▥","◷","✉","⚙"][i]} &nbsp;${p}</button>`).join("");
-function notify(t){$("toast").textContent=t;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3000)}
+if($("year"))$("year").textContent=new Date().getFullYear();
+if($("nav"))$("nav").innerHTML=pages.map((p,i)=>`<button class="nav ${i===0?"active":""}" data-page="${p}">${["◈","♙","▣","⇄","▤","▦","▥","◷","✉","⚙"][i]} &nbsp;${p}</button>`).join("");
+function notify(t){const el=$("toast");if(!el)return;el.textContent=t;el.style.display="block";setTimeout(()=>el.style.display="none",3000)}
 function panel(title,body){return `<section class="panel"><h2>${title}</h2>${body}</section>`}
 function metric(label,value){return `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`}
 async function loadProfile(){const {data}=await db.from("employee_profiles").select("full_name,home_branch_id,is_active").eq("user_id",user.id).maybeSingle();profile=data}
-function workspace(){ $("login").classList.add("hidden");$("workspace").classList.remove("hidden");$("signout").classList.remove("hidden");$("status").textContent="Authenticated"; }
+function workspace(){ $("login")?.classList.add("hidden");$("workspace")?.classList.remove("hidden");$("signout")?.classList.remove("hidden");if($("status"))$("status").textContent="Authenticated"; }
 async function rows(table,cols="*"){const {data,error}=await db.from(table).select(cols).limit(50);if(error)throw error;return data||[]}
 async function go(page){
- $("title").textContent=page;document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
- const c=$("content");c.innerHTML=panel(page,"<p class='muted'>Loading workspace…</p>");
+ if($("title"))$("title").textContent=page;document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
+ const c=$("content");if(!c)return;c.innerHTML=panel(page,"<p class='muted'>Loading workspace…</p>");
  try{
  if(page==="Overview"){
  let nc="—",na="—";try{nc=(await rows("customers","id")).length}catch{}try{na=(await rows("bank_accounts","id")).length}catch{}
  c.innerHTML=`<div class="metrics">${metric("Customers loaded",nc)}${metric("Accounts loaded",na)}${metric("Signed-in staff",esc(profile?.full_name||user?.email))}${metric("Environment","Development")}</div><div class="grid" style="margin-top:16px">${panel("Work areas",pages.slice(1).map(p=>`<div class="row"><button class="secondary" data-go="${p}">Open ${p}</button></div>`).join(""))}${panel("Safety checklist","<p>Verify balanced debit/credit posting, approval controls, branch permissions, idempotency, audit records and backups before live use.</p>")}</div>`;
  
  }else if(page==="Customers"){
- const data=await rows("customers","id,full_name,phone,email,status");
+ const data=await rows("customers","id,full_name,email,status");
  c.innerHTML=`<div class="grid">
- ${panel("Customer records",data.length?`<div class="scroll"><table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Status</th></tr>${data.map(x=>`<tr><td>${esc(x.full_name||"—")}</td><td>${esc(x.phone||"—")}</td><td>${esc(x.email||"—")}</td><td>${esc(x.status||"—")}</td></tr>`).join("")}</table></div>`:"<p>No records visible, or no customers yet.</p>")}
- ${panel("Register New Customer",`<form id="add-customer"><label>Full Name<input name="full_name" required></label><label>Phone<input name="phone" required></label><label>Email<input name="email" type="email"></label><label>KYC Status<select name="status"><option value="pending">Pending Review</option><option value="verified">Verified</option></select></label><button class="primary">Save Customer</button><p id="custmsg" class="error"></p></form>`)}
+ ${panel("Customer records",data.length?`<div class="scroll"><table><tr><th>Name</th><th>Email</th><th>Status</th></tr>${data.map(x=>`<tr><td>${esc(x.full_name||"—")}</td><td>${esc(x.email||"—")}</td><td>${esc(x.status||"—")}</td></tr>`).join("")}</table></div>`:"<p>No records visible, or no customers yet.</p>")}
+ ${panel("Register New Customer",`<form id="add-customer"><label>Full Name<input name="full_name" required></label><label>Email<input name="email" type="email"></label><label>KYC Status<select name="status"><option value="pending">Pending Review</option><option value="verified">Verified</option></select></label><button class="primary">Save Customer</button><p id="custmsg" class="error"></p></form>`)}
  </div>`;
  $("add-customer").onsubmit=async e=>{
    e.preventDefault();
    const f=new FormData(e.target);
    const {error}=await db.from("customers").insert([{
      full_name: f.get("full_name"),
-     phone: f.get("phone"),
      email: f.get("email"),
      status: f.get("status"),
      branch_id: profile?.home_branch_id || null
@@ -121,9 +120,8 @@ async function go(page){
  c.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
  }catch(e){c.innerHTML=panel(page,`<p>Could not load data. Verify table names, columns and Row Level Security.</p><p class="error">${esc(e.message)}</p>`)}
 }
-async function clock(kind){const method="manual";const result=kind==="in"?await db.rpc("staff_clock_in",{p_branch_id:profile?.home_branch_id||null,p_method:method}):await db.rpc("staff_clock_out",{p_method:method,p_notes:""});$("attmsg").textContent=result.error?result.error.message:"Request accepted; verify the saved attendance event."; if(!result.error){ notify("Attendance recorded."); go("Staff Attendance"); }}
-$("nav").onclick=e=>{const b=e.target.closest("[data-page]");if(b)go(b.dataset.page)};
-$("login-form").onsubmit=async e=>{e.preventDefault();if(!db){$("login-message").textContent="Supabase library unavailable.";return}const {data,error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error){$("login-message").textContent=error.message;return}user=data.user;await loadProfile();workspace();go("Overview")};
-$("signout").onclick=async()=>{await db?.auth.signOut();user=null;profile=null;$("login").classList.remove("hidden");$("workspace").classList.add("hidden");$("signout").classList.add("hidden");$("status").textContent="Signed out"};
-(async()=>{if(!db){$("login-message").textContent="Supabase client could not initialize.";return}const {data}=await db.auth.getSession();if(data.session){user=data.session.user;await loadProfile();workspace();go("Overview")}})();
-  
+async function clock(kind){const method="manual";const result=kind==="in"?await db.rpc("staff_clock_in",{p_branch_id:profile?.home_branch_id||null,p_method:method}):await db.rpc("staff_clock_out",{p_method:method,p_notes:""});if($("attmsg"))$("attmsg").textContent=result.error?result.error.message:"Request accepted; verify the saved attendance event."; if(!result.error){ notify("Attendance recorded."); go("Staff Attendance"); }}
+if($("nav"))$("nav").onclick=e=>{const b=e.target.closest("[data-page]");if(b)go(b.dataset.page)};
+if($("login-form"))$("login-form").onsubmit=async e=>{e.preventDefault();if(!db){if($("login-message"))$("login-message").textContent="Supabase library unavailable.";return}const {data,error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error){if($("login-message"))$("login-message").textContent=error.message;return}user=data.user;await loadProfile();workspace();go("Overview")};
+if($("signout"))$("signout").onclick=async()=>{await db?.auth.signOut();user=null;profile=null;$("login")?.classList.remove("hidden");$("workspace")?.classList.add("hidden");$("signout")?.classList.add("hidden");if($("status"))$("status").textContent="Signed out"};
+(async()=>{if(!db){if($("login-message"))$("login-message").textContent="Supabase client could not initialize.";return}const {data}=await db.auth.getSession();if(data.session){user=data.session.user;await loadProfile();workspace();go("Overview")}})();
