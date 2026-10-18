@@ -361,9 +361,13 @@ window.switchPage = function(pageName) {
          </ul>
          <hr>
          <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
-         <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. These settings are currently a preview and are not yet saved to the database.</p>
+         <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. The schedule can be saved only after the attendance_policies.sql database setup is installed. Saving requires an authorized manager and creates an audit event.</p>
          <div class="notice-box"><strong>Manager configuration</strong><br>Use the fields below to plan the schedule. Saving official rules will require a manager-authorized database action and an audit trail.</div>
          <form id="attendance-policy-form" onsubmit="previewAttendancePolicy(event)">
+           <div class="grid-2">
+             <label>Branch UUID (leave blank for global policy; branch managers must select an authorized branch)<input id="attendance-branch-id" type="text" placeholder="Optional branch UUID"></label>
+             <label>Policy effective from<input id="attendance-effective-from" type="date" required></label>
+           </div>
            <div class="grid-2">
              <label>Standard clock-in time<input id="attendance-start" type="time" value="08:30" required></label>
              <label>Standard clock-out time<input id="attendance-end" type="time" value="17:00" required></label>
@@ -385,7 +389,9 @@ window.switchPage = function(pageName) {
              <label><input type="checkbox" name="attendance-day" value="Sunday"> Sunday</label>
            </fieldset>
            <div class="form-grid">
-             <button type="submit" class="primary">Preview schedule & timesheet rules</button>
+             <button type="submit" class="secondary">Preview schedule & timesheet rules</button>
+             <button type="button" class="primary" onclick="saveAttendancePolicy()">Save policy (manager only)</button>
+             <button type="button" class="secondary" onclick="loadAttendancePolicy()">Load saved policy</button>
              <button type="button" class="secondary" onclick="resetAttendancePolicy()">Reset to defaults</button>
            </div>
          </form>
@@ -397,7 +403,7 @@ window.switchPage = function(pageName) {
            <div class="metric-card"><strong>Absence & leave</strong><p class="muted">Track absent days, approved leave, public holidays, rest days and missing punches separately.</p></div>
            <div class="metric-card"><strong>Payroll export</strong><p class="muted">Approved timesheets can later feed payroll summaries, with overtime and deductions shown separately.</p></div>
          </div>
-         <p class="muted">This is a setup and rules preview: fingerprint capture, official attendance records, secure manager-only saving and payroll integration are not enabled yet.</p>
+         <p class="muted">Schedule saving is available after the SQL setup is installed. Fingerprint capture, official attendance event capture, manager correction workflow and payroll integration are separate steps and are not enabled yet.</p>
          <p><a href="https://github.com/nuwarihovictor/zivamuntuyo_banking/blob/main/docs/attendance-device-compatibility.md" target="_blank" rel="noopener noreferrer">Read device compatibility and implementation plan</a></p>`
       )}
     `;
@@ -945,6 +951,57 @@ window.printTestReceipt = function() {
   printWindow.document.close();
 };
 
+window.loadAttendancePolicy = async function() {
+  const feedback=document.getElementById("attendance-policy-feedback");
+  if(!feedback)return;
+  if(!db){feedback.textContent="Database connection unavailable; saved policy cannot be loaded.";return;}
+  const branchEl=document.getElementById("attendance-branch-id");
+  const branchId=branchEl?branchEl.value.trim():"";
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){feedback.textContent="Enter a valid branch UUID or leave blank for the global policy.";return;}
+  feedback.textContent="Loading saved attendance policy…";
+  const {data,error}=await db.rpc("get_attendance_policy",{p_branch_id:branchId||null});
+  if(error){feedback.textContent="Saved-policy loading requires attendance_policies.sql installed in Supabase. Details: "+error.message;return;}
+  const row=data&&data[0];
+  if(!row){feedback.textContent="No saved policy exists for this scope yet. Defaults remain a preview until a manager saves a policy.";return;}
+  const set=(id,value)=>{const el=document.getElementById(id);if(el&&value!==null&&value!==undefined)el.value=String(value).slice(0,5);};
+  set("attendance-start",row.clock_in_time);set("attendance-end",row.clock_out_time);
+  set("attendance-break-start",row.break_start_time);set("attendance-break-end",row.break_end_time);
+  set("attendance-break-minutes",row.unpaid_break_minutes);set("attendance-grace",row.grace_minutes);
+  set("attendance-timezone",row.timezone_name);set("attendance-effective-from",row.effective_from);
+  const ot=document.getElementById("attendance-overtime");if(ot)ot.value=row.overtime_requires_approval?"yes":"no";
+  document.querySelectorAll('input[name="attendance-day"]').forEach(el=>{el.checked=(row.working_days||[]).includes(el.value);});
+  feedback.textContent="Loaded saved policy effective "+row.effective_from+". Review it before making changes.";
+};
+window.saveAttendancePolicy = async function() {
+  const feedback=document.getElementById("attendance-policy-feedback");
+  if(!feedback)return;
+  if(!db){feedback.textContent="Database connection unavailable; policy was not saved.";return;}
+  const read=id=>document.getElementById(id);
+  const branchId=read("attendance-branch-id").value.trim();
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){feedback.textContent="Enter a valid branch UUID or leave blank for global policy.";return;}
+  if(!read("attendance-effective-from").value){feedback.textContent="Choose the policy effective date.";return;}
+  window.previewAttendancePolicy();
+  if(/must be later|cannot exceed|Enter both|none selected/.test(feedback.textContent)){return;}
+  const days=Array.from(document.querySelectorAll('input[name="attendance-day"]:checked')).map(el=>el.value);
+  if(!days.length){feedback.textContent="Select at least one working day.";return;}
+  const toMinutes=t=>{const p=t.split(":").map(Number);return p[0]*60+p[1];};
+  const bs=read("attendance-break-start").value||null,be=read("attendance-break-end").value||null;
+  if(bs&&be&&(toMinutes(bs)<toMinutes(read("attendance-start").value)||toMinutes(be)>toMinutes(read("attendance-end").value))){feedback.textContent="Break times must fall within the scheduled shift.";return;}
+  const args={
+    p_branch_id:branchId||null,p_working_days:days,
+    p_clock_in_time:read("attendance-start").value,p_clock_out_time:read("attendance-end").value,
+    p_break_start_time:bs,p_break_end_time:be,
+    p_unpaid_break_minutes:Number(read("attendance-break-minutes").value),
+    p_grace_minutes:Number(read("attendance-grace").value),
+    p_overtime_requires_approval:read("attendance-overtime").value==="yes",
+    p_timezone_name:read("attendance-timezone").value,
+    p_effective_from:read("attendance-effective-from").value
+  };
+  feedback.textContent="Saving attendance policy securely…";
+  const {data,error}=await db.rpc("save_attendance_policy",args);
+  if(error){feedback.textContent="Policy was not confirmed saved. Ensure attendance_policies.sql is installed and your account has manager permissions. Details: "+error.message;return;}
+  feedback.textContent="Policy saved successfully (ID: "+String(data||"") +"). Changes were audit-logged. Official clock events and timesheets still require their separate implementation.";
+};
 window.previewAttendancePolicy = function(event) {
   if (event && event.preventDefault) event.preventDefault();
   const read = id => document.getElementById(id);
