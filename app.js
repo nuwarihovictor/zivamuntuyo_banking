@@ -747,6 +747,19 @@ window.loadAttendancePolicy();
       <section class="form-studio-preview-column"><div class="form-studio-preview-head"><h3>Live print preview</h3><button type="button" class="primary" onclick="fsPrint()">Print / Save PDF</button></div><div id="fs-preview" class="form-studio-paper"></div></section></div></section>`;
     fsChange("account");
   }
+
+  else if (pageName === "Performance") {
+    c.innerHTML = '<span class="category-tag">Management accounts · recorded activity</span><h2 class="page-heading">Bank Performance</h2><p class="page-intro">Recorded income, expenses, operating surplus or deficit, non-withdrawable share capital, restricted reserves and cash movement. These management figures are not an audited profit-and-loss statement.</p>' +
+      panel("PERIOD & BRANCH FILTERS","Review performance","Choose a branch and period.",'<div class="form-grid performance-filters"><label>Branch<select id="performance-branch"><option value="">All authorized branches</option></select></label><label>From date<input type="date" id="performance-start"></label><label>To date<input type="date" id="performance-end"></label><button type="button" class="primary" onclick="loadBankPerformance()">Refresh performance</button></div><p id="performance-feedback" class="muted" aria-live="polite">Loading…</p>') +
+      '<div id="performance-summary" class="performance-summary-grid"></div>' +
+      panel("INCOME, EXPENSES & CAPITAL","Category breakdown","Share capital and security reserves are separate from income and expenses.",'<div id="performance-categories">Loading…</div>') +
+      panel("MONTHLY PERFORMANCE","Trend over time","Monthly recorded income less recorded expenses.",'<div id="performance-monthly">Loading…</div>') +
+      panel("RECORD INCOME OR EXPENSE","Controlled finance entry","Use only for amounts received or expenses supported by a receipt/voucher. Other fee collection workflows are captured automatically. Loan interest and late-payment penalties are entered here until repayments are integrated.",'<form id="performance-entry-form" onsubmit="handleFinancialActivitySubmit(event)"><div class="form-grid"><label>Category *<select name="category" required><option value="loan_interest_income">Loan interest received</option><option value="late_loan_penalty">Late loan-payment penalty received</option><option value="other_income">Other income received</option><option value="operating_expense">Operating expense paid</option></select></label><label>Amount (UGX) *<input name="amount" type="number" min="1" step="1" required></label><label>Receipt / voucher reference<input name="receipt_number" maxlength="100"></label><label>Event date *<input type="date" name="event_date" required></label><label class="performance-description-field">Description *<input name="description" minlength="4" maxlength="250" required></label></div><label class="fs-check-row"><input type="checkbox" name="confirm_evidence" required> I confirm the entry is supported by a receipt or approved voucher and has not already been recorded.</label><button class="primary" type="submit">Record financial activity</button><p id="performance-entry-feedback" class="muted" aria-live="polite"></p></form>') +
+      panel("RECENT FINANCIAL ACTIVITY","Audit trail view","Recent entries in your authorized scope.",'<div id="performance-activity">Loading…</div>') +
+      '<p class="muted performance-caveat">Share purchases are retained as non-withdrawable share capital, not operating profit. Savings and fixed deposits remain customer liabilities, not income. Financial statements should be reviewed by the bank accountant under applicable Ugandan accounting rules. Interest and penalties are manually recorded here until linked to loan repayments.</p>';
+    window.loadPerformanceBranchOptions();
+    window.loadBankPerformance();
+  }
   else if (pageName === "Reports") {
     c.innerHTML = `
       <span class="category-tag">Live ledger reports</span>
