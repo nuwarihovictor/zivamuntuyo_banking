@@ -1249,7 +1249,7 @@ window.loadLoanApplicationDocuments = async function(button) {
     const folder="loan-applications/"+id;
     const {data,error}=await db.storage.from("bank-application-documents").list(folder,{limit:100,sortBy:{column:"name",order:"desc"}});
     if(error)throw error;
-    const files=(data||[]).filter(x=>x.name&&!x.id===false);
+    const files=(data||[]).filter(x=>x.name&&x.id);
     if(!files.length){host.textContent="No attached documents found yet.";return;}
     const links=await Promise.all(files.map(async file=>{
       const path=folder+"/"+file.name;
