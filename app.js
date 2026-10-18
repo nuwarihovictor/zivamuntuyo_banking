@@ -2042,7 +2042,7 @@ window.loadStaffChat=async function(options={}){
     const currentValue=selector.value||"";
     const [branchResult,messageResult,voiceResult]=await Promise.all([
       db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
-      db.rpc("list_staff_messages",{p_branch_id:currentValue||null,p_limit:100}),
+      db.rpc("list_staff_channel_messages",{p_branch_id:currentValue||null,p_limit:100}),
       db.rpc("list_staff_voice_notes",{p_branch_id:currentValue||null,p_limit:100})
     ]);
     if(branchResult.error){feedback.textContent="Branch channels could not be loaded: "+branchResult.error.message;return;}
@@ -2079,7 +2079,7 @@ window.pollVicLineAllConversations=async function(){
     await Promise.all(channels.map(async channel=>{
       const key=channel.id||"bankwide";
       const [messages,voices]=await Promise.all([
-        db.rpc("list_staff_messages",{p_branch_id:channel.id||null,p_limit:1}),
+        db.rpc("list_staff_channel_messages",{p_branch_id:channel.id||null,p_limit:1}),
         db.rpc("list_staff_voice_notes",{p_branch_id:channel.id||null,p_limit:1})
       ]);
       if(messages.error)return;
@@ -2111,7 +2111,7 @@ window.sendStaffChatMessage = async function(event) {
   if (submitButton) submitButton.disabled = true;
   if (feedback) feedback.textContent = "Sending message…";
   try {
-    const { error } = await db.rpc("send_staff_message", {
+    const { error } = await db.rpc("send_staff_channel_message", {
       p_message: message,
       p_branch_id: selector && selector.value ? selector.value : null
     });
