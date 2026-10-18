@@ -61,14 +61,37 @@ function switchPage(pageName) {
   } 
   else if (pageName === "Customers") {
     c.innerHTML = panel(
-      "CUSTOMER INFORMATION FILE (CIF)",
-      "Verified Customer Directory",
-      "Centralized KYC and entity registration profiles.",
+      "CUSTOMER ONBOARDING (CIF & KYC)",
+      "Register New Bank Customer",
+      "Capture verified customer identification details before account creation.",
+      `<form id="cust-form" style="display:flex; flex-direction:column; gap:12px; max-width:500px;" onsubmit="handleCustomerSubmit(event)">
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Full Legal Name * 
+          <input type="text" name="full_name" required placeholder="e.g. Nuwariho Victor" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+        </label>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">National ID (NIN) or Passport * 
+          <input type="text" name="nin_or_passport" required placeholder="CM12345678ABCD" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+        </label>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Phone Number * 
+          <input type="tel" name="phone_number" required placeholder="+256 700 000000" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+        </label>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Email Address 
+          <input type="email" name="email" placeholder="victor@zivamuntuyo.com" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+        </label>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Physical Address * 
+          <input type="text" name="address" required placeholder="Kampala, Uganda" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+        </label>
+        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Register Customer (CIF)</button>
+        <p id="cust-feedback" style="font-size:12px;"></p>
+      </form>`
+    ) + panel(
+      "VERIFIED CUSTOMER DIRECTORY",
+      "Active CIF Records",
+      "List of all registered bank customers.",
       `<div id="cust-list"><p style="color:#9ca3af;">Loading customer records...</p></div>`
     );
 
     if (db) {
-      db.from("customers").select("*").limit(50).then(({ data, error }) => {
+      db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (error) {
           listEl.innerHTML = `<p style="color:#ef4444;">Error accessing records: ${esc(error.message)}</p>`;
@@ -76,33 +99,33 @@ function switchPage(pageName) {
         }
         if (data && data.length > 0) {
           listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
-            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Customer Number</th><th style="padding:8px;">Full Name</th><th style="padding:8px;">Type</th><th style="padding:8px;">KYC Status</th></tr>
+            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Customer Number</th><th style="padding:8px;">Full Name</th><th style="padding:8px;">NIN / ID</th><th style="padding:8px;">Phone</th></tr>
             ${data.map(cust => `<tr style="border-bottom:1px solid #1e4637;">
               <td style="padding:8px;"><strong>${esc(cust.customer_number)}</strong></td>
-              <td style="padding:8px;">${esc(cust.full_name || "N/A")}</td>
-              <td style="padding:8px;">${esc(cust.customer_type || "individual")}</td>
-              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">Verified</span></td>
+              <td style="padding:8px;">${esc(cust.full_name)}</td>
+              <td style="padding:8px;">${esc(cust.nin_or_passport)}</td>
+              <td style="padding:8px;">${esc(cust.phone_number)}</td>
             </tr>`).join("")}
           </table></div>`;
         } else {
-          listEl.innerHTML = `<p style="color:#9ca3af;">No customer records found.</p>`;
+          listEl.innerHTML = `<p style="color:#9ca3af;">No customer records found. Register a customer above to begin.</p>`;
         }
       });
     }
   }
   else if (pageName === "Accounts") {
     c.innerHTML = panel(
-      "COMMERCIAL ACCOUNT OPENING",
-      "New Account Application Workflow",
-      "Open Individual, Joint, Group (with 3 signatories), Institutional, Business, or Fixed Deposit accounts.",
-      `<form id="acc-form" style="display:flex; flex-direction:column; gap:12px; max-width:450px;" onsubmit="handleAccountSubmit(event)">
+      "COMMERCIAL ACCOUNT OPENING WORKFLOW",
+      "Open New Account (6 Core Product Types)",
+      "Select a customer and product type. Dynamic fields will adapt for Group Signatories or Fixed Deposits.",
+      `<form id="acc-form" style="display:flex; flex-direction:column; gap:12px; max-width:500px;" onsubmit="handleAccountSubmit(event)">
         <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Customer * 
           <select name="customer_id" id="sel-cust" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="">Loading customers...</option>
           </select>
         </label>
         <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account Product Type * 
-          <select name="account_type_id" id="sel-acctype" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+          <select name="account_type_id" id="sel-acctype" required onchange="toggleDynamicAccountFields(this)" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="">Loading product types...</option>
           </select>
         </label>
@@ -111,13 +134,12 @@ function switchPage(pageName) {
             <option value="">Loading branches...</option>
           </select>
         </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Currency * 
-          <select name="currency_code" id="sel-curr" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-            <option value="UGX">UGX - Uganda Shilling</option>
-          </select>
-        </label>
-        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Submit for Approval</button>
-        <p id="acc-feedback" style="font-size:12px; margin-top:4px;"></p>
+
+        <!-- Dynamic Container for Group Signatories or Fixed Deposit Terms -->
+        <div id="dynamic-fields" style="display:flex; flex-direction:column; gap:12px;"></div>
+
+        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Submit Account Application</button>
+        <p id="acc-feedback" style="font-size:12px;"></p>
       </form>`
     ) + panel(
       "ACTIVE BANK ACCOUNTS DIRECTORY",
@@ -132,33 +154,36 @@ function switchPage(pageName) {
         db.from("account_types").select("id, type_code, type_name").eq("is_active", true),
         db.from("branches").select("id, branch_code, branch_name").eq("is_active", true)
       ]).then(([custRes, typeRes, branchRes]) => {
+        window._accountTypesCache = typeRes.data || [];
+
         const custSelect = document.getElementById("sel-cust");
         if (custSelect && custRes.data) {
-          custSelect.innerHTML = custRes.data.map(c => `<option value="${c.id}">${esc(c.customer_number)} - ${esc(c.full_name || 'Customer')}</option>`).join("");
+          custSelect.innerHTML = `<option value="">-- Select Customer --</option>` + custRes.data.map(c => `<option value="${c.id}">${esc(c.customer_number)} - ${esc(c.full_name)}</option>`).join("");
         }
         const typeSelect = document.getElementById("sel-acctype");
         if (typeSelect && typeRes.data) {
-          typeSelect.innerHTML = typeRes.data.map(t => `<option value="${t.id}">${esc(t.type_name)} (${esc(t.type_code)})</option>`).join("");
+          typeSelect.innerHTML = `<option value="">-- Select Account Type --</option>` + typeRes.data.map(t => `<option value="${t.id}" data-code="${t.type_code}">${esc(t.type_name)}</option>`).join("");
         }
         const branchSelect = document.getElementById("sel-branch");
         if (branchSelect && branchRes.data) {
-          branchSelect.innerHTML = branchRes.data.map(b => `<option value="${b.id}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join("");
+          branchSelect.innerHTML = `<option value="">-- Select Branch --</option>` + branchRes.data.map(b => `<option value="${b.id}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join("");
         }
       });
 
-      db.from("bank_accounts").select("id, account_number, status, currency_code").then(({ data }) => {
+      db.from("bank_accounts").select("id, account_number, status, currency_code, balance").then(({ data }) => {
         const listEl = document.getElementById("acc-list");
         if (listEl && data && data.length > 0) {
           listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
-            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Account Number</th><th style="padding:8px;">Currency</th><th style="padding:8px;">Status</th></tr>
+            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Account Number</th><th style="padding:8px;">Currency</th><th style="padding:8px;">Balance (UGX)</th><th style="padding:8px;">Status</th></tr>
             ${data.map(a => `<tr style="border-bottom:1px solid #1e4637;">
-              <td style="padding:8px;"><strong>${esc(a.account_number || a.id.substring(0,8))}</strong></td>
+              <td style="padding:8px;"><strong>${esc(a.account_number)}</strong></td>
               <td style="padding:8px;">${esc(a.currency_code || "UGX")}</td>
-              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">${esc(a.status || "active")}</span></td>
+              <td style="padding:8px;">${Number(a.balance || 0).toLocaleString()}</td>
+              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">${esc(a.status)}</span></td>
             </tr>`).join("")}
           </table></div>`;
         } else if (listEl) {
-          listEl.innerHTML = `<p style="color:#9ca3af;">No bank accounts registered yet. Use the form above to submit an application.</p>`;
+          listEl.innerHTML = `<p style="color:#9ca3af;">No bank accounts registered yet.</p>`;
         }
       });
     }
@@ -167,11 +192,11 @@ function switchPage(pageName) {
     c.innerHTML = panel(
       "TRANSACTION PROCESSING ENGINE",
       "Double-Entry Ledger Posting",
-      "Execute deposits, withdrawals, and internal transfers with automated teller validation.",
+      "Execute deposits, withdrawals, and internal transfers.",
       `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
          <form style="display:flex; flex-direction:column; gap:12px;" onsubmit="handleTransaction(event)">
            <h3 style="color:#d97706; font-size:14px; margin-bottom:4px;">Post Teller Transaction</h3>
-           <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account Number / ID 
+           <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account ID / UUID 
              <input type="text" name="account_id" required placeholder="Enter Account UUID" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
            </label>
            <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Transaction Type 
@@ -197,8 +222,8 @@ function switchPage(pageName) {
     c.innerHTML = panel(
       "OFFICER APPROVALS & SIGNATORIES",
       "Pending Authorizations",
-      "Authorize pending account openings and group signatory rules.",
-      `<div id="approvals-list"><p style="color:#9ca3af; font-size:13px;">No pending items requiring authorization.</p></div>`
+      "Review account creation requests and group signatory configurations.",
+      `<p style="color:#9ca3af; font-size:13px;">No pending items requiring authorization.</p>`
     );
   }
   else {
@@ -206,7 +231,87 @@ function switchPage(pageName) {
   }
 }
 
-// Global form submission handler for account creation
+// Dynamic field switcher for Group Accounts and Fixed Deposits
+window.toggleDynamicAccountFields = function(selectEl) {
+  const container = document.getElementById("dynamic-fields");
+  const selectedOption = selectEl.options[selectEl.selectedIndex];
+  const typeCode = selectedOption ? selectedOption.getAttribute("data-code") : "";
+
+  if (typeCode === "GRP") {
+    container.innerHTML = `
+      <div style="background:rgba(0,0,0,0.2); padding:12px; border:1px solid #1e4637; border-radius:6px;">
+        <h4 style="color:#d97706; font-size:13px; margin-bottom:8px;">Group Signatory Mandates</h4>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Chairperson Name *
+          <input type="text" name="chairperson" required placeholder="Chairperson Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        </label>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Secretary Name *
+          <input type="text" name="secretary" required placeholder="Secretary Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        </label>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Treasurer Name *
+          <input type="text" name="treasurer" required placeholder="Treasurer Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        </label>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Withdrawal Approval Rule *
+          <select name="signatory_rule" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+            <option value="any_one">Any One Signatory</option>
+            <option value="any_two">Any Two Signatories</option>
+            <option value="all_three">All Three Signatories Required</option>
+          </select>
+        </label>
+      </div>
+    `;
+  } else if (typeCode === "FIX") {
+    container.innerHTML = `
+      <div style="background:rgba(0,0,0,0.2); padding:12px; border:1px solid #1e4637; border-radius:6px;">
+        <h4 style="color:#d97706; font-size:13px; margin-bottom:8px;">Fixed Deposit Terms</h4>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Tenure Period *
+          <select name="tenure_months" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+            <option value="6">6 Months</option>
+            <option value="12" selected>12 Months</option>
+            <option value="24">24 Months</option>
+          </select>
+        </label>
+        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Agreed Interest Rate (% p.a.) *
+          <input type="number" name="interest_rate" value="12.5" step="0.1" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        </label>
+      </div>
+    `;
+  } else {
+    container.innerHTML = "";
+  }
+};
+
+// Customer Registration Handler
+window.handleCustomerSubmit = async function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const feedback = document.getElementById("cust-feedback");
+  feedback.style.color = "#d97706";
+  feedback.textContent = "Registering customer KYC profile...";
+
+  const formData = new FormData(form);
+  const payload = {
+    customer_number: "CUST-" + Math.floor(100000 + Math.random() * 900000),
+    full_name: formData.get("full_name"),
+    nin_or_passport: formData.get("nin_or_passport"),
+    phone_number: formData.get("phone_number"),
+    email: formData.get("email"),
+    address: formData.get("address"),
+    status: "active"
+  };
+
+  const { error } = await db.from("customers").insert([payload]);
+  if (error) {
+    feedback.style.color = "#ef4444";
+    feedback.textContent = "Registration failed: " + error.message;
+  } else {
+    feedback.style.color = "#4ade80";
+    feedback.textContent = "Customer successfully registered!";
+    form.reset();
+    setTimeout(() => switchPage("Customers"), 1000);
+  }
+};
+
+// Account Opening Handler
 window.handleAccountSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
@@ -215,62 +320,24 @@ window.handleAccountSubmit = async function(e) {
   feedback.textContent = "Processing account application...";
 
   const formData = new FormData(form);
+  const metadata = {};
+  
+  // Collect dynamic fields if present
+  if (formData.get("chairperson")) {
+    metadata.signatories = {
+      chairperson: formData.get("chairperson"),
+      secretary: formData.get("secretary"),
+      treasurer: formData.get("treasurer"),
+      rule: formData.get("signatory_rule")
+    };
+  }
+  if (formData.get("tenure_months")) {
+    metadata.fixed_deposit = {
+      tenure_months: formData.get("tenure_months"),
+      interest_rate: formData.get("interest_rate")
+    };
+  }
+
   const payload = {
     customer_id: formData.get("customer_id"),
-    account_type_id: formData.get("account_type_id"),
-    branch_id: formData.get("branch_id"),
-    currency_code: formData.get("currency_code"),
-    account_number: "ACC-" + Math.floor(10000000 + Math.random() * 90000000),
-    status: "active"
-  };
-
-  const { error } = await db.from("bank_accounts").insert([payload]);
-  if (error) {
-    feedback.style.color = "#ef4444";
-    feedback.textContent = "Error: " + error.message;
-  } else {
-    feedback.style.color = "#4ade80";
-    feedback.textContent = "Account successfully opened and activated!";
-    form.reset();
-    setTimeout(() => switchPage("Accounts"), 1200);
-  }
-};
-
-// Global transaction handler
-window.handleTransaction = async function(e) {
-  e.preventDefault();
-  const form = e.target;
-  const feedback = document.getElementById("tx-feedback");
-  feedback.style.color = "#d97706";
-  feedback.textContent = "Posting to ledger...";
-
-  const formData = new FormData(form);
-  const payload = {
-    transaction_reference: "TRX-" + Math.floor(10000000 + Math.random() * 90000000),
-    account_id: formData.get("account_id"),
-    transaction_type: formData.get("tx_type"),
-    amount: parseFloat(formData.get("amount")),
-    currency_code: "UGX",
-    narration: "Teller " + formData.get("tx_type") + " posting",
-    status: "posted"
-  };
-
-  const { error } = await db.from("transactions").insert([payload]);
-  if (error) {
-    feedback.style.color = "#ef4444";
-    feedback.textContent = "Transaction failed: " + error.message;
-  } else {
-    feedback.style.color = "#4ade80";
-    feedback.textContent = "Transaction successfully posted to ledger!";
-    form.reset();
-  }
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      switchPage(e.currentTarget.dataset.page);
-    });
-  });
-  switchPage("Dashboard");
-});
+    account_type_id: formData.g
