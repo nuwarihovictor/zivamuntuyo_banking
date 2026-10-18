@@ -752,7 +752,8 @@ window.loadAttendancePolicy();
     c.innerHTML = '<span class="category-tag">Institutional banking · bulk salary payments</span><h2 class="page-heading">Institutional Payroll</h2><p class="page-intro">Pay salaries from an institution account in one controlled batch. Each employee is charged a flat UGX 1,000 commission on the payment date; the remaining salary is credited to their own active UGX account.</p>' +
       panel("PAYROLL FUNDING","Select the institution account","The account must have enough available balance for the full gross payroll.",'<div class="form-grid"><label>Institution funding account *<select id="payroll-source-account" required><option value="">Loading active UGX accounts…</option></select></label><label>Payroll reference *<input id="payroll-reference" required minlength="4" placeholder="e.g. SCHOOL-OCT-2026"></label><label>Payment date *<input id="payroll-date" type="date" required></label></div><p id="payroll-account-feedback" class="muted" aria-live="polite">Loading active accounts…</p>') +
       panel("EMPLOYEE SALARY LIST","Paste or enter payroll rows","Use one employee per line in this format: account number | employee name | gross salary | employee number (optional). The account number must match an active UGX account in the same branch.",'<label>Employee payroll rows *<textarea id="payroll-rows" rows="9" placeholder="0012345678 | Amina N. | 500000 | EMP-001&#10;0012345679 | David K. | 420000 | EMP-002" required></textarea></label><p class="muted">Commission is fixed at UGX 1,000 per employee. Gross salary must exceed UGX 1,000. Duplicate accounts, invalid accounts, future dates and insufficient funding are rejected.</p><div class="button-row"><button type="button" class="primary" onclick="previewInstitutionPayroll()">Preview payroll totals</button><button type="button" class="primary" onclick="processInstitutionPayroll()">Confirm &amp; pay salaries</button></div><div id="payroll-preview" class="panel" aria-live="polite"><p class="muted">Preview totals before confirming payment.</p></div><p id="payroll-feedback" class="muted" aria-live="polite"></p>') +
-      panel("POSTED PAYROLL RECEIPT","Batch confirmation","Print the summary after a successful posting.",'<div id="payroll-receipt" class="receipt-preview"><p class="muted">No payroll has been posted in this session.</p></div><button type="button" class="secondary" onclick="printInstitutionPayrollReceipt()">Print payroll summary</button>');
+      panel("POSTED PAYROLL RECEIPT","Batch confirmation","Print the summary after a successful posting.",'<div id="payroll-receipt" class="receipt-preview"><p class="muted">No payroll has been posted in this session.</p></div><button type="button" class="secondary" onclick="printInstitutionPayrollReceipt()">Print payroll summary</button>'); +
+      panel("SIGNED PAYROLL RECORDS","Archive the signed payroll list and withdrawal slip","Upload scans signed by at least two responsible institution leaders. The documents remain private and are linked to the posted payroll batch for audit and future reference.",'<div class="form-grid"><label>Posted payroll batch ID *<input id="payroll-evidence-batch" required placeholder="Filled automatically after payroll posting"></label><label>Signed payroll list scan (PDF/JPG/PNG) *<input id="payroll-evidence-list" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required></label><label>Signed withdrawal slip scan (PDF/JPG/PNG) *<input id="payroll-evidence-slip" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required></label></div><h3>Institution signatories (2 required, 3 maximum)</h3><div class="form-grid"><label>Signer 1 full name *<input id="payroll-signer-1-name" required maxlength="160"></label><label>Signer 1 position *<input id="payroll-signer-1-role" required maxlength="120" placeholder="e.g. Head Teacher / Director"></label><label>Signer 2 full name *<input id="payroll-signer-2-name" required maxlength="160"></label><label>Signer 2 position *<input id="payroll-signer-2-role" required maxlength="120"></label><label>Signer 3 full name (optional)<input id="payroll-signer-3-name" maxlength="160"></label><label>Signer 3 position (optional)<input id="payroll-signer-3-role" maxlength="120"></label></div><label class="fs-check-row"><input id="payroll-signers-confirmed" type="checkbox" required> I confirm the names above are the people who signed the payroll list and withdrawal slip.</label><button type="button" class="primary" onclick="attachInstitutionPayrollEvidence()">Upload scans &amp; archive with payroll</button><p id="payroll-evidence-feedback" class="muted" aria-live="polite">Documents must be signed before scanning. Keep the original signed papers according to the institution retention policy.</p>');
     const dateEl=document.getElementById("payroll-date"); if(dateEl)dateEl.value=new Date().toLocaleDateString("en-CA");
     window.loadInstitutionPayrollAccounts();
   }
@@ -1949,6 +1950,8 @@ window.processInstitutionPayroll = async function(){
     const {data,error}=await db.rpc("process_institution_payroll",{p_branch_id:source.branch_id,p_institution_account_id:d.source,p_payroll_reference:d.reference,p_payroll_date:d.date,p_items:d.items});
     if(error)throw error;
     const result=data||{};
+    window.lastInstitutionPayrollResult=result;
+    const evidenceBatch=document.getElementById("payroll-evidence-batch");if(evidenceBatch)evidenceBatch.value=result.batch_id||"";
     const summary="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nINSTITUTIONAL PAYROLL RECEIPT\nReference: "+result.payroll_reference+"\nDate: "+result.payroll_date+"\nBatch: "+result.batch_id+"\nEmployees paid: "+result.employee_count+"\nGross payroll: UGX "+Number(result.gross_total).toLocaleString("en-UG")+"\nCommission (UGX 1,000 each): UGX "+Number(result.commission_total).toLocaleString("en-UG")+"\nTotal credited to employee accounts: UGX "+Number(result.net_total).toLocaleString("en-UG")+"\nStatus: POSTED\nGeneral ledger journal: "+result.journal_id;
     const receipt=document.getElementById("payroll-receipt");if(receipt){receipt.textContent=summary;receipt.dataset.summary=summary;}
     const preview=document.getElementById("payroll-preview");if(preview)preview.textContent=summary;
@@ -2050,3 +2053,38 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+
+
+window.attachInstitutionPayrollEvidence = async function(){
+ const feedback=document.getElementById("payroll-evidence-feedback");
+ const batchId=document.getElementById("payroll-evidence-batch")?.value?.trim()||"";
+ const listFile=document.getElementById("payroll-evidence-list")?.files?.[0];
+ const slipFile=document.getElementById("payroll-evidence-slip")?.files?.[0];
+ const confirmed=document.getElementById("payroll-signers-confirmed")?.checked;
+ try{
+  if(!db)throw new Error("Database connection is not ready.");
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(batchId))throw new Error("Post a payroll first or enter a valid payroll batch ID.");
+  if(!listFile||!slipFile)throw new Error("Choose both the signed payroll list and signed withdrawal slip scans.");
+  const allowed=["application/pdf","image/jpeg","image/png"];
+  for(const file of [listFile,slipFile]){if(!allowed.includes(file.type))throw new Error("Only PDF, JPG and PNG scans are allowed.");if(file.size>15*1024*1024)throw new Error("Each scan must be 15 MB or smaller.");}
+  if(!confirmed)throw new Error("Confirm that the listed leaders signed the physical documents.");
+  const signers=[];
+  for(let i=1;i<=3;i++){
+   const name=document.getElementById("payroll-signer-"+i+"-name")?.value?.trim()||"";
+   const role=document.getElementById("payroll-signer-"+i+"-role")?.value?.trim()||"";
+   if(i<=2&&(!name||!role))throw new Error("Enter names and positions for at least two signers.");
+   if(name||role){if(!name||!role)throw new Error("Complete both the name and position for each optional signer.");signers.push({name,role,signed:true});}
+  }
+  if(signers.length<2||signers.length>3)throw new Error("Provide two or three signers.");
+  const ext=f=>f.name.toLowerCase().endsWith(".pdf")?"pdf":f.name.toLowerCase().endsWith(".png")?"png":f.name.toLowerCase().endsWith(".jpeg")?"jpeg":"jpg";
+  const listPath="institution-payroll/"+batchId+"/payroll-list."+ext(listFile);
+  const slipPath="institution-payroll/"+batchId+"/withdrawal-slip."+ext(slipFile);
+  if(feedback)feedback.textContent="Uploading private payroll scans…";
+  const bucket=db.storage.from("institution-payroll-evidence");
+  const up1=await bucket.upload(listPath,listFile,{upsert:true,contentType:listFile.type});if(up1.error)throw up1.error;
+  const up2=await bucket.upload(slipPath,slipFile,{upsert:true,contentType:slipFile.type});if(up2.error)throw up2.error;
+  const {data,error}=await db.rpc("attach_institution_payroll_evidence",{p_batch_id:batchId,p_payroll_list_object_path:listPath,p_withdrawal_slip_object_path:slipPath,p_signers:signers});
+  if(error)throw error;
+  if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
+ }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
