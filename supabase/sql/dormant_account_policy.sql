@@ -107,7 +107,7 @@ begin
   insert into public.ledger_entries(journal_id,ledger_account_id,entry_side,amount,currency_code,branch_id,customer_account_id,description)
   values(v_journal,v_income_ledger,'credit',22000,'UGX',v_branch,p_account_id,'Dormant account reactivation fee income');
 
-  v_tx_ref:='DORF-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,16));
+  v_tx_ref:=v_receipt;
   insert into public.transactions(transaction_reference,account_id,branch_id,transaction_type,amount,currency_code,narration,status)
   values(v_tx_ref,p_account_id,v_branch,'dormant_reactivation_fee',22000,'UGX',
     'Dormant account reactivation fee paid by '||p_payment_method||'; receipt '||v_receipt,'posted');
