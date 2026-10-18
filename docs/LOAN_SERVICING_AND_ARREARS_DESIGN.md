@@ -24,6 +24,30 @@ It shows dated principal/interest instalments, balance after each instalment, es
 11. Closure: payoff quotation, final receipt, zero-balance check, release of collateral/guarantees and closure certificate.
 12. Reporting: portfolio outstanding, due today/next 7/30 days, overdue buckets (1–7, 8–30, 31–60, 61–90, 90+ configurable), PAR30/PAR90, collection rates, disbursements, recoveries, rescheduled loans, write-offs, officer/branch/product analysis, maturity list, ageing and audit exports.
 
+## Due-date notifications and overdue visual identification
+
+The servicing module must provide a prominent due-date alert system, not just a schedule calculator.
+
+- **Upcoming:** configurable reminders before an instalment is due (recommended defaults: 7 days, 3 days and 1 day; product/management settings can change them).
+- **Due today:** clearly identify instalments due on the current institution business date.
+- **Grace period:** show the grace-period end date separately from the contractual due date, and state clearly whether a payment is overdue or only within grace.
+- **Overdue:** once the contractual due date and any configured grace rules have passed, show days past due (DPD), unpaid amount and oldest overdue instalment.
+- **Escalation:** configurable follow-up stages, such as first reminder, call required, supervisor review and formal recovery queue. Staff must be able to record contact attempts and promises-to-pay.
+- **Channels:** in-app dashboard and notification centre first; optional browser/desktop notifications and email/SMS/WhatsApp only when the institution configures and authorizes a supported provider. Delivery failure must be logged and retried safely. Do not claim an SMS or message was sent unless the provider confirms it.
+- **Roles and branches:** notify only authorized staff for the relevant branch/portfolio, with escalation to approved supervisors. Do not expose full identity or loan details on lock-screen notifications.
+- **Reliability:** generate alerts from saved authoritative repayment schedules in a trusted scheduled server/database job using the institution timezone/business date. Prevent duplicate alerts with an idempotency key; log creation, delivery attempts, acknowledgement and resolution. Alerts must not depend on a staff member keeping a browser tab open.
+- **Visual legend:** use both a text label and a distinct icon/color so meaning remains clear for color-blind users and printed reports:
+  - 🟢 **Upcoming** — not yet due.
+  - 🔵 **Due today** — due on the business date.
+  - 🟠 **Grace period** — due date passed, but configured grace has not expired.
+  - 🔴 **Overdue** — unpaid after the applicable due/grace rule; display exact DPD and amount.
+  - ⚫ **Closed/settled** — no outstanding scheduled amount.
+  - 🟣 **Rescheduled** — schedule changed through an approved, audited process.
+- **Dashboard views:** due today, due in 7/30 days, overdue by DPD bucket, overdue amount, assigned collection officer, next action and alert history. Provide filters for branch, product, officer and date.
+- **Important:** status must be computed from the stored schedule, actual posted/allocated repayments and approved grace policy—not manually chosen emoji or a browser-only preview. A payment or authorized reschedule must update the status based on authoritative records.
+
+## 
+
 ## Required screens
 - Loan product configuration and calculator.
 - Application pipeline and document checklist.
