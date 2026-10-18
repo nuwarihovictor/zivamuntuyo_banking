@@ -53,3 +53,15 @@ The new member/account register code passes the JavaScript syntax check and the 
 - [ ] Enforce the requested one-individual-account-per-person rule inside the authoritative account-opening database RPC, while permitting valid joint accounts. Do not rely on browser-only checks.
 - [ ] Confirm how pending, active, dormant, frozen, rejected and closed accounts affect eligibility, then test concurrency and bypass attempts.
 - Policy/design: `docs/national-id-and-account-opening-policy.md`; SQL preflight draft: `supabase/sql/customer_identity_uniqueness_preflight.sql`.
+
+
+## Loan servicing and arrears management — newly researched scope
+- [x] Add a browser-side repayment schedule preview calculator (flat, reducing-balance equal instalments, reducing-balance equal principal). Preview only; not a booking or accounting workflow.
+- [x] Document loan lifecycle, due-date monitoring, grace periods, arrears/DPD, collections, prepayments, rescheduling, collateral/guarantors, reporting, accounting controls and acceptance tests.
+- [x] Draft a proposed schema design without applying it to the database.
+- [ ] Verify current loan database schema and authoritative RPCs; extend existing tables rather than creating duplicates.
+- [ ] Implement server/database-generated and versioned repayment schedules, due-date dashboard and automated business-date arrears calculation.
+- [ ] Implement payment capture, allocation, receipts, reversals, balanced journal posting and idempotency with maker-checker.
+- [ ] Implement collection work queues, reminders, rescheduling/settlement, collateral and guarantor tracking, write-off and portfolio-at-risk reports.
+- [ ] Validate formulas against independently calculated cases and reconcile loan schedules to the posted ledger; obtain credit manager/accountant and compliance sign-off.
+- Design: `docs/LOAN_SERVICING_AND_ARREARS_DESIGN.md`; schema proposal: `docs/LOAN_SERVICING_SCHEMA_DRAFT.md`.
