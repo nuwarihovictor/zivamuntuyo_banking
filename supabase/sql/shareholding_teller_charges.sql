@@ -1,5 +1,5 @@
 -- Shareholding, account-opening package and teller collection schema for Zivamuntuyo.
--- The matching RPC definitions are deployed in Supabase. Keep the function-definition SQL synchronized when replaying this schema into a fresh project.
+-- Apply supabase/sql/shareholding_teller_charge_functions.sql after this schema.
 create table if not exists public.customer_share_transactions (
  id uuid primary key default gen_random_uuid(), customer_id uuid not null references public.customers(id),
  branch_id uuid not null references public.branches(id), account_id uuid references public.bank_accounts(id),
