@@ -263,3 +263,14 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .loan-documents-list p { margin:7px 0; font-size:13px; }
 .loan-documents-list a { color:var(--link-color,var(--accent-color,#0e5a40)); font-weight:650; text-decoration:underline; }
 .loan-documents-list small { color:var(--text-muted); }
+
+/* Loan product pricing and General Manager controls */
+.loan-rate-notice { padding:12px 14px; margin:2px 0 14px; border:1px solid var(--border-color); border-radius:10px; font-size:13px; line-height:1.6; background:var(--panel-bg); }
+.loan-rate-settings-list { display:grid; gap:12px; }
+.loan-rate-setting { display:grid; grid-template-columns:minmax(0,1fr) minmax(220px,0.9fr); gap:12px; align-items:center; padding:14px; border:1px solid var(--border-color); border-radius:12px; }
+.loan-rate-setting p { margin:5px 0; }
+.loan-rate-edit-form { display:flex; flex-wrap:wrap; align-items:end; gap:9px; }
+.loan-rate-edit-form label { display:grid; gap:6px; flex:1 1 140px; font-size:13px; }
+.loan-rate-edit-form input { width:100%; min-width:0; }
+.fixed-rate-label { font-weight:750; padding:10px 12px; border:1px solid var(--border-color); border-radius:9px; }
+@media (max-width:680px) { .loan-rate-setting { grid-template-columns:1fr; } .loan-rate-edit-form { align-items:stretch; } }
