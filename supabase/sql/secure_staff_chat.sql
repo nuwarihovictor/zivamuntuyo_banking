@@ -1,7 +1,7 @@
 -- Secure staff chat for Zivamuntuyo Financial Services Ltd.
 -- Messages are read/written only through role-checked RPCs; raw biometric data is never involved.
 
-CREATE TABLE IF NOT EXISTS public.staff_messages (
+CREATE TABLE IF NOT EXISTS public.staff_channel_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_user_id uuid NOT NULL REFERENCES public.employee_profiles(user_id) ON DELETE RESTRICT,
   branch_id uuid NULL REFERENCES public.branches(id) ON DELETE RESTRICT,
@@ -9,13 +9,13 @@ CREATE TABLE IF NOT EXISTS public.staff_messages (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS staff_messages_channel_created_idx
-  ON public.staff_messages (branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS staff_channel_messages_channel_created_idx
+  ON public.staff_channel_messages (branch_id, created_at DESC);
 
-ALTER TABLE public.staff_messages ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.staff_messages FROM PUBLIC, anon, authenticated;
+ALTER TABLE public.staff_channel_messages ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.staff_channel_messages FROM PUBLIC, anon, authenticated;
 
-CREATE OR REPLACE FUNCTION public.list_staff_messages(
+CREATE OR REPLACE FUNCTION public.list_staff_channel_messages(
   p_branch_id uuid DEFAULT NULL,
   p_limit integer DEFAULT 100
 )
@@ -58,7 +58,7 @@ BEGIN
   RETURN QUERY
   SELECT m.id, m.sender_user_id, ep.full_name::text, ep.employee_number::text,
          m.branch_id, b.branch_name::text, m.message_text, m.created_at
-  FROM public.staff_messages m
+  FROM public.staff_channel_messages m
   JOIN public.employee_profiles ep ON ep.user_id = m.sender_user_id
   LEFT JOIN public.branches b ON b.id = m.branch_id
   WHERE m.branch_id IS NOT DISTINCT FROM p_branch_id
@@ -67,7 +67,7 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.send_staff_message(
+CREATE OR REPLACE FUNCTION public.send_staff_channel_message(
   p_message text,
   p_branch_id uuid DEFAULT NULL
 )
@@ -101,14 +101,14 @@ BEGIN
     RAISE EXCEPTION 'Active employee profile required';
   END IF;
 
-  INSERT INTO public.staff_messages(sender_user_id, branch_id, message_text)
+  INSERT INTO public.staff_channel_messages(sender_user_id, branch_id, message_text)
   VALUES (auth.uid(), p_branch_id, v_message)
   RETURNING id INTO v_id;
   RETURN v_id;
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.list_staff_messages(uuid, integer) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.send_staff_message(text, uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.list_staff_messages(uuid, integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.send_staff_message(text, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.list_staff_channel_messages(uuid, integer) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.send_staff_channel_message(text, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.list_staff_channel_messages(uuid, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_staff_channel_message(text, uuid) TO authenticated;
