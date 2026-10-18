@@ -655,17 +655,28 @@ window.loadAttendancePolicy();
               <button type="button" class="vicline-icon-button" title="Refresh messages" aria-label="Refresh messages" onclick="window.loadStaffChat()">↻</button>
             </div>
           </header>
-          <div class="vicline-channelbar">
-            <div class="vicline-channel-title">
-              <span class="vicline-channel-icon" aria-hidden="true">◎</span>
-              <div><strong>Messages</strong><small>Bank-wide or authorized branch conversation</small></div>
+          <div class="vicline-toolbar">
+            <div class="vicline-channel-title"><span class="vicline-channel-icon" aria-hidden="true">◎</span><div><strong>Messages</strong><small>Keep 10+ branch and team conversations within reach</small></div></div>
+            <div class="vicline-toolbar-actions">
+              <button type="button" class="vicline-settings-button" onclick="window.toggleVicLineSettings()" aria-expanded="false" id="vicline-settings-toggle"><span aria-hidden="true">⚙</span> Settings</button>
+              <label class="vicline-channel-picker">OPEN CONVERSATION<select id="staff-chat-branch" onchange="window.loadStaffChat()"><option value="">Bank-wide messages</option></select></label>
             </div>
-            <label class="vicline-channel-picker">CHAT CHANNEL
-              <select id="staff-chat-branch" onchange="window.loadStaffChat()">
-                <option value="">Bank-wide messages</option>
-              </select>
-            </label>
           </div>
+          <section class="vicline-settings-panel" id="vicline-settings-panel" hidden aria-labelledby="vicline-settings-title">
+            <div class="vicline-settings-heading"><div><h3 id="vicline-settings-title">VIC LINE settings</h3><p>Customize alerts and the look of your workspace on this device.</p></div><button type="button" class="vicline-close-settings" onclick="window.toggleVicLineSettings(false)" aria-label="Close settings">×</button></div>
+            <div class="vicline-settings-grid">
+              <label class="vicline-setting-row"><span><strong>Notification sounds</strong><small>Play a tone when a new message arrives while VIC LINE is open.</small></span><input type="checkbox" id="vicline-sound-enabled" checked onchange="window.saveVicLineSettings()"></label>
+              <label class="vicline-setting-row"><span><strong>Notification tone</strong><small>Choose the sound you prefer.</small></span><select id="vicline-sound-tone" onchange="window.saveVicLineSettings()"><option value="chime">Soft chime</option><option value="bell">Bell</option><option value="pop">Pop</option><option value="double">Double tone</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Sound volume</strong><small>Set notification loudness.</small></span><input type="range" id="vicline-sound-volume" min="0" max="100" value="55" oninput="window.updateVicLineVolumeLabel()" onchange="window.saveVicLineSettings()"><output id="vicline-volume-label">55%</output></label>
+              <label class="vicline-setting-row"><span><strong>Desktop notifications</strong><small>Ask permission to show browser alerts for new messages.</small></span><button type="button" class="secondary" id="vicline-notification-permission" onclick="window.enableVicLineDesktopNotifications()">Enable alerts</button></label>
+              <label class="vicline-setting-row"><span><strong>Appearance</strong><small>Choose a comfortable chat background.</small></span><select id="vicline-appearance" onchange="window.saveVicLineSettings()"><option value="light">Light</option><option value="soft">Soft lavender</option><option value="dark">Dark</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Message density</strong><small>Choose how compact the conversation looks.</small></span><select id="vicline-density" onchange="window.saveVicLineSettings()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+            </div>
+            <div class="vicline-settings-footer"><button type="button" class="secondary" onclick="window.testVicLineNotificationTone()">▶ Test tone</button><span id="vicline-settings-feedback" role="status" aria-live="polite">Settings are saved on this device.</span></div>
+          </section>
+          <div class="vicline-inbox-layout">
+            <aside class="vicline-inbox-sidebar" aria-label="Available conversations"><div class="vicline-inbox-sidebar-heading"><strong>Conversations</strong><span id="vicline-conversation-count">Loading…</span></div><div id="vicline-conversation-list" class="vicline-conversation-list"><p class="muted">Loading conversations…</p></div><p class="vicline-sidebar-note">Each conversation follows bank-wide or branch access permissions.</p></aside>
+            <div class="vicline-chat-column">
           <div class="vicline-conversation-heading">
             <div class="vicline-conversation-avatar" aria-hidden="true">✦</div>
             <div class="vicline-conversation-copy"><strong id="vicline-current-channel">VIC LINE team</strong><span>Internal communication space</span></div>
@@ -693,10 +704,13 @@ window.loadAttendancePolicy();
             </section>
             <p class="vicline-safety-note">Keep passwords, PINs and customer credentials out of chat. Live calls are planned for a later phase.</p>
           </div>
+            </div>
+          </div>
         </section>
       </div>
     `;
-    window.loadStaffChat();
+    window.applyVicLineSettings();
+    window.loadStaffChat().then(() => { if (!window.vicLinePollHandle) window.vicLineStartPolling(); });
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
