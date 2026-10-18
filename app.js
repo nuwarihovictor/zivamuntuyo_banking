@@ -285,8 +285,11 @@ window.switchPage = function(pageName) {
         "Open New Account",
         "Submit an account application for a valid customer. Database permissions and approval rules determine whether it can be created.",
         `<form id="acc-form" onsubmit="handleAccountSubmit(event)">
-          <label>Customer UUID *
-            <input type="text" name="customer_id" required placeholder="Enter Customer UUID">
+          <label>Find customer *
+            <input type="search" id="account-customer-search" autocomplete="off" placeholder="Search by customer name or number" oninput="searchAccountOpeningCustomers(this)">
+            <input type="hidden" name="customer_id" required>
+            <div id="account-customer-results" class="account-search-results" role="listbox"></div>
+            <p id="account-customer-selected" class="muted">Choose the verified customer before opening an account.</p>
           </label>
           <label>Branch *
             <select name="branch_id" id="account-branch-id" required>
@@ -1030,6 +1033,31 @@ window.handleCustomerSubmit = async function(e) {
     form.reset();
     setTimeout(() => window.switchPage("Customers"), 1000);
   }
+};
+
+window.searchAccountOpeningCustomers = async function(input) {
+  const results=document.getElementById("account-customer-results");
+  const hidden=document.querySelector('#acc-form input[name="customer_id"]');
+  const selected=document.getElementById("account-customer-selected");
+  if(!results||!hidden)return;
+  hidden.value="";
+  if(selected)selected.textContent="Choose the verified customer before opening an account.";
+  const term=String(input.value||"").trim();
+  if(term.length<2){results.textContent=term?"Type at least 2 characters.":"";return;}
+  if(!db){results.textContent="Database connection unavailable.";return;}
+  results.textContent="Searching customers you can access…";
+  try{
+    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").ilike("full_name","%"+term.replace(/[%_]/g,"\\window.handleAccountSubmit = async function(e) {")+"%").limit(10);
+    if(error){results.textContent="Customer search unavailable: "+error.message;return;}
+    const rows=(data||[]).filter(row=>["active","approved"].includes(String(row.status||"").toLowerCase()));
+    if(!rows.length){results.textContent="No matching active or approved customer found in records you can access.";return;}
+    results.innerHTML=rows.map((row,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(row.full_name||"Customer")+'</strong><span>'+esc(row.customer_number||"No customer number")+'</span><small>'+esc(row.phone_number||"")+'</small></button>').join("");
+    results.querySelectorAll(".account-search-option").forEach((button,i)=>button.addEventListener("click",()=>{
+      const row=rows[i];hidden.value=row.id;input.value=row.full_name||row.customer_number||"";
+      results.innerHTML="";
+      if(selected)selected.textContent="Selected "+(row.full_name||"customer")+" · "+(row.customer_number||"customer number")+"; the server validates eligibility.";
+    }));
+  }catch(err){results.textContent="Customer search failed. Check the connection and try again.";}
 };
 
 window.handleAccountSubmit = async function(e) {
