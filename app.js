@@ -710,6 +710,22 @@ window.loadAttendancePolicy();
       <span class="category-tag">Credit operations</span>
       <h2 class="page-heading">Loans & Credit</h2>
       <p class="muted">Register a loan application, attach evidence, and track independent review decisions. Approval here records a credit decision; it does not disburse funds or create a posted loan ledger.</p>
+      ${panel("LOAN REPAYMENT SCHEDULE PREVIEW","Estimate instalments and due dates","Planning calculator only. It does not approve, book, disburse or post a loan. Final schedules must be generated and stored by the secured database workflow using the approved product terms.",`
+        <form id="loan-schedule-preview-form" onsubmit="previewLoanRepaymentSchedule(event)">
+          <div class="form-grid">
+            <label>Principal amount *<input type="number" name="principal" min="1" step="0.01" required placeholder="e.g. 1000000"></label>
+            <label>Annual interest rate (%) *<input type="number" name="annual_rate" min="0" max="100" step="0.01" required value="24"></label>
+            <label>Term (months) *<input type="number" name="term_months" min="1" max="360" step="1" required value="12"></label>
+            <label>Interest method *<select name="method" required><option value="reducing_emi">Reducing balance — equal instalments</option><option value="reducing_equal_principal">Reducing balance — equal principal</option><option value="flat">Flat rate on original principal</option></select></label>
+            <label>First instalment due date *<input type="date" name="first_due_date" required></label>
+            <label>Grace period (days)<input type="number" name="grace_days" min="0" max="365" step="1" value="0"></label>
+          </div>
+          <p class="muted">Preview assumptions: monthly instalments; annual rate divided by 12; no fees, insurance, penalties, holiday adjustment or payment rounding policy included. Confirm the legally approved product method before quoting a borrower.</p>
+          <button type="submit" class="primary">Calculate repayment schedule</button>
+          <button type="button" class="secondary" onclick="document.getElementById('loan-schedule-preview').innerHTML='';document.getElementById('loan-schedule-preview-form').reset()">Clear preview</button>
+        </form>
+        <div id="loan-schedule-preview" aria-live="polite"></div>
+      `)}
       ${panel("NEW LOAN APPLICATION","Capture request and supporting evidence","Use an active customer and the branch responsible for the application. Attach ID, land title, chairperson letter and other supporting documents.",`
         <form id="loan-application-form" onsubmit="handleLoanApplicationSubmit(event)">
           <label>Customer *
@@ -1275,6 +1291,58 @@ window.loadTrialBalance = async function() {
 
 window.normalizeCustomerIdentity = function(value) {
   return String(value || "").normalize("NFKC").trim().toUpperCase().replace(/[\\s-]+/g, "");
+};
+
+
+window.previewLoanRepaymentSchedule = function(event) {
+  event.preventDefault();
+  const form=event.target, host=document.getElementById("loan-schedule-preview");
+  if(!host)return;
+  const fd=new FormData(form), principal=Number(fd.get("principal")), annualRate=Number(fd.get("annual_rate"))/100;
+  const months=Number(fd.get("term_months")), grace=Number(fd.get("grace_days")||0), method=String(fd.get("method"));
+  const firstDate=String(fd.get("first_due_date")||"");
+  if(!(principal>0)||!(months>=1&&months<=360&&Number.isInteger(months))||annualRate<0||annualRate>1||!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!(grace>=0&&grace<=365)){
+    host.textContent="Check principal, rate, term, first due date and grace period.";return;
+  }
+  const monthly=annualRate/12;
+  const money2=n=>Number(n).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const dueDate=(iso,offset)=>{
+    const [y,m,d]=iso.split("-").map(Number), targetMonth=m-1+offset, targetYear=y+Math.floor(targetMonth/12), monthIndex=((targetMonth%12)+12)%12;
+    const lastDay=new Date(targetYear,monthIndex+1,0).getDate();
+    return new Date(targetYear,monthIndex,Math.min(d,lastDay));
+  };
+  let balance=principal,totalInterest=0,totalPrincipal=0,totalDue=0;
+  const emi=monthly===0?principal/months:(principal*monthly)/(1-Math.pow(1+monthly,-months));
+  const rows=[];
+  for(let i=1;i<=months;i++){
+    let interest,principalDue,payment;
+    if(method==="flat"){
+      interest=principal*monthly;
+      principalDue=principal/months;
+      payment=interest+principalDue;
+    }else if(method==="reducing_equal_principal"){
+      principalDue=i===months?balance:principal/months;
+      interest=balance*monthly;
+      payment=principalDue+interest;
+    }else{
+      interest=balance*monthly;
+      payment=i===months?balance+interest:emi;
+      principalDue=Math.min(balance,Math.max(0,payment-interest));
+      if(i===months)payment=principalDue+interest;
+    }
+    principalDue=Math.min(balance,principalDue);
+    if(i===months && method!=="flat" && method!=="reducing_equal_principal"){
+      principalDue=balance;
+      payment=principalDue+interest;
+    }
+    balance=Math.max(0,balance-principalDue);
+    totalInterest+=interest;totalPrincipal+=principalDue;totalDue+=payment;
+    const date=dueDate(firstDate,i-1);
+    const graceEnd=new Date(date.getTime());graceEnd.setDate(graceEnd.getDate()+grace);
+    rows.push({n:i,date:date.toISOString().slice(0,10),graceEnd:graceEnd.toISOString().slice(0,10),principal:principalDue,interest,payment,balance});
+  }
+  const methodName={flat:"Flat rate",reducing_emi:"Reducing balance — equal instalments",reducing_equal_principal:"Reducing balance — equal principal"}[method];
+  host.innerHTML='<div class="grid-2"><div class="metric-card"><h3>Estimated instalment</h3><div class="metric-val">'+money2(rows[0]?.payment||0)+'</div><p class="muted">UGX-equivalent in selected loan currency; amount may vary in final period.</p></div><div class="metric-card"><h3>Total estimated interest</h3><div class="metric-val">'+money2(totalInterest)+'</div><p class="muted">Method: '+esc(methodName)+'</p></div><div class="metric-card"><h3>Total scheduled payments</h3><div class="metric-val">'+money2(totalDue)+'</div></div><div class="metric-card"><h3>Final due date</h3><div class="metric-val">'+esc(rows[rows.length-1]?.date||"—")+'</div></div></div><div class="table-responsive"><table class="data-table"><thead><tr><th>#</th><th>Due date</th><th>Grace period ends</th><th>Principal</th><th>Interest</th><th>Instalment</th><th>Balance after payment</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+r.n+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.graceEnd)+'</td><td>'+money2(r.principal)+'</td><td>'+money2(r.interest)+'</td><td>'+money2(r.payment)+'</td><td>'+money2(r.balance)+'</td></tr>').join("")+'</tbody></table></div><p class="muted">PREVIEW ONLY — not a repayment demand or binding offer. Confirm rate basis, exact date rules, rounding, fees, holidays, grace treatment and approval before using with a borrower.</p>';
 };
 
 window.handleCustomerSubmit = async function(e) {
