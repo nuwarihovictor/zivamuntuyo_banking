@@ -496,98 +496,67 @@ window.switchPage = function(pageName) {
   }
 }
 
-let dashboardDebitCreditChart = null;
+let dashboardMonthlyChart = null;
+let dashboardDepositWithdrawalChart = null;
+let dashboardBranchChart = null;
 let dashboardAccountTypeChart = null;
-let dashboardChartRows = [];
+let dashboardAnalyticsRows = [];
 
+function destroyDashboardCharts() {
+  [dashboardMonthlyChart,dashboardDepositWithdrawalChart,dashboardBranchChart,dashboardAccountTypeChart].forEach(chart=>{if(chart)chart.destroy();});
+  dashboardMonthlyChart=dashboardDepositWithdrawalChart=dashboardBranchChart=dashboardAccountTypeChart=null;
+}
 window.loadDashboardCharts = async function() {
-  const feedback = document.getElementById("dashboard-feedback");
-  const kpis = document.getElementById("dashboard-kpis");
-  const branchInput = document.getElementById("dashboard-branch-id");
-  if (!feedback || !kpis) return;
-  kpis.innerHTML = "";
-  dashboardChartRows = [];
-  if (!db) {
-    feedback.textContent = "Database connection unavailable. Charts require live posted-ledger data.";
-    return;
-  }
-  const branchId = branchInput ? branchInput.value.trim() : "";
-  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
-    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
-    return;
-  }
-  feedback.textContent = "Loading posted ledger data…";
-  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
-  if (error) {
-    feedback.textContent = "Live charts are not available yet. Install the secure list_trial_balance function in Supabase and verify accounting permissions. Details: " + error.message;
-    return;
-  }
-  dashboardChartRows = data || [];
-  if (!dashboardChartRows.length) {
-    feedback.textContent = "No active ledger account data was returned. Charts are intentionally empty rather than showing demo numbers.";
-    if (dashboardDebitCreditChart) { dashboardDebitCreditChart.destroy(); dashboardDebitCreditChart = null; }
-    if (dashboardAccountTypeChart) { dashboardAccountTypeChart.destroy(); dashboardAccountTypeChart = null; }
-    const currencySelect = document.getElementById("dashboard-chart-currency");
-    if (currencySelect) currencySelect.innerHTML = "";
-    return;
-  }
-  const groups = {};
-  dashboardChartRows.forEach(row => {
-    const currency = String(row.currency_code || "UNKNOWN").trim();
-    if (!groups[currency]) groups[currency] = { debit: 0, credit: 0, accounts: {} };
-    const group = groups[currency];
-    group.debit += Number(row.debit_total || 0);
-    group.credit += Number(row.credit_total || 0);
-    const type = String(row.ledger_type || "Unclassified");
-    if (!group.accounts[type]) group.accounts[type] = 0;
-    group.accounts[type] += Math.abs(Number(row.debit_total || 0) - Number(row.credit_total || 0));
-  });
-  const fmt = (n, cur) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " " + cur;
-  kpis.innerHTML = Object.entries(groups).map(([currency, g]) =>
-    '<div class="metric-card"><div class="metric-sub">Posted debits · ' + esc(currency) + '</div><div class="metric-val" style="font-size:18px;">' + esc(fmt(g.debit,currency)) + '</div><div class="muted">Posted credits: ' + esc(fmt(g.credit,currency)) + '</div></div>'
-  ).join("");
-  const currencySelect = document.getElementById("dashboard-chart-currency");
-  if (currencySelect) {
-    const previous = currencySelect.value;
-    currencySelect.innerHTML = Object.keys(groups).map(cur => '<option value="' + esc(cur) + '">' + esc(cur) + '</option>').join("");
-    if (groups[previous]) currencySelect.value = previous;
-  }
-  if (typeof Chart === "undefined") {
-    feedback.textContent = "Ledger data loaded, but the chart library did not load. Check your internet connection and reload.";
-    return;
-  }
-  if (dashboardDebitCreditChart) dashboardDebitCreditChart.destroy();
-  const currencyNames = Object.keys(groups);
-  dashboardDebitCreditChart = new Chart(document.getElementById("dashboard-debit-credit"), {
-    type: "bar",
-    data: { labels: currencyNames, datasets: [
-      { label: "Debits", data: currencyNames.map(cur => groups[cur].debit) },
-      { label: "Credits", data: currencyNames.map(cur => groups[cur].credit) }
-    ]},
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: "bottom" } } }
-  });
-  window.renderDashboardTypeChart();
-  feedback.textContent = "Loaded " + dashboardChartRows.length + " ledger accounts from posted journals. Data refreshes when you select Refresh dashboard.";
+  const feedback=document.getElementById("dashboard-feedback");
+  const kpis=document.getElementById("dashboard-kpis");
+  const branchInput=document.getElementById("dashboard-branch-id");
+  if(!feedback||!kpis)return;
+  kpis.innerHTML=""; dashboardAnalyticsRows=[];
+  const branchId=branchInput?branchInput.value.trim():"";
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){feedback.textContent="Enter a valid branch UUID or leave the field blank.";return;}
+  if(!db){feedback.textContent="Database connection unavailable. Charts require live posted transaction data.";destroyDashboardCharts();return;}
+  feedback.textContent="Loading monthly trends, deposits, withdrawals and branch performance…";
+  const {data,error}=await db.rpc("list_dashboard_analytics",{p_branch_id:branchId||null,p_months:12});
+  if(error){feedback.textContent="Dashboard analytics are not available until the secure list_dashboard_analytics SQL function is installed in Supabase and permissions are verified. Details: "+error.message;destroyDashboardCharts();return;}
+  dashboardAnalyticsRows=data||[];
+  if(!dashboardAnalyticsRows.length){feedback.textContent="No posted journal data was returned for your authorized branch scope. Charts remain empty instead of showing demo figures.";destroyDashboardCharts();const sel=document.getElementById("dashboard-chart-currency");if(sel)sel.innerHTML="";return;}
+  const currencies=[...new Set(dashboardAnalyticsRows.map(r=>String(r.currency_code||"UNKNOWN").trim()))].sort();
+  const sel=document.getElementById("dashboard-chart-currency");
+  if(sel){const previous=sel.value;sel.innerHTML=currencies.map(cur=>'<option value="'+esc(cur)+'">'+esc(cur)+'</option>').join("");if(currencies.includes(previous))sel.value=previous;}
+  const summaries=dashboardAnalyticsRows.filter(r=>r.metric_type==="currency_summary");
+  const fmt=(n,cur)=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2})+" "+cur;
+  kpis.innerHTML=summaries.map(r=>'<div class="metric-card"><div class="metric-sub">Posted activity · '+esc(r.currency_code)+'</div><div class="metric-val" style="font-size:17px;">Deposits: '+esc(fmt(r.deposit_total,r.currency_code))+'</div><div class="muted">Withdrawals: '+esc(fmt(r.withdrawal_total,r.currency_code))+'</div><div class="muted">Transactions: '+Number(r.transaction_count||0)+'</div></div>').join("");
+  if(typeof Chart==="undefined"){feedback.textContent="Analytics data loaded, but the chart library did not load. Check the internet connection and reload.";return;}
+  window.renderDashboardAnalyticsCharts();
+  feedback.textContent="Loaded "+dashboardAnalyticsRows.length+" analytics rows from posted journals. Values remain separated by currency; no sample figures are used.";
 };
-
-window.renderDashboardTypeChart = function() {
-  const canvas = document.getElementById("dashboard-account-types");
-  const select = document.getElementById("dashboard-chart-currency");
-  if (!canvas || !select || typeof Chart === "undefined" || !dashboardChartRows.length) return;
-  const currency = select.value;
-  const groups = {};
-  dashboardChartRows.filter(row => String(row.currency_code || "UNKNOWN").trim() === currency).forEach(row => {
-    const type = String(row.ledger_type || "Unclassified");
-    groups[type] = (groups[type] || 0) + Math.abs(Number(row.debit_total || 0) - Number(row.credit_total || 0));
-  });
-  if (dashboardAccountTypeChart) dashboardAccountTypeChart.destroy();
-  dashboardAccountTypeChart = new Chart(canvas, {
-    type: "doughnut",
-    data: { labels: Object.keys(groups), datasets: [{ label: "Absolute net movement", data: Object.values(groups) }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
-  });
+window.renderDashboardAnalyticsCharts=function(){
+  const sel=document.getElementById("dashboard-chart-currency");
+  if(!sel||typeof Chart==="undefined"||!dashboardAnalyticsRows.length)return;
+  const currency=sel.value;
+  const rows=dashboardAnalyticsRows.filter(r=>String(r.currency_code||"UNKNOWN").trim()===currency);
+  const monthly=rows.filter(r=>r.metric_type==="monthly").sort((a,b)=>String(a.period_start).localeCompare(String(b.period_start)));
+  const branches=rows.filter(r=>r.metric_type==="branch").sort((a,b)=>String(a.branch_name||"").localeCompare(String(b.branch_name||"")));
+  const types=rows.filter(r=>r.metric_type==="account_type");
+  destroyDashboardCharts();
+  const common={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}};
+  const moneyAxis={beginAtZero:true,ticks:{callback:value=>Number(value).toLocaleString()}};
+  const monthlyLabels=monthly.map(r=>r.label||String(r.period_start||""));
+  const makeChart=(id,config)=>{const canvas=document.getElementById(id);return canvas?new Chart(canvas,config):null;};
+  dashboardMonthlyChart=makeChart("dashboard-monthly-trend",{type:"line",data:{labels:monthlyLabels,datasets:[
+    {label:"Deposits",data:monthly.map(r=>Number(r.deposit_count||0)),tension:.25},
+    {label:"Withdrawals",data:monthly.map(r=>Number(r.withdrawal_count||0)),tension:.25}
+  ]},options:{...common,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+  dashboardDepositWithdrawalChart=makeChart("dashboard-deposits-withdrawals",{type:"bar",data:{labels:monthlyLabels,datasets:[
+    {label:"Deposits ("+currency+")",data:monthly.map(r=>Number(r.deposit_total||0))},
+    {label:"Withdrawals ("+currency+")",data:monthly.map(r=>Number(r.withdrawal_total||0))}
+  ]},options:{...common,scales:{y:moneyAxis}}});
+  dashboardBranchChart=makeChart("dashboard-branch-performance",{type:"bar",data:{labels:branches.map(r=>r.branch_name||"Unnamed branch"),datasets:[
+    {label:"Deposits ("+currency+")",data:branches.map(r=>Number(r.deposit_total||0))},
+    {label:"Withdrawals ("+currency+")",data:branches.map(r=>Number(r.withdrawal_total||0))}
+  ]},options:{...common,indexAxis:"y",scales:{x:moneyAxis}}});
+  dashboardAccountTypeChart=makeChart("dashboard-account-types",{type:"doughnut",data:{labels:types.map(r=>r.ledger_type||"Unclassified"),datasets:[{label:"Absolute net movement",data:types.map(r=>Math.abs(Number(r.debit_total||0)-Number(r.credit_total||0)))}]},options:common});
 };
-
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
   const summary = document.getElementById("reports-summary");
