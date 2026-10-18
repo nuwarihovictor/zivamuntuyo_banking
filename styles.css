@@ -368,3 +368,19 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 @media(max-width:560px){.pricing-policy-grid{grid-template-columns:1fr}.pricing-policy-card{padding:14px}}
 
 .account-shareholding-callout{border-left:4px solid var(--accent-gold,#cba85a)}
+
+/* Bank performance reporting */
+.performance-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 22px}
+.performance-metric{min-width:0;padding:17px;border:1px solid var(--line);border-radius:13px;background:var(--panel-bg,#fff);display:flex;flex-direction:column;gap:7px}
+.performance-metric span{font-size:12px;color:var(--muted,#718078);font-weight:600}
+.performance-metric strong{font-size:clamp(18px,2vw,25px);line-height:1.2;overflow-wrap:anywhere;color:var(--ink,#183b2b)}
+.performance-metric small{font-size:11px;line-height:1.5;color:var(--muted,#718078)}
+.performance-metric.expense,.performance-metric.loss{border-color:#e7c6c6}
+.performance-metric.loss strong,.performance-negative{color:#a12d32!important}
+.performance-metric.income,.performance-metric.surplus{border-color:#c9e1d2}
+.performance-metric.capital,.performance-metric.reserve{border-color:#e8dbb8}
+.performance-filters{align-items:end}
+.performance-description-field{grid-column:1/-1}
+.performance-caveat{margin:18px 0;padding:13px 15px;border-left:4px solid var(--accent-gold,#cba85a);background:var(--input-bg,#f4f7f4);border-radius:8px;line-height:1.7}
+@media(max-width:850px){.performance-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.performance-summary-grid{grid-template-columns:1fr}.performance-metric{padding:14px}.performance-filters{grid-template-columns:1fr}}
