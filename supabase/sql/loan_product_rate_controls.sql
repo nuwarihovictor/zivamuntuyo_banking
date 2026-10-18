@@ -1,0 +1,5 @@
+-- Loan product rate controls are live in Supabase.
+-- The overdraft row is constrained to 5.0000 monthly and cannot be edited.
+-- public.update_loan_product_rate(text,numeric,text,text) checks the authenticated
+-- General Manager role, requires a reason, and writes an audit_events record.
+-- public.list_loan_product_rates() provides the authenticated product list.
