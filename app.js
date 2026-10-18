@@ -158,7 +158,7 @@ window.switchPage = function(pageName) {
     `;
     if(db){
       Promise.all([
-        db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active,sex,date_of_birth,national_id,photo_url,employment_status,job_title,start_date").order("full_name"),
+        db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active,sex,date_of_birth,photo_url,employment_status,job_title,start_date").order("full_name"),
         db.from("branches").select("id,branch_name").eq("is_active",true),
         db.from("staff_roles").select("id,role_code,role_name")
       ]).then(([staffResult,branchResult,roleResult])=>{
@@ -173,13 +173,12 @@ window.switchPage = function(pageName) {
         const today=new Date();
         const ageOf=d=>{if(!d)return "Not recorded";const born=new Date(d+"T00:00:00");let age=today.getFullYear()-born.getFullYear();if(today.getMonth()<born.getMonth()||(today.getMonth()===born.getMonth()&&today.getDate()<born.getDate()))age--;return age>=0&&age<120?age+" years":"Check date";};
         const safePhoto=url=>url&&/^https:\/\//i.test(url)?'<img class="staff-photo" loading="lazy" alt="Staff profile photo" src="'+esc(url)+'">':'<div class="staff-photo-placeholder" aria-label="No profile photo"><span>👤</span></div>';
-        const sensitive=window.currentEmployeeRole&&["system_admin","bank_admin","hr_manager"].includes(window.currentEmployeeRole);
         listEl.innerHTML=people.map(s=>{
           const role=roles.get(s.role_id)||{name:"Role not assigned",code:""};
           const status=s.employment_status|| (s.is_active?"Active":"Inactive");
           const details=[
             ["Sex",s.sex||"Not recorded"],["Age",ageOf(s.date_of_birth)],["Employee ID",s.employee_number||"Not assigned"],
-            ["National ID",sensitive?(s.national_id||"Not recorded"):(s.national_id?"Restricted":"Not recorded")],
+            ["National ID","Stored separately; restricted access"],
             ["Date of birth",s.date_of_birth||"Not recorded"],["Phone",s.phone_number||"Not recorded"],
             ["Work email",s.work_email||"Not recorded"],["Branch",branches.get(s.home_branch_id)||"Not assigned"],
             ["Job title",s.job_title||role.name||"Not assigned"],["Employment status",status],["Start date",s.start_date||"Not recorded"]
