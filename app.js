@@ -408,6 +408,28 @@ window.switchPage = function(pageName) {
     `;
     window.loadTrialBalance();
   }
+  else if (pageName === "Reports") {
+    c.innerHTML = `
+      <span class="category-tag">Live ledger reports</span>
+      <h2 class="page-heading">Financial Reports</h2>
+      ${panel(
+        "POSTED LEDGER SUMMARY",
+        "Report totals from the general ledger",
+        "This summary uses posted journal entries only and keeps each currency separate. It is not an audited financial statement.",
+        `<div class="form-grid">
+           <label>Branch UUID (optional; must be within your authorized scope)
+             <input id="reports-branch-id" type="text" placeholder="Optional branch UUID">
+           </label>
+           <button type="button" class="secondary" onclick="loadFinancialReports()">Refresh reports</button>
+         </div>
+         <div id="reports-feedback" class="muted" aria-live="polite">Loading ledger report…</div>
+         <div id="reports-summary"></div>
+         <div id="reports-detail"></div>
+         <p class="muted">Income statement and balance sheet classifications require a reviewed chart of accounts. No estimates or demo figures are displayed.</p>`
+      )}
+    `;
+    window.loadFinancialReports();
+  }
   else {
     c.innerHTML = `
       <span class="category-tag">System Module</span>
@@ -416,6 +438,66 @@ window.switchPage = function(pageName) {
     `;
   }
 }
+
+window.loadFinancialReports = async function() {
+  const feedback = document.getElementById("reports-feedback");
+  const summary = document.getElementById("reports-summary");
+  const detail = document.getElementById("reports-detail");
+  const branchInput = document.getElementById("reports-branch-id");
+  if (!feedback || !summary || !detail) return;
+  summary.innerHTML = "";
+  detail.innerHTML = "";
+  if (!db) {
+    feedback.textContent = "Database connection unavailable. No report figures are being shown.";
+    return;
+  }
+  const branchId = branchInput ? branchInput.value.trim() : "";
+  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
+    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
+    return;
+  }
+  feedback.textContent = "Loading posted ledger totals…";
+  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  if (error) {
+    feedback.textContent = "Reports could not load. Install the secure list_trial_balance SQL function in Supabase and check your accounting role. Details: " + error.message;
+    return;
+  }
+  const rows = data || [];
+  if (!rows.length) {
+    feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
+    return;
+  }
+  const currencies = {};
+  rows.forEach(row => {
+    const currency = String(row.currency_code || "UNKNOWN").trim();
+    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: {} };
+    const group = currencies[currency];
+    group.debit += Number(row.debit_total || 0);
+    group.credit += Number(row.credit_total || 0);
+    group.count++;
+    const type = String(row.ledger_type || "Unclassified");
+    if (!group.accounts[type]) group.accounts[type] = { debit: 0, credit: 0, count: 0 };
+    group.accounts[type].debit += Number(row.debit_total || 0);
+    group.accounts[type].credit += Number(row.credit_total || 0);
+    group.accounts[type].count++;
+  });
+  const money = (n, currency) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
+  summary.innerHTML = Object.entries(currencies).map(([currency, g]) =>
+    '<div class="metric-card"><div class="metric-sub">Posted ledger • ' + esc(currency) + '</div>' +
+    '<div class="metric-val" style="font-size:17px;">Debits: ' + esc(money(g.debit, currency)) + '</div>' +
+    '<div class="metric-val" style="font-size:17px;">Credits: ' + esc(money(g.credit, currency)) + '</div>' +
+    '<div class="muted">Difference: ' + esc(money(g.debit - g.credit, currency)) + ' | Accounts: ' + g.count + '</div></div>'
+  ).join("");
+  detail.innerHTML = Object.entries(currencies).map(([currency, g]) =>
+    '<h3>' + esc(currency) + ' — Totals by ledger type</h3>' +
+    Object.entries(g.accounts).map(([type, t]) =>
+      '<div class="list-item"><div><strong>' + esc(type) + '</strong><br><span class="muted">Accounts: ' + t.count +
+      ' | Debits: ' + esc(money(t.debit, currency)) + ' | Credits: ' + esc(money(t.credit, currency)) +
+      ' | Net debit: ' + esc(money(t.debit - t.credit, currency)) + '</span></div></div>'
+    ).join("")
+  ).join("");
+  feedback.textContent = "Report loaded from " + rows.length + " active ledger accounts and posted journal entries. Currency totals are not combined.";
+};
 
 window.loadTrialBalance = async function() {
   const list = document.getElementById("gl-list");
