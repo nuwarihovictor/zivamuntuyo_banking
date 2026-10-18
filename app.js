@@ -644,7 +644,7 @@ window.loadAttendancePolicy();
       ${panel(
         "SECURE STAFF MESSAGES",
         "Internal staff communication",
-        "Messages are saved securely. Choose bank-wide chat or a branch channel you are authorized to access.",
+        "Choose bank-wide chat or a branch channel you are authorized to access. Voice notes are stored privately and are never played automatically.",
         `<div class="form-grid">
            <label>Conversation
              <select id="staff-chat-branch" onchange="window.loadStaffChat()">
@@ -661,7 +661,19 @@ window.loadAttendancePolicy();
            </label>
            <button type="submit" class="primary">Send message</button>
          </form>
-         <p class="muted">Messages are visible to staff with access to the selected channel. Do not share passwords, PINs, customer secrets, or full account credentials in chat.</p>`
+         <section class="staff-voice-note-tools" aria-labelledby="staff-voice-note-heading">
+           <h3 id="staff-voice-note-heading">Voice note</h3>
+           <p class="muted">Record up to 120 seconds. Preview before sending. Maximum file size: 3 MB. Your browser will ask for microphone permission when you start.</p>
+           <div class="staff-voice-controls">
+             <button type="button" class="secondary" id="staff-voice-record" onclick="window.startStaffVoiceRecording()">🎙️ Record</button>
+             <button type="button" class="secondary" id="staff-voice-stop" onclick="window.stopStaffVoiceRecording()" disabled>Stop</button>
+             <button type="button" class="secondary" id="staff-voice-discard" onclick="window.discardStaffVoiceRecording()" disabled>Discard</button>
+             <button type="button" class="primary" id="staff-voice-send" onclick="window.sendStaffVoiceNote()" disabled>Send voice note</button>
+           </div>
+           <p id="staff-voice-feedback" class="muted" role="status" aria-live="polite">No recording yet.</p>
+           <audio id="staff-voice-preview" controls hidden preload="metadata"></audio>
+         </section>
+         <p class="muted">Do not share passwords, PINs, customer secrets, or full account credentials in chat. Live voice calls are not enabled yet.</p>`
       )}
     `;
     window.loadStaffChat();
@@ -1757,6 +1769,171 @@ document.addEventListener("click", function(event) {
   if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
 });
 
+window.staffVoiceRecorder = null;
+window.staffVoiceStream = null;
+window.staffVoiceChunks = [];
+window.staffVoiceBlob = null;
+window.staffVoiceMimeType = "";
+window.staffVoiceStartedAt = 0;
+window.staffVoiceTimer = null;
+window.staffVoiceChannelAtStart = null;
+window.staffVoicePreviewUrl = null;
+
+function staffVoiceFormatTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+function staffVoiceSetButtons(state) {
+  const record = document.getElementById("staff-voice-record");
+  const stop = document.getElementById("staff-voice-stop");
+  const discard = document.getElementById("staff-voice-discard");
+  const send = document.getElementById("staff-voice-send");
+  if (!record || !stop || !discard || !send) return;
+  record.disabled = state === "recording" || state === "ready" || state === "uploading";
+  stop.disabled = state !== "recording";
+  discard.disabled = state !== "ready";
+  send.disabled = state !== "ready";
+}
+
+window.startStaffVoiceRecording = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const preview = document.getElementById("staff-voice-preview");
+  if (!db || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    if (feedback) feedback.textContent = "Voice recording is not supported in this browser. Try a current Chrome or Edge browser over HTTPS.";
+    return;
+  }
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const supported = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+    const mime = supported.find(type => MediaRecorder.isTypeSupported(type)) || "";
+    const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    window.staffVoiceStream = stream;
+    window.staffVoiceRecorder = recorder;
+    window.staffVoiceChunks = [];
+    window.staffVoiceBlob = null;
+    window.staffVoiceMimeType = (recorder.mimeType || mime || "audio/webm").split(";")[0].toLowerCase();
+    window.staffVoiceChannelAtStart = (document.getElementById("staff-chat-branch") || {}).value || "";
+    window.staffVoiceStartedAt = Date.now();
+    if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+    recorder.ondataavailable = event => { if (event.data && event.data.size) window.staffVoiceChunks.push(event.data); };
+    recorder.onerror = () => {
+      if (feedback) feedback.textContent = "The browser could not record audio. Stop and try again.";
+      window.stopStaffVoiceRecording();
+    };
+    recorder.onstop = () => {
+      const duration = Math.ceil((Date.now() - window.staffVoiceStartedAt) / 1000);
+      const blob = new Blob(window.staffVoiceChunks, { type: window.staffVoiceMimeType });
+      window.staffVoiceBlob = blob;
+      if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+      window.staffVoiceStream = null;
+      if (window.staffVoiceTimer) clearInterval(window.staffVoiceTimer);
+      window.staffVoiceTimer = null;
+      if (blob.size > 3145728) {
+        window.staffVoiceBlob = null;
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "This recording is larger than 3 MB. Record a shorter note.";
+        return;
+      }
+      if (!blob.size || duration < 1) {
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "The recording was too short or empty. Please record again.";
+        return;
+      }
+      window.staffVoiceDuration = Math.min(duration, 120);
+      window.staffVoicePreviewUrl = URL.createObjectURL(blob);
+      if (preview) { preview.src = window.staffVoicePreviewUrl; preview.hidden = false; }
+      staffVoiceSetButtons("ready");
+      if (feedback) feedback.textContent = "Preview the recording before sending (" + staffVoiceFormatTime(window.staffVoiceDuration) + ", " + Math.ceil(blob.size / 1024) + " KB).";
+    };
+    recorder.start(500);
+    staffVoiceSetButtons("recording");
+    if (feedback) feedback.textContent = "Recording… 00:00 / 02:00";
+    window.staffVoiceTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - window.staffVoiceStartedAt) / 1000);
+      if (feedback) feedback.textContent = "Recording… " + staffVoiceFormatTime(elapsed) + " / 02:00";
+      if (elapsed >= 120) window.stopStaffVoiceRecording();
+    }, 500);
+  } catch (error) {
+    if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+    window.staffVoiceStream = null;
+    staffVoiceSetButtons("idle");
+    if (feedback) feedback.textContent = error && error.name === "NotAllowedError"
+      ? "Microphone permission was denied. Allow microphone access in your browser settings and try again."
+      : "Microphone unavailable. Check that it is connected and not being used by another app.";
+  }
+};
+
+window.stopStaffVoiceRecording = function() {
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") {
+    try { window.staffVoiceRecorder.stop(); } catch (error) {}
+  }
+};
+
+window.discardStaffVoiceRecording = function() {
+  const preview = document.getElementById("staff-voice-preview");
+  if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+  window.staffVoicePreviewUrl = null;
+  window.staffVoiceBlob = null;
+  window.staffVoiceChunks = [];
+  if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+  staffVoiceSetButtons("idle");
+  const feedback = document.getElementById("staff-voice-feedback");
+  if (feedback) feedback.textContent = "Recording discarded.";
+};
+
+window.sendStaffVoiceNote = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const selector = document.getElementById("staff-chat-branch");
+  const blob = window.staffVoiceBlob;
+  if (!db || !blob) return;
+  const branchId = selector && selector.value ? selector.value : null;
+  if ((branchId || "") !== (window.staffVoiceChannelAtStart || "")) {
+    if (feedback) feedback.textContent = "The conversation changed after recording. Discard this note and record it in the intended channel.";
+    return;
+  }
+  if (blob.size > 3145728 || !window.staffVoiceDuration || window.staffVoiceDuration > 120) {
+    if (feedback) feedback.textContent = "This recording exceeds the allowed size or duration.";
+    return;
+  }
+  const sendButton = document.getElementById("staff-voice-send");
+  staffVoiceSetButtons("uploading");
+  if (sendButton) sendButton.disabled = true;
+  if (feedback) feedback.textContent = "Uploading voice note securely…";
+  let uploadedPath = null;
+  try {
+    const { data: userData, error: userError } = await db.auth.getUser();
+    if (userError || !userData || !userData.user) throw new Error("Your signed-in user could not be verified. Sign in again.");
+    const ext = window.staffVoiceMimeType === "audio/mp4" ? "m4a"
+      : window.staffVoiceMimeType === "audio/ogg" ? "ogg"
+      : window.staffVoiceMimeType === "audio/mpeg" ? "mp3"
+      : window.staffVoiceMimeType === "audio/wav" ? "wav" : "webm";
+    const channelKey = branchId || "global";
+    uploadedPath = userData.user.id + "/" + channelKey + "/" + crypto.randomUUID() + "." + ext;
+    const { error: uploadError } = await db.storage.from("staff-voice-notes").upload(uploadedPath, blob, {
+      contentType: window.staffVoiceMimeType,
+      cacheControl: "300",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { error: registerError } = await db.rpc("register_staff_voice_note", {
+      p_branch_id: branchId,
+      p_storage_path: uploadedPath,
+      p_mime_type: window.staffVoiceMimeType,
+      p_byte_size: blob.size,
+      p_duration_seconds: window.staffVoiceDuration
+    });
+    if (registerError) throw registerError;
+    window.discardStaffVoiceRecording();
+    if (feedback) feedback.textContent = "Voice note sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  } catch (error) {
+    if (feedback) feedback.textContent = "Voice note was not confirmed as sent. " + (error && error.message ? error.message : "Check your connection and try again.");
+    staffVoiceSetButtons("ready");
+  }
+};
+
 window.loadStaffChat = async function() {
   const feedback = document.getElementById("staff-chat-feedback");
   const list = document.getElementById("staff-chat-messages");
@@ -1766,14 +1943,12 @@ window.loadStaffChat = async function() {
     feedback.textContent = "Database connection unavailable. Messages were not loaded.";
     return;
   }
-  feedback.textContent = "Loading messages…";
+  feedback.textContent = "Loading messages and voice notes…";
   try {
-    const [branchResult, messageResult] = await Promise.all([
+    const [branchResult, messageResult, voiceResult] = await Promise.all([
       db.from("branches").select("id,branch_name").eq("is_active", true).order("branch_name"),
-      db.rpc("list_staff_messages", {
-        p_branch_id: selector.value || null,
-        p_limit: 100
-      })
+      db.rpc("list_staff_messages", { p_branch_id: selector.value || null, p_limit: 100 }),
+      db.rpc("list_staff_voice_notes", { p_branch_id: selector.value || null, p_limit: 100 })
     ]);
     if (branchResult.error) {
       feedback.textContent = "Branch channels could not be loaded: " + branchResult.error.message;
@@ -1788,17 +1963,33 @@ window.loadStaffChat = async function() {
       list.innerHTML = "";
       return;
     }
-    const messages = (messageResult.data || []).slice().reverse();
-    list.innerHTML = messages.map(m => {
+    if (voiceResult.error) {
+      feedback.textContent = "Text messages loaded, but voice notes are unavailable until the voice-note database setup is applied: " + voiceResult.error.message;
+    }
+    const items = (messageResult.data || []).map(m => ({ kind: "text", data: m, at: new Date(m.created_at).getTime() || 0 }));
+    const notes = voiceResult.error ? [] : (voiceResult.data || []);
+    const noteItems = await Promise.all(notes.map(async note => {
+      const { data, error } = await db.storage.from("staff-voice-notes").createSignedUrl(note.storage_path, 300);
+      return { kind: "voice", data: note, url: error || !data ? "" : data.signedUrl, at: new Date(note.created_at).getTime() || 0 };
+    }));
+    const merged = items.concat(noteItems).sort((a, b) => a.at - b.at);
+    list.innerHTML = merged.map(item => {
+      const m = item.data;
       const sender = m.sender_name || m.sender_employee_number || "Staff member";
       const time = m.created_at ? new Date(m.created_at).toLocaleString() : "";
-      return '<article class="list-item staff-chat-message"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>' +
-        esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 0">' +
+      if (item.kind === "voice") {
+        const player = item.url
+          ? '<audio controls preload="none" aria-label="Voice note from ' + esc(sender) + '" src="' + esc(item.url) + '"></audio>'
+          : '<p class="muted">Audio playback unavailable. Refresh and check your channel access.</p>';
+        return '<article class="list-item staff-chat-message staff-voice-message"><div class="staff-chat-message-heading"><strong>' + esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p class="staff-voice-label">🎙️ Voice note · ' + esc(staffVoiceFormatTime(m.duration_seconds)) + '</p>' + player + '</article>';
+      }
+      return '<article class="list-item staff-chat-message"><div class="staff-chat-message-heading"><strong>' +
+        esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p class="staff-chat-text">' +
         esc(m.message_text) + '</p></article>';
     }).join("") || '<p class="muted">No messages in this conversation yet. You can send the first message.</p>';
-    feedback.textContent = messages.length + " message" + (messages.length === 1 ? "" : "s") + " loaded. Use Refresh messages to check for new replies.";
+    feedback.textContent = merged.length + " item" + (merged.length === 1 ? "" : "s") + " loaded. Use Refresh messages to check for new replies.";
   } catch (error) {
-    feedback.textContent = "A connection error prevented messages from loading.";
+    feedback.textContent = "A connection error prevented messages and voice notes from loading.";
   }
 };
 
