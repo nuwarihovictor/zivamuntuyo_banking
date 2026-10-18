@@ -25,7 +25,17 @@
   </header>
 
   <section id="login-screen" class="login-screen" aria-labelledby="login-title" hidden>
-    <div class="login-card">
+    <div id="branch-entry-directory" class="login-card branch-entry-directory" hidden>
+      <div class="login-brand-mark">Z</div>
+      <p class="login-eyebrow">ZIVAMUNTUYO BRANCH NETWORK</p>
+      <h2>Select a branch</h2>
+      <p class="login-description">Choose a branch and select Open. You will then sign in with your own staff email and password. Only authorised staff can enter a branch.</p>
+      <div id="branch-entry-list" class="branch-entry-list"><p class="muted">Loading active branches…</p></div>
+      <p id="branch-entry-feedback" class="login-feedback" role="status" aria-live="polite"></p>
+      <button id="bank-wide-login-button" type="button" class="secondary">Bank-wide staff sign-in</button>
+    </div>
+    <div id="staff-login-card" class="login-card" hidden>
+      <button id="back-to-branch-directory" type="button" class="secondary">← Back to branch list</button>
       <div class="login-brand-mark">Z</div>
       <p class="login-eyebrow">SECURE STAFF ACCESS</p>
       <h2 id="login-title">Sign in to Zivamuntuyo</h2>
