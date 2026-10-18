@@ -89,11 +89,10 @@ window.switchPage = function(pageName) {
          <p class="muted">Charts are operational summaries, not audited financial statements. A balanced total does not prove all transactions have been recorded.</p>`
       )}
     `;
-    window.loadDashboardBranchOptions();
-    window.loadDashboardCharts();
-
-
-window.loadBranchPortfolioSummary();
+    window.loadDashboardBranchOptions().then(() => {
+      window.loadDashboardCharts();
+      window.loadBranchPortfolioSummary();
+    });
   } 
   else if (pageName === "Branches") {
     c.innerHTML = `
