@@ -499,7 +499,7 @@ window.loadCashApprovals = async function() {
   if (pending.error) {
     pendingEl.textContent = "Could not load requests: " + pending.error.message;
   } else {
-    const rows = pending.data || [];
+    const rows = (pending.data || []).filter(r => !r.approved_by);
     pendingEl.innerHTML = rows.length ? rows.map(r =>
       '<div class="list-item"><div><strong>' + esc(r.journal_number) + '</strong> — ' + esc(r.transaction_type) +
       '<br><span class="muted">Account: ' + esc(r.account_number) + ' | Branch: ' + esc(r.branch_name) +
