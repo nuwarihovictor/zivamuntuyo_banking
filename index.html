@@ -1,1 +1,62 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zivamuntuyo Financial Services Ltd</title><link rel="stylesheet" href="styles.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><aside><div class="brand"><b>Z</b><span><strong>ZIVAMUNTUYO</strong><small>FINANCIAL SERVICES LTD</small></span></div><p class="label">WORKSPACE</p><nav><button class="active" data-page="Overview">▦ Overview</button><button data-page="Customers">♙ Customers <small>Planned</small></button><button data-page="Accounts">▤ Accounts <small>Planned</small></button><button data-page="Transactions">⇄ Transactions <small>Planned</small></button><button data-page="Loans">◷ Loans <small>Planned</small></button><button data-page="Accounting">▥ Accounting <small>Planned</small></button><button data-page="Reports">▧ Reports <small>Planned</small></button></nav><div class="secure">● Security first<br><small>Financial actions disabled until verified</small></div></aside><main><header><div><small class="eyebrow">BANKING MANAGEMENT SYSTEM</small><h1 id="title">Overview</h1></div><span class="tag">SETUP ENVIRONMENT</span></header><div id="setup" class="notice"><b>Initial setup required</b><p>Add your Supabase project URL and public publishable/anon key to <code>app.js</code>. Never put a service-role key in browser code.</p></div><section id="login" class="card"><small class="eyebrow">SECURE ACCESS</small><h2>Welcome back</h2><p class="muted">Sign in with your authorized staff account.</p><label>Work email<input id="email" type="email" autocomplete="username" placeholder="name@company.com"></label><label>Password<input id="password" type="password" autocomplete="current-password" placeholder="Enter password"></label><button id="signin">Sign in securely →</button><p id="message" aria-live="polite"></p><small class="muted">Access depends on assigned role and branch permissions.</small></section><section id="dashboard" class="hidden"><div class="welcome"><div><h2 id="welcome">Welcome</h2><p class="muted">Your staff workspace</p></div><span id="role" class="tag green">Staff</span><button id="signout" class="secondary">Sign out</button></div><div class="stats"><article><small>CUSTOMERS</small><h2>—</h2><p>Awaiting secure module</p></article><article><small>ACTIVE ACCOUNTS</small><h2>—</h2><p>No account figures displayed</p></article><article><small>TODAY'S TRANSACTIONS</small><h2>—</h2><p>Posting not enabled</p></article><article><small>HOME BRANCH</small><h2 id="branch">—</h2><p>Assigned branch</p></article></div><div class="columns"><article class="card"><small class="eyebrow">GETTING STARTED</small><h3>System setup checklist</h3><p>✓ Cloud database project created</p><p>✓ Staff profile saved and verified in SQL</p><p>◷ Security policies and permissions need review</p><p>◷ Double-entry ledger and approvals not enabled</p></article><article class="card"><small class="eyebrow">BRANCH NETWORK</small><h3>Operating locations</h3><p><b>Butare</b> <span class="muted">Main Branch · Head Office</span></p><p><b>Rubirizi</b> <span class="muted">Uganda</span></p><p><b>Buhwenju</b> <span class="muted">Uganda</span></p><p><b>Ntungamo</b> <span class="muted">Uganda</span></p></article></div><div class="notice warning"><b>Live banking is not enabled.</b> This initial shell only provides sign-in and staff-profile verification. Customer accounts, balances and transactions remain disabled until permissions, ledger controls and recovery tests are completed.</div></section><section id="placeholder" class="card hidden"><small class="eyebrow">MODULE NOT ENABLED</small><h2 id="placeholder-title"></h2><p class="muted">This module will be connected after security and accounting controls are implemented and tested. No live financial actions are available here.</p></section><footer>© Zivamuntuyo Financial Services Ltd <span>Secure banking workspace · Initial build</span></footer></main><script src="app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zivamuntuyo Financial Services Ltd</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo-icon">Z</div>
+            <div>
+                <h1>ZIVAMUNTUYO</h1>
+                <p>FINANCIAL SERVICES LTD</p>
+            </div>
+        </div>
+        <div id="status" class="status-badge">Signed out</div>
+        <button id="signout" class="secondary hidden">Sign out</button>
+    </header>
+
+    <nav id="nav" class="nav-bar"></nav>
+
+    <main class="main-container">
+        <!-- LOGIN SECTION -->
+        <section id="login" class="panel">
+            <small>SECURE ACCESS</small>
+            <h2>Welcome back</h2>
+            <p class="muted">Sign in with your authorized staff account.</p>
+            
+            <form id="login-form">
+                <label>Work email
+                    <input type="email" id="email" value="info.nuwarihovictor@gmail.com" required>
+                </label>
+                <label>Password
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </label>
+                <button type="submit" class="primary">Sign in securely →</button>
+                <p id="login-message" class="error"></p>
+            </form>
+            <p class="muted" style="margin-top: 16px; font-size: 12px;">Access depends on assigned role and branch permissions.</p>
+        </section>
+
+        <!-- WORKSPACE SECTION -->
+        <div id="workspace" class="hidden">
+            <h1 id="title">Overview</h1>
+            <div id="content"></div>
+        </div>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <footer class="footer">
+        <p>© <span id="year"></span> Zivamuntuyo Financial Services Ltd</p>
+        <p><small class="muted">Secure banking workspace · Active Build</small></p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+  </html>
+  
