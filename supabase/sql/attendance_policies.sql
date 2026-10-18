@@ -31,10 +31,10 @@ CREATE TABLE IF NOT EXISTS public.attendance_policies (
   ),
   CONSTRAINT attendance_policy_timezone_valid CHECK (timezone_name IN ('Africa/Kampala','UTC'))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_policies_one_active_global
-  ON public.attendance_policies ((is_active)) WHERE branch_id IS NULL AND is_active;
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_policies_one_active_per_branch
-  ON public.attendance_policies (branch_id) WHERE branch_id IS NOT NULL AND is_active;
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_policies_global_effective_date
+  ON public.attendance_policies (effective_from) WHERE branch_id IS NULL AND is_active;
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_policies_branch_effective_date
+  ON public.attendance_policies (branch_id, effective_from) WHERE branch_id IS NOT NULL AND is_active;
 
 ALTER TABLE public.attendance_policies ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.attendance_policies FROM PUBLIC, anon, authenticated;
@@ -68,7 +68,9 @@ BEGIN
          ap.grace_minutes, ap.overtime_requires_approval, ap.timezone_name,
          ap.effective_from, ap.updated_at, ap.updated_by
   FROM public.attendance_policies ap
-  WHERE ap.is_active AND (ap.branch_id = p_branch_id OR (p_branch_id IS NULL AND ap.branch_id IS NULL))
+  WHERE ap.is_active
+    AND ap.effective_from <= CURRENT_DATE
+    AND (ap.branch_id = p_branch_id OR (p_branch_id IS NULL AND ap.branch_id IS NULL))
   ORDER BY ap.effective_from DESC, ap.updated_at DESC
   LIMIT 1;
 END;
@@ -99,7 +101,7 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   SELECT public.current_employee_role_code() INTO v_role;
-  IF v_role NOT IN ('system_admin','bank_admin','branch_manager') THEN
+  IF v_role IS NULL OR v_role NOT IN ('system_admin','bank_admin','branch_manager') THEN
     RAISE EXCEPTION 'Only administrators and branch managers may change attendance policies';
   END IF;
   IF p_branch_id IS NULL AND v_role NOT IN ('system_admin','bank_admin') THEN
@@ -132,7 +134,9 @@ BEGIN
 
   UPDATE public.attendance_policies
      SET is_active = false, updated_by = auth.uid(), updated_at = now()
-   WHERE is_active AND branch_id IS NOT DISTINCT FROM p_branch_id;
+   WHERE is_active
+     AND branch_id IS NOT DISTINCT FROM p_branch_id
+     AND effective_from >= COALESCE(p_effective_from,CURRENT_DATE);
 
   INSERT INTO public.attendance_policies (
     branch_id, working_days, clock_in_time, clock_out_time, break_start_time,
