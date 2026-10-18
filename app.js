@@ -388,18 +388,25 @@ window.switchPage = function(pageName) {
   }
   else if (pageName === "Accounting") {
     c.innerHTML = `
-      <span class="category-tag">Phase 5 & 8: General Ledger & Trial Balance</span>
+      <span class="category-tag">General Ledger & Trial Balance</span>
       <h2 class="page-heading">Accounting & Double-Entry Ledger</h2>
       ${panel(
-        "CHART OF ACCOUNTS & BALANCES",
-        "Trial Balance Verification",
-        "Ensures total debits equal total credits across all institutional ledgers.",
-        `<div id="gl-list">
-           <div class="list-item"><div><strong>10100 - Vault Cash</strong><br><span class="muted">Asset</span></div><span class="badge-role">Balanced</span></div>
-           <div class="list-item"><div><strong>20100 - Customer Deposits</strong><br><span class="muted">Liability</span></div><span class="badge-role">Balanced</span></div>
-         </div>`
+        "POSTED LEDGER TRIAL BALANCE",
+        "Ledger-backed accounting",
+        "Only posted journal entries are included. Totals are shown separately by currency; pending requests are excluded.",
+        `<div class="form-grid">
+           <label>Branch UUID (leave blank for all branches you are authorized to access)
+             <input id="trial-branch-id" type="text" placeholder="Optional branch UUID">
+           </label>
+           <button type="button" class="secondary" onclick="loadTrialBalance()">Refresh trial balance</button>
+         </div>
+         <div id="trial-balance-feedback" class="muted" aria-live="polite">Loading posted ledger balances…</div>
+         <div id="trial-balance-totals"></div>
+         <div id="gl-list"></div>
+         <p class="muted">A balanced trial balance does not by itself confirm that all business transactions were entered or independently audited.</p>`
       )}
     `;
+    window.loadTrialBalance();
   }
   else {
     c.innerHTML = `
@@ -409,6 +416,65 @@ window.switchPage = function(pageName) {
     `;
   }
 }
+
+window.loadTrialBalance = async function() {
+  const list = document.getElementById("gl-list");
+  const feedback = document.getElementById("trial-balance-feedback");
+  const totalsEl = document.getElementById("trial-balance-totals");
+  const branchInput = document.getElementById("trial-branch-id");
+  if (!list || !feedback || !totalsEl) return;
+  if (!db) {
+    feedback.textContent = "Database connection unavailable. No accounting figures are being shown.";
+    return;
+  }
+  const branchId = branchInput ? branchInput.value.trim() : "";
+  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
+    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
+    return;
+  }
+  feedback.textContent = "Loading posted journal entries…";
+  list.innerHTML = "";
+  totalsEl.innerHTML = "";
+  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  if (error) {
+    feedback.textContent = "Trial balance could not be loaded. The secure list_trial_balance database function must be installed and your employee role must have accounting access. Details: " + error.message;
+    return;
+  }
+  const rows = data || [];
+  if (!rows.length) {
+    feedback.textContent = "No active ledger accounts were found for your authorized branch scope. This is not a confirmation that the books are balanced.";
+    return;
+  }
+  const grouped = {};
+  rows.forEach(row => {
+    const currency = String(row.currency_code || "UNKNOWN").trim();
+    if (!grouped[currency]) grouped[currency] = { debit: 0, credit: 0, rows: [] };
+    grouped[currency].debit += Number(row.debit_total || 0);
+    grouped[currency].credit += Number(row.credit_total || 0);
+    grouped[currency].rows.push(row);
+  });
+  const money = (amount, currency) => Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
+  totalsEl.innerHTML = Object.entries(grouped).map(([currency, group]) => {
+    const difference = group.debit - group.credit;
+    const balanced = Math.abs(difference) < 0.005;
+    return '<div class="metric-card"><div class="metric-sub">Currency: ' + esc(currency) + '</div>' +
+      '<div class="metric-val" style="font-size:17px;">Debits: ' + esc(money(group.debit, currency)) + '</div>' +
+      '<div class="metric-val" style="font-size:17px;">Credits: ' + esc(money(group.credit, currency)) + '</div>' +
+      '<div class="muted">Difference: ' + esc(money(difference, currency)) + ' — ' + (balanced ? 'Totals match' : 'Out of balance') + '</div></div>';
+  }).join("");
+  list.innerHTML = Object.entries(grouped).map(([currency, group]) =>
+    '<h3>' + esc(currency) + ' — Ledger accounts</h3>' +
+    group.rows.map(row => {
+      const net = Number(row.net_balance || 0);
+      const status = Math.abs(Number(row.debit_total || 0) - Number(row.credit_total || 0)) < 0.005 ? "Account movement balanced" : "Movement differs";
+      return '<div class="list-item"><div><strong>' + esc(row.ledger_code) + ' — ' + esc(row.ledger_name) + '</strong><br>' +
+        '<span class="muted">' + esc(row.ledger_type) + ' | ' + esc(row.branch_name || "Branch") + ' | ' + esc(status) + '</span><br>' +
+        '<span class="muted">Debit: ' + esc(money(row.debit_total, currency)) + ' | Credit: ' + esc(money(row.credit_total, currency)) +
+        ' | Net (debit − credit): ' + esc(money(net, currency)) + '</span></div></div>';
+    }).join("")
+  ).join("");
+  feedback.textContent = "Loaded " + rows.length + " active ledger account(s) using posted journals only. Figures are grouped by currency.";
+};
 
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
