@@ -49,6 +49,10 @@ using (exists(select 1 from public.institution_payroll_batches b
 grant select on public.institution_payroll_batches, public.institution_payroll_items to authenticated;
 revoke insert,update,delete on public.institution_payroll_batches, public.institution_payroll_items from anon,authenticated;
 
+insert into public.ledger_accounts(ledger_code,ledger_name,ledger_type,currency_code,branch_id,is_control_account,is_active)
+values('4400','Institutional Payroll Commission Income','income','UGX',null,false,true)
+on conflict (ledger_code) do nothing;
+
 create or replace function public.process_institution_payroll(
   p_branch_id uuid,
   p_institution_account_id uuid,
