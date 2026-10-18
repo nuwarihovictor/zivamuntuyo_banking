@@ -1167,7 +1167,7 @@ window.previewStaffMessage = function() {
     : "Enter a message to preview. Nothing has been sent or saved.";
 };
 
-window.printTransactionReceipt = function(button) {
+window.printTransactionReceipt = function(button, skipConfirmation) {
   if(!button || !button.dataset) return;
   const status=document.getElementById("transaction-receipt-status");
   const reference=button.dataset.receiptReference||"";
@@ -1181,7 +1181,7 @@ window.printTransactionReceipt = function(button) {
     if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit.";
     return;
   }
-  if(!confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
+  if(!skipConfirmation && !confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
   const printWindow=window.open("","_blank","width=420,height=700");
   if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
   const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
