@@ -440,6 +440,10 @@ window.switchPage = function(pageName) {
         <p id="transaction-monitor-feedback" class="muted" aria-live="polite">Loading transaction activity…</p>
         <div id="transaction-monitor-list" data-transaction-mode="${transactionMode}"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`)}
     `;
+    const transactionList = document.getElementById("transaction-monitor-list");
+    if (transactionList) transactionList.dataset.transactionMode = transactionMode;
+    const transactionFeedback = document.getElementById("transaction-monitor-feedback");
+    if (transactionFeedback) transactionFeedback.textContent = isDeposit ? "Loading deposit activity…" : isWithdrawal ? "Loading withdrawal activity…" : "Loading transaction activity…";
     window.loadTransactionMonitor();
   }
   else if (pageName === "Attendance") {
@@ -1055,6 +1059,13 @@ window.handleTransaction = async function(e) {
   if (!Number.isFinite(amount) || amount <= 0) {
     if (feedback) feedback.textContent = "Enter an amount greater than zero.";
     return;
+  }
+  if (transactionType === "withdrawal") {
+    const confirmed = window.confirm("Confirm customer withdrawal\\nAccount: " + accountId + "\\nAmount: " + amount.toLocaleString() + "\\n\\nThis only submits a request for approval; do not pay cash until the approved request is posted.");
+    if (!confirmed) {
+      if (feedback) feedback.textContent = "Withdrawal request cancelled. No transaction was submitted.";
+      return;
+    }
   }
 
   const button = form.querySelector('button[type="submit"]');
