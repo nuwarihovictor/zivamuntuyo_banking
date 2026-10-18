@@ -151,3 +151,27 @@ begin
 end; $$;
 revoke all on function public.review_loan_application(uuid,text,text) from public,anon;
 grant execute on function public.review_loan_application(uuid,text,text) to authenticated;
+
+-- Loan application document access includes the General Manager across branches.
+drop policy if exists staff_read_loan_application_documents on storage.objects;
+create policy staff_read_loan_application_documents on storage.objects for select to authenticated using (
+ bucket_id='bank-application-documents' and split_part(name,'/',1)='loan-applications'
+ and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+ and exists(select 1 from public.loan_applications la where la.id::text=split_part(name,'/',2)
+  and (public.current_employee_role_code()='general_manager' or public.is_active_system_admin() or public.is_active_bank_admin() or public.is_active_branch_manager_for(la.branch_id) or public.current_employee_has_branch_access(la.branch_id)))
+);
+drop policy if exists staff_upload_loan_application_documents on storage.objects;
+create policy staff_upload_loan_application_documents on storage.objects for insert to authenticated with check (
+ bucket_id='bank-application-documents' and split_part(name,'/',1)='loan-applications'
+ and storage.extension(name) in ('pdf','jpg','jpeg','png')
+ and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+ and exists(select 1 from public.loan_applications la where la.id::text=split_part(name,'/',2)
+  and (public.current_employee_role_code()='general_manager' or public.is_active_system_admin() or public.is_active_bank_admin() or public.is_active_branch_manager_for(la.branch_id) or public.current_employee_has_branch_access(la.branch_id)))
+);
+drop policy if exists staff_delete_loan_application_documents on storage.objects;
+create policy staff_delete_loan_application_documents on storage.objects for delete to authenticated using (
+ bucket_id='bank-application-documents' and split_part(name,'/',1)='loan-applications'
+ and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+ and exists(select 1 from public.loan_applications la where la.id::text=split_part(name,'/',2)
+  and (public.current_employee_role_code()='general_manager' or public.is_active_system_admin() or public.is_active_bank_admin() or public.is_active_branch_manager_for(la.branch_id) or public.current_employee_has_branch_access(la.branch_id)))
+);
