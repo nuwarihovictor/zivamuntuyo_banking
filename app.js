@@ -347,6 +347,8 @@ window.switchPage = function(pageName) {
       )}
     `;
 
+    c.insertAdjacentHTML("beforeend", '<section class="panel account-shareholding-callout"><h2>SHAREHOLDING — SEPARATE FROM DEPOSIT ACCOUNTS</h2><p class="panel-desc"><strong>UGX 10,000 per share.</strong> Shares are non-withdrawable and are not savings or fixed deposits. They are reported separately as share capital and are not customer deposit balances.</p><button type="button" class="primary" onclick="switchPage(\'Shares\')">Open Shares & Charges</button></section>');
+
     if (db) {
       Promise.all([
         db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name"),
