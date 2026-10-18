@@ -142,7 +142,7 @@ window.switchPage = function(pageName) {
     c.innerHTML = `
       <span class="category-tag">People, accountability & access</span>
       <h2 class="page-heading">Staff Profiles & Responsibilities</h2>
-      ${panel("AUTHORIZED PERSONNEL DIRECTORY","Staff profile register","Personal information is shown only as available in the employee record and according to database permissions.",`<div id="staff-list"><p class="muted">Loading staff profiles…</p></div>`)}
+      ${panel("AUTHORIZED PERSONNEL DIRECTORY","Staff profile register","Personal information is shown only as available in the employee record and according to database permissions.",`<div id="staff-list"><p class="muted">Loading staff profiles…</p></div><div id="staff-editor-panel" hidden class="panel"><h2>Edit Staff Profile</h2><p class="panel-desc">System administrator only. Enter an HTTPS photo URL. Leave National ID blank to preserve the current value.</p><form id="staff-editor-form" class="staff-editor-form"><label>Select employee<select id="staff-edit-person" required><option value="">Choose employee</option></select></label><div class="grid-2"><label>Full name<input id="staff-edit-name" required maxlength="160"></label><label>Employee ID<input id="staff-edit-number" required maxlength="80"></label></div><div class="grid-2"><label>Sex<select id="staff-edit-sex"><option value="">Not recorded</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label>Date of birth<input id="staff-edit-dob" type="date"></label></div><div class="grid-2"><label>Phone<input id="staff-edit-phone" type="tel" maxlength="60"></label><label>Work email<input id="staff-edit-email" type="email" maxlength="254"></label></div><div class="grid-2"><label>Branch<select id="staff-edit-branch"><option value="">Not assigned</option></select></label><label>Role<select id="staff-edit-role"><option value="">Not assigned</option></select></label></div><div class="grid-2"><label>Job title<input id="staff-edit-title" maxlength="120"></label><label>Employment status<select id="staff-edit-status"><option value="active">Active</option><option value="probation">Probation</option><option value="on_leave">On leave</option><option value="suspended">Suspended</option><option value="terminated">Terminated</option><option value="inactive">Inactive</option></select></label></div><div class="grid-2"><label>Start date<input id="staff-edit-start" type="date"></label><label>Photo HTTPS URL<input id="staff-edit-photo" type="url" placeholder="https://..."></label></div><label>National ID (optional)<input id="staff-edit-national-id" maxlength="120" autocomplete="off"></label><p id="staff-edit-feedback" class="muted" aria-live="polite"></p><button type="submit" class="primary" id="staff-edit-save">Save staff profile</button></form></div>`)}
       ${panel("ROLE RESPONSIBILITIES","Who is responsible for what","Use this directory to understand each job title's expected duties. Actual permissions remain controlled by assigned system roles.",`
         <div class="responsibility-grid">
           <article class="responsibility-card"><h3>Bank / Branch Manager</h3><p>Leads branch performance and supervises staff.</p><ul><li>Review daily cash and transaction reports</li><li>Approve transactions and account requests within authority</li><li>Monitor customer service, controls and compliance</li><li>Review staff attendance and escalate incidents</li></ul></article>
@@ -161,7 +161,8 @@ window.switchPage = function(pageName) {
         db.from("employee_profiles").select("user_id,employee_number,full_name,work_email,phone_number,home_branch_id,role_id,is_active,sex,date_of_birth,photo_url,employment_status,job_title,start_date").order("full_name"),
         db.from("branches").select("id,branch_name").eq("is_active",true),
         db.from("staff_roles").select("id,role_code,role_name")
-      ]).then(([staffResult,branchResult,roleResult])=>{
+      ]).then(async ([staffResult,branchResult,roleResult])=>{
+        await loadCurrentEmployeeGreeting();
         const listEl=document.getElementById("staff-list");
         if(!listEl)return;
         const failed=[staffResult,branchResult,roleResult].find(x=>x.error);
@@ -185,6 +186,17 @@ window.switchPage = function(pageName) {
           ];
           return '<div class="staff-card">'+safePhoto(s.photo_url)+'<div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>'+esc(s.full_name||"Name not provided")+'</strong><span class="badge-role">'+esc(role.name)+'</span><span class="staff-status">'+esc(status)+'</span></div><div class="staff-detail-grid">'+details.map(([label,value])=>'<div class="staff-detail"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>').join("")+'</div></div></div>';
         }).join("");
+        window.staffProfileCache=people;
+        if(window.currentEmployeeRole==="system_admin"){
+          const editor=document.getElementById("staff-editor-panel");
+          if(editor)editor.hidden=false;
+          const person=document.getElementById("staff-edit-person");
+          person.innerHTML='<option value="">Choose employee</option>'+people.map(p=>'<option value="'+esc(p.user_id)+'">'+esc(p.full_name||p.employee_number)+' · '+esc(p.employee_number)+'</option>').join("");
+          document.getElementById("staff-edit-branch").innerHTML='<option value="">Not assigned</option>'+(branchResult.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
+          document.getElementById("staff-edit-role").innerHTML='<option value="">Not assigned</option>'+(roleResult.data||[]).map(r=>'<option value="'+esc(r.id)+'">'+esc(r.role_name||r.role_code)+'</option>').join("");
+          person.addEventListener("change",()=>window.fillStaffEditor(person.value));
+          document.getElementById("staff-editor-form").addEventListener("submit",window.saveStaffProfile);
+        }
       }).catch(()=>{
         const listEl=document.getElementById("staff-list");
         if(listEl)listEl.innerHTML='<p class="muted">A connection error prevented staff profiles from loading.</p>';
@@ -635,6 +647,33 @@ window.loadFinancialReports();
     `;
   }
 }
+
+window.fillStaffEditor=function(userId){
+  const s=(window.staffProfileCache||[]).find(p=>p.user_id===userId);if(!s)return;
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.value=value==null?"":String(value);};
+  set("staff-edit-name",s.full_name);set("staff-edit-number",s.employee_number);set("staff-edit-sex",s.sex);set("staff-edit-dob",s.date_of_birth);
+  set("staff-edit-phone",s.phone_number);set("staff-edit-email",s.work_email);set("staff-edit-branch",s.home_branch_id);set("staff-edit-role",s.role_id);
+  set("staff-edit-title",s.job_title);set("staff-edit-status",!s.is_active?"inactive":(s.employment_status||"active"));set("staff-edit-start",s.start_date);set("staff-edit-photo",s.photo_url);set("staff-edit-national-id","");
+  const f=document.getElementById("staff-edit-feedback");if(f)f.textContent="Loaded "+s.full_name+". Leave National ID blank to preserve its current value.";
+};
+window.saveStaffProfile=async function(event){
+  event.preventDefault();
+  const feedback=document.getElementById("staff-edit-feedback"),button=document.getElementById("staff-edit-save");
+  const val=id=>{const el=document.getElementById(id);return el&&el.value.trim()?el.value.trim():null;};
+  const userId=val("staff-edit-person");if(!userId||!db){if(feedback)feedback.textContent="Select a staff member and confirm the database connection.";return;}
+  button.disabled=true;button.textContent="Saving…";if(feedback)feedback.textContent="Saving staff profile securely…";
+  const {error}=await db.rpc("update_staff_profile",{
+    p_user_id:userId,p_full_name:val("staff-edit-name"),p_employee_number:val("staff-edit-number"),
+    p_work_email:val("staff-edit-email"),p_phone_number:val("staff-edit-phone"),p_home_branch_id:val("staff-edit-branch"),
+    p_role_id:val("staff-edit-role"),p_sex:val("staff-edit-sex"),p_date_of_birth:val("staff-edit-dob"),
+    p_national_id:val("staff-edit-national-id"),p_photo_url:val("staff-edit-photo"),p_employment_status:val("staff-edit-status"),
+    p_job_title:val("staff-edit-title"),p_start_date:val("staff-edit-start")
+  });
+  button.disabled=false;button.textContent="Save staff profile";
+  if(error){if(feedback)feedback.textContent="Could not save: "+error.message;return;}
+  if(feedback)feedback.textContent="Saved successfully. Refreshing staff directory…";window.switchPage("Staff");
+};
+
 window.loadDashboardBranchOptions = async function() {
   const select=document.getElementById("dashboard-branch-id");
   if(!select||!db)return;
