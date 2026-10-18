@@ -417,6 +417,13 @@ window.switchPage = function(pageName) {
       )}
     `;
     window.showAttendanceDeviceHelp();
+    const timesheetToday = new Date();
+    const timesheetToDate = timesheetToday.toISOString().slice(0,10);
+    const timesheetFromDate = new Date(timesheetToday.getTime() - 30*24*60*60*1000).toISOString().slice(0,10);
+    const timesheetFromInput = document.getElementById("timesheet-from");
+    const timesheetToInput = document.getElementById("timesheet-to");
+    if (timesheetFromInput && !timesheetFromInput.value) timesheetFromInput.value = timesheetFromDate;
+    if (timesheetToInput && !timesheetToInput.value) timesheetToInput.value = timesheetToDate;
     window.loadStaffTimesheets = async function() {
   const feedback=document.getElementById("timesheet-feedback");
   const list=document.getElementById("timesheet-list");
