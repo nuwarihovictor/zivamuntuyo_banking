@@ -2069,7 +2069,35 @@ window.loadStaffChat=async function(options={}){
     feedback.textContent=merged.length+" item"+(merged.length===1?"":"s")+" loaded. New-message checks run while VIC LINE is open.";
   }catch(error){feedback.textContent="A connection error prevented messages and voice notes from loading.";}
 };
-window.vicLineStartPolling=function(){if(window.vicLinePollHandle)clearInterval(window.vicLinePollHandle);window.vicLinePollHandle=setInterval(()=>{if(!document.hidden&&document.getElementById("staff-chat-branch"))window.loadStaffChat({polling:true});},30000);};
+window.pollVicLineAllConversations=async function(){
+  if(!db||!document.getElementById("staff-chat-branch"))return;
+  try{
+    const branchResult=await db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name");
+    if(branchResult.error)return;
+    const channels=[{id:"",name:"Bank-wide messages"}].concat((branchResult.data||[]).map(b=>({id:b.id,name:b.branch_name})));
+    await Promise.all(channels.map(async channel=>{
+      const key=channel.id||"bankwide";
+      const [messages,voices]=await Promise.all([
+        db.rpc("list_staff_messages",{p_branch_id:channel.id||null,p_limit:1}),
+        db.rpc("list_staff_voice_notes",{p_branch_id:channel.id||null,p_limit:1})
+      ]);
+      if(messages.error)return;
+      const latestText=(messages.data||[]).map(m=>({kind:"text",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0];
+      const latestVoice=!voices.error?(voices.data||[]).map(m=>({kind:"voice",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0]:null;
+      const latest=[latestText,latestVoice].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
+      if(!latest){if(window.vicLineSeenTimestamps[key]===undefined)window.vicLineSeenTimestamps[key]=0;return;}
+      const previous=window.vicLineSeenTimestamps[key];
+      if(previous!==undefined&&previous>0&&latest.at>previous){
+        const sender=String(latest.data.sender_name||latest.data.sender_employee_number||"");
+        if(!sender||sender!==String(window.currentEmployeeName||""))window.notifyVicLineNewMessage(latest.kind==="voice"?"New voice note received":latest.data.message_text,channel.name);
+      }
+      window.vicLineSeenMessages[key]=latest.data.id||latest.data.message_id||latest.data.storage_path||latest.data.created_at;
+      window.vicLineSeenTimestamps[key]=latest.at;
+    }));
+    if(!document.hidden&&document.getElementById("staff-chat-branch"))await window.loadStaffChat();
+  }catch(_){}
+};
+window.vicLineStartPolling=function(){if(window.vicLinePollHandle)clearInterval(window.vicLinePollHandle);window.vicLinePollHandle=setInterval(()=>{window.pollVicLineAllConversations();},30000);};
 window.sendStaffChatMessage = async function(event) {
   event.preventDefault();
   const form = event.currentTarget;
