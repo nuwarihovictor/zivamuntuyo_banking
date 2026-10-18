@@ -2,63 +2,65 @@
 // ZIVAMUNTUYO FINANCIAL SERVICES LTD - APP.JS
 // ==========================================
 
-// Initialize Supabase Client 
-// (Replace the second parameter with your Supabase Anon/Public Key if not already set)
 const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
+// PASTE YOUR SUPABASE ANON PUBLIC KEY HERE:
 const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"; 
-const db = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-// Helper: Escape HTML to prevent injection
+const db = (window.supabase && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY_HERE") 
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
+
 function esc(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Helper: UI Panel Wrapper
 function panel(title, subtitle, desc, contentHtml) {
   return `
     <div class="panel">
-      <h2>${esc(title)}</h2>
-      <p><strong>${esc(subtitle)}</strong> - ${esc(desc)}</p>
-      <hr style="border: 0; border-top: 1px solid #1e4637; margin-bottom: 14px;">
+      <h2 style="color:#fff; font-size:18px; margin-bottom:4px;">${esc(title)}</h2>
+      <p style="color:#9ca3af; font-size:13px; margin-bottom:12px;"><strong>${esc(subtitle)}</strong> — ${esc(desc)}</p>
+      <hr style="border:0; border-top:1px solid #1e4637; margin-bottom:16px;">
       ${contentHtml}
     </div>
   `;
 }
 
-// Global Notification Helper
-function notify(msg) {
-  alert(msg);
-}
-
-// ==========================================
-// PAGE ROUTER & RENDERER
-// ==========================================
 window.renderPage = function(page) {
   const c = document.getElementById("main-content");
   if (!c) return;
-  c.innerHTML = `<p class="muted">Loading ${esc(page)} module...</p>`;
+
+  if (!db) {
+    c.innerHTML = panel(
+      page.toUpperCase(),
+      "Configuration Required",
+      "Supabase connection key missing.",
+      `<p style="color:#ef4444; font-size:13px;">Please paste your Supabase <strong>anon public key</strong> into <code>app.js</code> on line 8 to enable database access.</p>`
+    );
+    return;
+  }
+
+  c.innerHTML = `<p class="muted" style="color:#9ca3af; font-size:13px;">Loading ${esc(page)} module...</p>`;
 
   if (page === "Dashboard") {
     c.innerHTML = panel(
       "EXECUTIVE DASHBOARD",
       "System Overview & Branch Status",
       "Real-time operational metrics across Butare, Rubirizi, Buhweju, and Ntungamo branches.",
-      `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
-         <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:12px; color:#d97706;">ACTIVE BRANCHES</h3>
-           <p style="font-size:24px; font-weight:bold; margin-top:6px;">4</p>
+      `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
+           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">Active Branches</h3>
+           <p style="font-size:24px; font-weight:bold; margin-top:6px; color:#fff;">4</p>
          </div>
-         <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:12px; color:#d97706;">CORE LEDGER</h3>
-           <p style="font-size:24px; font-weight:bold; margin-top:6px;">Double-Entry</p>
+         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
+           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">Core Ledger</h3>
+           <p style="font-size:24px; font-weight:bold; margin-top:6px; color:#fff;">Double-Entry</p>
          </div>
-         <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:12px; color:#d97706;">SYSTEM STATUS</h3>
+         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
+           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">System Status</h3>
            <p style="font-size:24px; font-weight:bold; color:#4ade80; margin-top:6px;">Online</p>
          </div>
-       </div>
-       <p class="muted">Select a module from the left menu to manage customers, accounts, or approvals.</p>`
+       </div>`
     );
   } 
   else if (page === "Customers") {
@@ -66,8 +68,7 @@ window.renderPage = function(page) {
       "CUSTOMER MANAGEMENT",
       "Registered Bank Customers",
       "Directory of verified customers in the Zivamuntuyo database.",
-      `<div id="cust-list"><p class="muted">Loading customers...</p></div>
-       <br><button class="secondary" id="btn-refresh-cust">Refresh List</button>`
+      `<div id="cust-list"><p class="muted">Loading customers...</p></div>`
     );
 
     async function loadCustomers() {
@@ -77,60 +78,56 @@ window.renderPage = function(page) {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          listEl.innerHTML = `<div class="scroll"><table>
-            <tr><th>Customer Number ID</th><th>Actions</th></tr>
-            ${data.map(cust => `<tr>
-              <td><strong>${esc(cust.customer_number || cust.id)}</strong></td>
-              <td><span class="badge-role">Active</span></td>
+          listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
+            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Customer Number / ID</th><th style="padding:8px;">Status</th></tr>
+            ${data.map(cust => `<tr style="border-bottom:1px solid #1e4637;">
+              <td style="padding:8px;"><strong>${esc(cust.customer_number || cust.id)}</strong></td>
+              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">Active</span></td>
             </tr>`).join("")}
           </table></div>`;
         } else {
-          listEl.innerHTML = `<p class="muted">No customers found in database.</p>`;
+          listEl.innerHTML = `<p style="color:#9ca3af; font-size:13px;">No customers found in database.</p>`;
         }
       } catch (err) {
-        document.getElementById("cust-list").innerHTML = `<p class="error">Error loading customers: ${esc(err.message)}</p>`;
+        document.getElementById("cust-list").innerHTML = `<p style="color:#ef4444; font-size:13px;">Error: ${esc(err.message)}</p>`;
       }
     }
-
     loadCustomers();
-    const refBtn = document.getElementById("btn-refresh-cust");
-    if (refBtn) refBtn.onclick = loadCustomers;
   }
   else if (page === "Accounts") {
     c.innerHTML = panel(
       "ACCOUNT OPENING REQUEST",
       "Submit New Account Application",
       "Choose an approved customer, account type, and home branch.",
-      `<form id="acc-form">
-        <label>Customer * 
-          <select name="customer_id" id="sel-cust" required>
+      `<form id="acc-form" style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Customer * 
+          <select name="customer_id" id="sel-cust" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="">Loading customers...</option>
           </select>
         </label>
-        <label>Account Type * 
-          <select name="account_type_id" id="sel-acctype" required>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account Type * 
+          <select name="account_type_id" id="sel-acctype" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="">Loading account types...</option>
           </select>
         </label>
-        <label>Branch * 
-          <select name="branch_id" id="sel-branch" required>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Branch * 
+          <select name="branch_id" id="sel-branch" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="">Loading branches...</option>
           </select>
         </label>
-        <label>Currency * 
-          <select name="currency_code" id="sel-curr" required>
+        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Currency * 
+          <select name="currency_code" id="sel-curr" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
             <option value="UGX">UGX - Uganda Shilling</option>
           </select>
         </label>
-        <button class="primary" type="submit">Submit Account Request</button>
-        <p id="acc-msg" class="error"></p>
+        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Submit Account Request</button>
+        <p id="acc-msg" style="color:#ef4444; font-size:12px;"></p>
       </form>`
     ) + panel(
       "CUSTOMER ACCOUNTS LIST",
       "Bank Accounts Directory",
-      "Real-time list of bank accounts and statuses.",
-      `<div id="acc-list"><p class="muted">Loading accounts...</p></div>
-       <br><button class="secondary" id="btn-refresh-acc">Refresh Accounts</button>`
+      "Real-time list of bank accounts.",
+      `<div id="acc-list"><p class="muted">Loading accounts...</p></div>`
     );
 
     async function loadDropdowns() {
@@ -162,7 +159,7 @@ window.renderPage = function(page) {
           branchSelect.innerHTML = `<option value="">No branches found</option>`;
         }
       } catch (err) {
-        console.error("Dropdown load error:", err);
+        console.error("Error loading dropdowns:", err);
       }
     }
 
@@ -173,85 +170,30 @@ window.renderPage = function(page) {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          listEl.innerHTML = `<div class="scroll"><table>
-            <tr><th>Account Number</th><th>Currency</th><th>Status</th><th>Created At</th></tr>
-            ${data.map(a => `<tr>
-              <td><strong>${esc(a.account_number || a.id.substring(0,8))}</strong></td>
-              <td>${esc(a.currency_code || "UGX")}</td>
-              <td><span class="badge-role">${esc(a.status || "pending")}</span></td>
-              <td>${new Date(a.created_at).toLocaleDateString()}</td>
+          listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
+            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Account Number</th><th style="padding:8px;">Currency</th><th style="padding:8px;">Status</th></tr>
+            ${data.map(a => `<tr style="border-bottom:1px solid #1e4637;">
+              <td style="padding:8px;"><strong>${esc(a.account_number || a.id.substring(0,8))}</strong></td>
+              <td style="padding:8px;">${esc(a.currency_code || "UGX")}</td>
+              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">${esc(a.status || "active")}</span></td>
             </tr>`).join("")}
           </table></div>`;
         } else {
-          listEl.innerHTML = `<p class="muted">No bank accounts registered yet.</p>`;
+          listEl.innerHTML = `<p style="color:#9ca3af; font-size:13px;">No bank accounts registered yet.</p>`;
         }
       } catch (err) {
-        document.getElementById("acc-list").innerHTML = `<p class="error">Could not load accounts: ${esc(err.message)}</p>`;
+        document.getElementById("acc-list").innerHTML = `<p style="color:#ef4444; font-size:13px;">Could not load accounts: ${esc(err.message)}</p>`;
       }
     }
 
     loadDropdowns();
     loadAccounts();
-
-    document.getElementById("btn-refresh-acc").onclick = loadAccounts;
-
-    document.getElementById("acc-form").onsubmit = async (e) => {
-      e.preventDefault();
-      const form = new FormData(e.target);
-      const msgEl = document.getElementById("acc-msg");
-      msgEl.textContent = "";
-
-      const { error } = await db.rpc("open_account_request", {
-        p_customer_id: form.get("customer_id"),
-        p_account_type_id: form.get("account_type_id"),
-        p_branch_id: form.get("branch_id"),
-        p_currency_code: form.get("currency_code")
-      });
-
-      if (error) {
-        msgEl.textContent = error.message;
-      } else {
-        notify("Account request submitted successfully!");
-        loadAccounts();
-      }
-    };
   }
-  else if (page === "Transactions") {
-    c.innerHTML = panel(
-      "TRANSACTION PROCESSING",
-      "Double-Entry Ledger Posting",
-      "Execute secure branch deposits and withdrawals.",
-      `<p class="muted">Transaction pipeline is active and synchronized with double-entry ledger rules.</p>`
-    );
-  }
-  else if (page === "Approvals") {
-    c.innerHTML = panel(
-      "MANAGER APPROVALS",
-      "Pending Authorizations",
-      "Review and approve pending account openings and high-value transactions.",
-      `<p class="muted">No pending authorizations requiring branch manager sign-off.</p>`
-    );
-  }
-  else if (page === "Reports") {
-    c.innerHTML = panel(
-      "FINANCIAL REPORTS",
-      "Audit & Balance Sheets",
-      "Generate regulatory and internal branch audit statements.",
-      `<p class="muted">Report generation modules online.</p>`
-    );
-  }
-  else if (page === "Settings") {
-    c.innerHTML = panel(
-      "SYSTEM CONFIGURATION",
-      "Feature Flags & Settings",
-      "Manage application feature settings and branch parameters.",
-      `<p class="muted">All system modules are enabled and operational.</p>`
-    );
+  else {
+    c.innerHTML = panel(page.toUpperCase(), "Module Active", "Section operational.", `<p style="color:#9ca3af; font-size:13px;">Module content ready for testing.</p>`);
   }
 };
 
-// Auto-load Dashboard on window load
 window.onload = () => {
   if (window.renderPage) window.renderPage("Dashboard");
 };
-          
