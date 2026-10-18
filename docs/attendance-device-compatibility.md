@@ -32,3 +32,5 @@ These are candidate integration paths, not a statement that every model has been
 
 ## Current state
 The web app contains a device-family selector and integration guidance only. No fingerprint scan, device connection, biometric storage, or official attendance write is enabled yet.
+
+See [fingerprint attendance integration foundation](fingerprint-attendance-integration-foundation.md) for the proposed normalized event contract, device-selection checklist, security controls, and acceptance tests. This is a design foundation only; it does not certify any hardware or enable fingerprint ingestion.
