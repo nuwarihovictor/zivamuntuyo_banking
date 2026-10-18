@@ -366,3 +366,5 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 #security-fee-form,#security-topup-form{padding:15px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}
 @media(max-width:1050px){.pricing-policy-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.pricing-policy-grid{grid-template-columns:1fr}.pricing-policy-card{padding:14px}}
+
+.account-shareholding-callout{border-left:4px solid var(--accent-gold,#cba85a)}
