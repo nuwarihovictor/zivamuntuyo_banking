@@ -28,6 +28,9 @@ create table if not exists public.financial_activity_ledger (
 );
 create index if not exists financial_activity_branch_date_idx on public.financial_activity_ledger(branch_id,event_date desc);
 create index if not exists financial_activity_category_idx on public.financial_activity_ledger(category,event_date desc);
+create index if not exists financial_activity_customer_idx on public.financial_activity_ledger(customer_id);
+create index if not exists financial_activity_loan_idx on public.financial_activity_ledger(loan_application_id);
+create index if not exists financial_activity_recorded_by_idx on public.financial_activity_ledger(recorded_by);
 create unique index if not exists financial_activity_receipt_unique on public.financial_activity_ledger(receipt_number) where receipt_number is not null;
 alter table public.financial_activity_ledger enable row level security;
 drop policy if exists "Finance activity visible within authorized branches" on public.financial_activity_ledger;
@@ -85,21 +88,23 @@ revoke all on function public.capture_financial_activity_from_source() from publ
 
 create or replace function public.record_financial_activity(p_branch_id uuid,p_category text,p_amount numeric,p_description text,p_receipt_number text default null,p_customer_id uuid default null,p_loan_application_id uuid default null,p_event_date date default null)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); pl text;ci numeric(14,2):=0;co numeric(14,2):=0; rec text:=nullif(trim(p_receipt_number),''); new_id uuid; evdate date:=coalesce(p_event_date,timezone('Africa/Kampala',now())::date);
+declare u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); pl text;ci numeric(14,2):=0;co numeric(14,2):=0; rec text:=nullif(trim(p_receipt_number),''); new_id uuid; evdate date:=coalesce(p_event_date,timezone('Africa/Kampala',now())::date); customer_value uuid:=p_customer_id;
 begin
  if u is null then raise exception 'Sign-in required';end if;
  if role_code is null or role_code not in ('system_admin','bank_admin','branch_manager','accountant','teller','general_manager') then raise exception 'Finance permission required';end if;
  if not public.current_employee_can_transact_in_branch(p_branch_id) then raise exception 'Branch access denied';end if;
  if p_amount is null or p_amount<=0 or p_amount>100000000000 then raise exception 'Enter a positive valid amount';end if;
  if p_description is null or length(trim(p_description))<4 then raise exception 'Provide a clear description';end if;
+ if rec is null then raise exception 'Receipt or payment voucher reference is required';end if;
  if p_category not in ('loan_interest_income','late_loan_penalty','other_income','operating_expense') then raise exception 'Unsupported manual finance category';end if;
+ if p_category in ('loan_interest_income','late_loan_penalty') and p_loan_application_id is null then raise exception 'Select the loan application for interest or late-payment penalty';end if;
  if p_category='operating_expense' and role_code not in ('system_admin','bank_admin','branch_manager','accountant','general_manager') then raise exception 'Only finance or management staff may record expenses';end if;
- if p_loan_application_id is not null and not exists(select 1 from public.loan_applications l where l.id=p_loan_application_id and l.branch_id=p_branch_id) then raise exception 'Loan application not found in selected branch';end if;
- if p_customer_id is not null and not exists(select 1 from public.customers c where c.id=p_customer_id and c.status in ('active','approved')) then raise exception 'Customer must be active or approved';end if;
+ if p_loan_application_id is not null then select l.customer_id into customer_value from public.loan_applications l where l.id=p_loan_application_id and l.branch_id=p_branch_id; if not found then raise exception 'Loan application not found in selected branch';end if;end if;
+ if customer_value is not null and not exists(select 1 from public.customers c where c.id=customer_value and c.status in ('active','approved')) then raise exception 'Customer must be active or approved';end if;
  pl:=case when p_category='operating_expense' then 'expense' else 'income' end;
  if pl='expense' then co:=round(p_amount,2);else ci:=round(p_amount,2);end if;
  insert into public.financial_activity_ledger(branch_id,event_date,category,profit_loss_type,amount,cash_in,cash_out,description,receipt_number,customer_id,loan_application_id,source_table,recorded_by)
- values(p_branch_id,evdate,p_category,pl,round(p_amount,2),ci,co,trim(p_description),rec,p_customer_id,p_loan_application_id,'manual',u) returning id into new_id;
+ values(p_branch_id,evdate,p_category,pl,round(p_amount,2),ci,co,trim(p_description),rec,customer_value,p_loan_application_id,'manual',u) returning id into new_id;
  insert into public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
  values(u,p_branch_id,'financial_activity_recorded','financial_activity_ledger',new_id::text,'success',jsonb_build_object('category',p_category,'amount',round(p_amount,2),'description',trim(p_description),'receipt_number',rec,'profit_loss_type',pl));
  return jsonb_build_object('id',new_id,'category',p_category,'amount',round(p_amount,2),'profit_loss_type',pl,'receipt_number',rec,'event_date',evdate);
