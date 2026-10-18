@@ -2079,18 +2079,21 @@ function showAuthenticatedWorkspace() {
   loadCurrentEmployeeGreeting();
   window.switchPage("Dashboard");
   if (activeBranchContext) {
+    const existingBanner = document.getElementById("branch-context-banner");
+    if (existingBanner) existingBanner.remove();
     const banner = document.createElement("div");
+    banner.id = "branch-context-banner";
     banner.className = "branch-context-banner";
-    banner.style.cssText = "padding:12px 16px;margin:0 0 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap";
+    banner.style.cssText = "padding:10px 16px;margin:0 0 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap";
     const label = document.createElement("div");
     label.textContent = "BRANCH WORKSPACE · " + activeBranchContext.name;
     label.style.fontWeight = "700";
     const exit = document.createElement("button");
     exit.type = "button"; exit.className = "secondary"; exit.textContent = "Return to branch directory";
-    exit.addEventListener("click", () => { activeBranchContext = null; window.switchPage("Branches"); });
+    exit.addEventListener("click", () => { activeBranchContext = null; banner.remove(); window.switchPage("Branches"); });
     banner.append(label, exit);
-    const mainContent = document.getElementById("main-content");
-    if (mainContent) mainContent.insertBefore(banner, mainContent.firstChild);
+    const navBar = document.querySelector(".nav-bar");
+    if (navBar && navBar.parentNode) navBar.parentNode.insertBefore(banner, navBar);
   }
   setTimeout(setWelcomeMessage,100);
 }
@@ -2130,6 +2133,7 @@ async function handleStaffLogin(event) {
       }
       activeBranchContext = requestedBranch;
       pendingBranchOpen = null;
+      showAuthenticatedWorkspace();
     }
     if (feedback) feedback.textContent = "";
   } catch (error) {
@@ -2141,6 +2145,9 @@ async function handleStaffLogin(event) {
 
 async function handleStaffSignOut() {
   if (!db) return;
+  pendingBranchOpen = null;
+  activeBranchContext = null;
+  document.getElementById("branch-context-banner")?.remove();
   const button = document.getElementById("sign-out-button");
   if (button) button.disabled = true;
   try {
