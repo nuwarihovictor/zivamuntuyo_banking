@@ -1,4 +1,3 @@
-// Development starter only. Never put service_role or secret keys in browser code.
 const SUPABASE_URL="https://hwghiezvghdqxnhcnpwk.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
 const db=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
@@ -127,3 +126,4 @@ $("nav").onclick=e=>{const b=e.target.closest("[data-page]");if(b)go(b.dataset.p
 $("login-form").onsubmit=async e=>{e.preventDefault();if(!db){$("login-message").textContent="Supabase library unavailable.";return}const {data,error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error){$("login-message").textContent=error.message;return}user=data.user;await loadProfile();workspace();go("Overview")};
 $("signout").onclick=async()=>{await db?.auth.signOut();user=null;profile=null;$("login").classList.remove("hidden");$("workspace").classList.add("hidden");$("signout").classList.add("hidden");$("status").textContent="Signed out"};
 (async()=>{if(!db){$("login-message").textContent="Supabase client could not initialize.";return}const {data}=await db.auth.getSession();if(data.session){user=data.session.user;await loadProfile();workspace();go("Overview")}})();
+  
