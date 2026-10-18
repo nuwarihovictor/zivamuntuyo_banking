@@ -23,10 +23,12 @@ Implementation status: the branch now contains browser-side voice-note recording
 
 <!-- The checked items indicate code has been added, not that it has passed testing or been deployed. -->
 
-- Add a Record voice note control beside the text message box.
 - Test supported Chrome and Edge versions on Windows 10 and Windows 11.
 
 ### Secure storage and authorization
+
+- [x] Draft private bucket setup, metadata table, storage policies and authenticated RPCs in `supabase/sql/staff_voice_notes.sql`.
+- [ ] Apply the SQL in a test project and verify the policies and RPCs before any production deployment.
 - Store audio in a **private** Supabase Storage bucket, not a public bucket.
 - Create a metadata record with a random ID, sender identity derived from the authenticated session, channel/branch ID, storage path, MIME type, byte size, duration, and creation timestamp.
 - Authorize uploads, listing, and playback server-side. Reuse the staff chat's active-employee and branch-access rules; do not trust a branch ID supplied by the browser.
