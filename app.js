@@ -49,7 +49,7 @@ window.switchPage = function(pageName) {
            <label>Branch UUID (optional; limited to your authorized branch scope)
              <input id="dashboard-branch-id" type="text" placeholder="All authorized branches">
            </label>
-           <button type="button" class="secondary" onclick="loadDashboardCharts()">Refresh dashboard</button>
+           <button type="button" class="secondary" onclick="loadDashboardCharts();loadBranchPortfolioSummary()">Refresh dashboard</button>
          </div>
          <div id="dashboard-feedback" class="muted" aria-live="polite">Loading live accounting data…</div>
          <div id="dashboard-kpis" class="grid-2"></div>
