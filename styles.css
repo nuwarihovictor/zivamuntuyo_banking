@@ -257,3 +257,9 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .loan-application-card textarea,.loan-application-card select { width:100%; }
 @media (min-width:850px) { .loan-application-card .loan-review-form { grid-template-columns:1fr 2fr auto; align-items:end; } }
 @media (max-width:600px) { .loan-card-top,.section-heading-row { flex-direction:column; } .loan-card-amount { font-size:19px; } }
+
+.loan-documents-actions { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color); }
+.loan-documents-list { overflow-wrap:anywhere; }
+.loan-documents-list p { margin:7px 0; font-size:13px; }
+.loan-documents-list a { color:var(--link-color,var(--accent-color,#0e5a40)); font-weight:650; text-decoration:underline; }
+.loan-documents-list small { color:var(--text-muted); }
