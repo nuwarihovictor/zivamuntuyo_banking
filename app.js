@@ -1992,7 +1992,7 @@ window.applyVicLineSettings = function() {
 };
 window.saveVicLineSettings = function() {
   const el=id=>document.getElementById(id);
-  const settings={soundEnabled:!!el("vicline-sound-enabled")?.checked,tone:el("vicline-sound-tone")?.value||"chime",volume:Math.max(0,Math.min(100,Number(el("vicline-sound-volume")?.value||55))),appearance:el("vicline-appearance")?.value||"light",density:el("vicline-density")?.value||"comfortable"};
+  const existing=window.getVicLineSettings();const settings={soundEnabled:!!el("vicline-sound-enabled")?.checked,tone:el("vicline-sound-tone")?.value||"chime",volume:Math.max(0,Math.min(100,Number(el("vicline-sound-volume")?.value||55))),desktopNotifications:existing.desktopNotifications===true,appearance:el("vicline-appearance")?.value||"light",density:el("vicline-density")?.value||"comfortable"};
   try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}
   window.applyVicLineSettings();
   const feedback=el("vicline-settings-feedback");if(feedback)feedback.textContent="Your VIC LINE preferences have been saved on this device.";
@@ -2005,7 +2005,7 @@ window.enableVicLineDesktopNotifications=async function(){
   let permission=Notification.permission;
   if(permission==="default")permission=await Notification.requestPermission();
   if(feedback)feedback.textContent=permission==="granted"?"Browser notifications enabled.":"Notifications were not enabled. Check this site's browser permissions.";
-  const button=document.getElementById("vicline-notification-permission");if(button)button.textContent=permission==="granted"?"Alerts enabled":"Enable alerts";
+  if(permission==="granted"){const settings=window.getVicLineSettings();settings.desktopNotifications=true;try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}}\n  const button=document.getElementById("vicline-notification-permission");if(button)button.textContent=permission==="granted"?"Alerts enabled":"Enable alerts";
 };
 window.playVicLineTone=function(toneOverride){
   const settings=window.getVicLineSettings();if(!settings.soundEnabled&&!toneOverride)return;
