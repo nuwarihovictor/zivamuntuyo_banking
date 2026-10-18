@@ -215,41 +215,46 @@ window.switchPage = function(pageName) {
     `;
 
     if (db) {
-      db.from("bank_accounts")
-        .select("id, account_number, currency_code, status, balance, branch_id, opened_at, created_at")
-        .order("created_at", { ascending: false })
+      db.rpc("list_customer_account_balance_reconciliation")
         .then(({ data, error }) => {
           const listEl = document.getElementById("acc-list");
           if (!listEl) return;
           if (error) {
-            listEl.innerHTML = `<p class="muted">Account records could not be loaded. Check that you are signed in and authorized for your branch. Details: ${esc(error.message)}</p>`;
+            listEl.innerHTML = `<p class="muted">Ledger reconciliation could not be loaded. Check that you are signed in, have an active employee profile, and have access to the account branch. Details: ${esc(error.message)}</p>`;
             return;
           }
           if (!data || data.length === 0) {
-            listEl.innerHTML = `<p class="muted">No bank accounts are visible for your access, or no accounts have been registered.</p>`;
+            listEl.innerHTML = `<p class="muted">No accounts are visible for your branch access, or no accounts have been registered.</p>`;
             return;
           }
           listEl.innerHTML = data.map(a => {
-            const balance = Number(a.balance);
-            const balanceText = Number.isFinite(balance)
-              ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            const stored = Number(a.stored_balance);
+            const ledger = a.ledger_balance === null || a.ledger_balance === undefined ? null : Number(a.ledger_balance);
+            const fmt = value => Number.isFinite(value)
+              ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
               : "Not available";
+            const currency = (a.currency_code || "UGX").trim();
+            const reconciliation = !a.ledger_configured || ledger === null || !Number.isFinite(ledger)
+              ? '<span class="muted">Reconciliation: NOT CONFIGURED — customer liability ledger missing</span>'
+              : '<span class="muted">Difference (stored − ledger): ' + fmt(stored - ledger) + ' ' + esc(currency) + '</span>';
             return `
               <div class="list-item">
                 <div>
                   <strong>${esc(a.account_number || "Account number unavailable")}</strong><br>
-                  <span class="muted">Stored balance: ${balanceText} ${esc((a.currency_code || "UGX").trim())}</span><br>
-                  <span class="muted">Account UUID: ${esc(a.id)}</span><br>
+                  <span class="muted">Stored balance: ${fmt(stored)} ${esc(currency)}</span><br>
+                  <span class="muted">Posted-ledger balance: ${ledger === null ? "Unavailable" : fmt(ledger)} ${esc(currency)}</span><br>
+                  ${reconciliation}<br>
+                  <span class="muted">Account UUID: ${esc(a.account_id)}</span><br>
                   <span class="muted">Branch UUID: ${esc(a.branch_id || "Not assigned")}</span>
                 </div>
-                <span class="badge-role">${esc(a.status || "unknown")}</span>
+                <span class="badge-role">${esc(a.account_status || "unknown")}</span>
               </div>
             `;
           }).join("");
         })
         .catch(() => {
           const listEl = document.getElementById("acc-list");
-          if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented the account directory from loading. Please refresh and check your connection.</p>`;
+          if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented account reconciliation from loading. Please refresh and check your connection.</p>`;
         });
     } else {
       const listEl = document.getElementById("acc-list");
