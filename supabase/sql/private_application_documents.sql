@@ -20,8 +20,8 @@ for select to authenticated using (
   or
   (split_part(name,'/',1)='account-opening'
    and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and c.branch_id is not null
-    and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id))))
+   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and ((c.branch_id is not null and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id)))
+    or exists(select 1 from public.account_holders ah join public.bank_accounts ba on ba.id=ah.account_id where ah.customer_id=c.id and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(ba.branch_id) or public.current_employee_has_branch_access(ba.branch_id)))))
  ));
 
 drop policy if exists "staff_upload_authorized_application_documents" on storage.objects;
@@ -35,8 +35,8 @@ for insert to authenticated with check (
   or
   (split_part(name,'/',1)='account-opening'
    and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and c.branch_id is not null
-    and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id))))
+   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and ((c.branch_id is not null and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id)))
+    or exists(select 1 from public.account_holders ah join public.bank_accounts ba on ba.id=ah.account_id where ah.customer_id=c.id and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(ba.branch_id) or public.current_employee_has_branch_access(ba.branch_id)))))
  ));
 
 drop policy if exists "staff_delete_authorized_application_documents" on storage.objects;
@@ -50,6 +50,6 @@ for delete to authenticated using (
   or
   (split_part(name,'/',1)='account-opening'
    and split_part(name,'/',2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and c.branch_id is not null
-    and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id))))
+   and exists(select 1 from public.customers c where c.id::text=split_part(name,'/',2) and ((c.branch_id is not null and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(c.branch_id) or public.current_employee_has_branch_access(c.branch_id)))
+    or exists(select 1 from public.account_holders ah join public.bank_accounts ba on ba.id=ah.account_id where ah.customer_id=c.id and (public.is_active_bank_admin() or public.is_active_system_admin() or public.is_active_branch_manager_for(ba.branch_id) or public.current_employee_has_branch_access(ba.branch_id)))))
  ));
