@@ -96,3 +96,11 @@ The release candidate is not production-ready yet. The new code is on a GitHub r
 - [x] Added non-posting repayment schedule calculator preview; three illustrative monthly methods.
 - [x] Added loan servicing design and schema draft documentation.
 - [ ] No claim of complete loan servicing until authoritative schedules, due-date dashboard, repayments, allocation, arrears, collections, ledger integration and audit controls pass acceptance tests.
+
+
+## Integration branch update — 18 October 2026
+The coordinated audit branch `integration/full-system-audit-2026-10` is based on `feature/due-date-alerts-account-eligibility`, which carries the newer loan-servicing and account-eligibility work together with the release-candidate UI foundations. See `docs/FULL_SYSTEM_INTEGRATION_AUDIT_2026-10-18.md` for the consolidated status matrix.
+
+New static CI checks validate core files, navigation shell, local asset references, responsive CSS presence and obvious accidental secret-key exposure. These checks are not a substitute for database security tests or browser/device acceptance. The audit branch does not apply SQL, merge itself, or deploy to Vercel.
+
+**Still release-blocking:** server-side individual/joint account eligibility and complete joint-holder approval; tested RLS/RPC/ledger integrity; authoritative loan schedules, repayments, arrears and reminders; real fingerprint-device integration if required for launch; receipt/chat testing; Windows 10/11 and Android acceptance; and verified Vercel preview/domain/rollback.
