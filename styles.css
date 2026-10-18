@@ -441,3 +441,26 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
   .staff-chat-messages { max-height: 60vh; padding: 8px; }
   .staff-chat-message { padding: 10px; }
 }
+
+
+/* Staff chat voice notes */
+.staff-voice-note-tools {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+}
+.staff-voice-note-tools h3 { font-size: 16px; margin-bottom: 6px; }
+.staff-voice-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.staff-voice-controls button:disabled { opacity: .5; cursor: not-allowed; }
+#staff-voice-preview { display: block; width: 100%; max-width: 520px; margin-top: 12px; }
+.staff-chat-message { display: block; padding: 12px 0; }
+.staff-chat-message-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.staff-chat-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; }
+.staff-voice-label { font-weight: 700; margin: 8px 0; }
+.staff-voice-message audio { width: min(100%, 420px); display: block; }
+@media (max-width: 560px) {
+  .staff-voice-note-tools { padding: 12px; }
+  .staff-voice-controls button { flex: 1 1 130px; }
+}
