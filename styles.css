@@ -397,6 +397,7 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .login-screen{min-height:calc(100vh - 140px);display:grid;place-items:center;padding:28px 16px;background:var(--bg,#f4f7f4)}
 .login-screen[hidden],.nav-bar[hidden],.main-container[hidden],.footer[hidden],#sign-out-button[hidden]{display:none!important}
 #branch-entry-directory[hidden],#staff-login-card[hidden]{display:none!important}
+#approval-limit-admin-panel[hidden]{display:none!important}
 .branch-entry-list{display:grid;gap:10px;margin:18px 0}.branch-entry-row{align-items:center;gap:14px}.branch-entry-row>div:first-child{min-width:0;flex:1}.branch-entry-row .primary{min-width:78px}.branch-entry-directory{max-height:calc(100dvh - 40px);overflow:auto}
 .login-card{width:min(100%,460px);padding:clamp(22px,5vw,38px);border:1px solid var(--border-color,#dfe7e0);border-radius:22px;background:var(--panel-bg,#fff);box-shadow:0 18px 55px rgba(8,45,30,.12)}
 .login-brand-mark{width:52px;height:52px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(145deg,#e6c77f,#b18a42);color:#073b2b;font-size:30px;font-weight:900;margin-bottom:20px}
