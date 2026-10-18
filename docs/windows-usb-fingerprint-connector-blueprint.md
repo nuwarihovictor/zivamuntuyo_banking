@@ -121,3 +121,8 @@ The current rollout assumption is **one USB fingerprint reader per branch**. Bra
 - Pilot one reader at one location first. After the exact model passes the Windows 10 and Windows 11 test matrix, repeat a controlled installation and acceptance checklist for each branch before enabling official attendance writes.
 - Confirm branch count, whether Butare head office requires its own reader, network reliability at each location, and whether a branch has a Windows 10/11 workstation before calculating the final purchase quantity.
 - The one-reader-per-branch plan is a deployment requirement only; it does not mean fingerprint integration is already implemented or hardware compatibility is verified.
+
+
+### Confirmed head-office decision
+
+The organization confirmed that **Butare Head Office will have its own reader**. Therefore the deployment plan includes one reader for every active branch, including Butare Head Office. The final quantity must be counted from the current active branch register immediately before procurement; do not count inactive or duplicate branch records.
