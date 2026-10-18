@@ -27,14 +27,18 @@ function panel(title, subtitle, desc, contentHtml) {
   `;
 }
 
-function staffModuleTabs(active){
+function transactionModuleTabs(active){
+  const tabs=[["Transactions","Overview","📋"],["Deposits","Deposits","⬇️"],["Withdrawals","Withdrawals","⬆️"]];
+  return '<div class="transaction-module-tabs" role="navigation" aria-label="Transaction sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="transaction-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
+}
+\nfunction staffModuleTabs(active){
   const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","Team Chat","💬"]];
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
 
 window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
-    if (btn.dataset.page === pageName || (btn.dataset.page === "Staff" && ["Staff","Attendance","StaffChat"].includes(pageName))) {
+    if (btn.dataset.page === pageName || (btn.dataset.page === "Staff" && ["Staff","Attendance","StaffChat"].includes(pageName)) || (btn.dataset.page === "Transactions" && ["Transactions","Deposits","Withdrawals"].includes(pageName))) {
       btn.classList.add('active');
     } else {
       btn.classList.remove('active');
@@ -388,55 +392,53 @@ window.switchPage = function(pageName) {
       if (listEl) listEl.innerHTML = `<p class="muted">Database client is unavailable. No account records were loaded.</p>`;
     }
   }
-  else if (pageName === "Transactions") {
+  else if (["Transactions","Deposits","Withdrawals"].includes(pageName)) {
+    const transactionMode = pageName === "Deposits" ? "deposit" : pageName === "Withdrawals" ? "withdrawal" : "both";
+    const isDeposit = transactionMode === "deposit";
+    const isWithdrawal = transactionMode === "withdrawal";
+    const heading = isDeposit ? "Customer Deposits" : isWithdrawal ? "Customer Withdrawals" : "Transactions Overview";
+    const subheading = isDeposit ? "Receive money into a customer account" : isWithdrawal ? "Pay money out from a customer account" : "Choose a transaction type to get started";
+    const intro = isDeposit
+      ? "Use this dedicated workflow when a customer deposits funds. Confirm the account and amount with the customer before submitting. A receipt is available only after successful ledger posting."
+      : isWithdrawal
+        ? "Use this dedicated workflow when a customer withdraws funds. Verify identity, account, available balance and applicable approval rules before submitting. No cash is paid out by this request alone."
+        : "Deposits and withdrawals have separate workflows to reduce selection errors. Requests remain pending until independently approved and posted.";
     c.innerHTML = `
-      <span class="category-tag">Phase 6: Ledger Engine</span>
-      <h2 class="page-heading">Transactions</h2>
-      ${panel(
-        "TRANSACTION PROCESSING",
-        "Cash transaction request",
-        "Submit deposits and withdrawals for approval. A customer receipt becomes available for a deposit only after the approved transaction is successfully posted to the ledger.",
-        `<form onsubmit="handleTransaction(event)">
-           <label>Account UUID * 
-             <input type="text" name="account_id" required placeholder="Enter Account UUID">
-           </label>
-           <label>Transaction Type * 
-             <select name="tx_type">
-               <option value="deposit">Deposit (Credit)</option>
-               <option value="withdrawal">Withdrawal (Debit)</option>
-             </select>
-           </label>
-           <label>Amount (UGX) * 
-             <input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="50000.00">
-           </label>
-           <button type="submit" class="primary">Submit for Approval</button>
-           <p id="tx-feedback" class="muted"></p>
-         </form>`
-      )}
-      ${panel(
-        "TRANSACTION MONITOR",
-        "Recent transaction activity",
-        "Authorized staff can review pending, approved and posted journal requests. This list is read-only; posting remains in the approval workflow.",
-        `<div class="form-grid">
+      <span class="category-tag">Cash operations · Maker-checker controls</span>
+      <h2 class="page-heading">${heading}</h2>
+      ${transactionModuleTabs(pageName)}
+      <div class="transaction-workflow-banner ${isDeposit?"deposit":isWithdrawal?"withdrawal":"overview"}">
+        <div class="transaction-workflow-icon">${isDeposit?"⬇️":isWithdrawal?"⬆️":"📋"}</div>
+        <div><strong>${heading}</strong><p>${subheading}</p><small>${intro}</small></div>
+      </div>
+      ${(!isWithdrawal ? panel("DEPOSIT ENTRY", "Receive customer funds", "The request is submitted for approval. Do not hand the customer a final receipt until ledger posting succeeds.", `
+        <form id="deposit-transaction-form" class="transaction-entry-form" onsubmit="handleTransaction(event)">
+          <input type="hidden" name="tx_type" value="deposit">
+          <label>Customer account UUID <span class="required-mark">*</span><input type="text" name="account_id" required maxlength="80" autocomplete="off" placeholder="Enter or scan account UUID"></label>
+          <label>Deposit amount <span class="required-mark">*</span><div class="amount-input-wrap"><input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"><span>Currency is taken from the account</span></div></label>
+          <div class="transaction-checklist"><strong>Before submitting</strong><label><input type="checkbox" required> I verified the customer account and the amount to be deposited.</label><label><input type="checkbox" required> I understand this request is not a completed transaction until posted.</label></div>
+          <button type="submit" class="primary transaction-submit">Submit deposit for approval</button>
+          <p id="tx-feedback" class="muted" aria-live="polite"></p>
+        </form>`):"")}
+      ${(!isDeposit ? panel("WITHDRAWAL ENTRY", "Pay customer funds", "Verify customer identity and the account's available balance. The secure backend must enforce balance and approval rules before any payout.", `
+        <form id="withdrawal-transaction-form" class="transaction-entry-form" onsubmit="handleTransaction(event)">
+          <input type="hidden" name="tx_type" value="withdrawal">
+          <label>Customer account UUID <span class="required-mark">*</span><input type="text" name="account_id" required maxlength="80" autocomplete="off" placeholder="Enter or scan account UUID"></label>
+          <label>Withdrawal amount <span class="required-mark">*</span><div class="amount-input-wrap"><input type="number" name="amount" required min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"><span>Currency is taken from the account</span></div></label>
+          <div class="transaction-checklist"><strong>Before submitting</strong><label><input type="checkbox" required> I verified the customer's identity and account details.</label><label><input type="checkbox" required> I checked the amount and understand approval is required before payout.</label></div>
+          <button type="submit" class="primary transaction-submit">Submit withdrawal for approval</button>
+          <p id="tx-feedback" class="muted" aria-live="polite"></p>
+        </form>`):"")}
+      ${panel("TRANSACTION ACTIVITY", "Recent transaction records", "Review journal requests and posted activity you are authorized to see. Receipts are available only for posted deposits.", `
+        <div class="form-grid transaction-filters">
           <label>Branch UUID (optional)<input id="monitor-branch-id" type="text" placeholder="All authorized branches"></label>
-          <label>Status
-            <select id="monitor-status">
-              <option value="">All statuses</option>
-              <option value="pending_approval">Pending approval</option>
-              <option value="approved">Approved</option>
-              <option value="posted">Posted</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </label>
+          <label>Status<select id="monitor-status"><option value="">All statuses</option><option value="pending_approval">Pending approval</option><option value="approved">Approved</option><option value="posted">Posted</option><option value="rejected">Rejected</option></select></label>
           <button type="button" class="secondary" onclick="loadTransactionMonitor()">Refresh activity</button>
         </div>
         <p id="transaction-monitor-feedback" class="muted" aria-live="polite">Loading transaction activity…</p>
-        <div id="transaction-monitor-list"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`
-      )}
+        <div id="transaction-monitor-list"></div><div id="transaction-receipt-status" class="muted" aria-live="polite"></div>`)}
     `;
-
-
-window.loadTransactionMonitor();
+    window.loadTransactionMonitor();
   }
   else if (pageName === "Attendance") {
     c.innerHTML = `
