@@ -34,8 +34,8 @@ begin
  if not found then raise exception 'Loan product not found'; end if;
  if not v_product.editable_by_general_manager or v_product.product_code='overdraft' then raise exception 'The overdraft rate is fixed at 5 percent per month'; end if;
  update public.loan_product_rates set rate_percent=p_interest_rate,rate_period=p_rate_period,updated_by=v_user,updated_at=now() where product_code=p_product_code;
- insert into public.audit_events(branch_id,actor_user_id,action,entity_type,entity_id,details)
- values(null,v_user,'loan_interest_rate_changed','loan_product_rate',v_product.product_code,
+ insert into public.audit_events(branch_id,actor_user_id,action,entity_type,entity_id,outcome,details)
+ values(null,v_user,'loan_interest_rate_changed','loan_product_rate',v_product.product_code,'success',
  jsonb_build_object('old_rate',v_product.rate_percent,'old_period',v_product.rate_period,'new_rate',p_interest_rate,'new_period',p_rate_period,'reason',trim(p_reason)));
  return jsonb_build_object('product_code',v_product.product_code,'rate_percent',p_interest_rate,'rate_period',p_rate_period);
 end;
