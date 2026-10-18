@@ -25,7 +25,7 @@ function panel(title, subtitle, desc, contentHtml) {
   `;
 }
 
-function switchPage(pageName) {
+window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
     if (btn.dataset.page === pageName) {
       btn.classList.add('active');
@@ -486,8 +486,10 @@ function initApp() {
   switchPage("Dashboard");
 }
 
+// Immediate execution listener to prevent hanging on "Initializing workspace..."
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
-}
+  }
+                                                                
