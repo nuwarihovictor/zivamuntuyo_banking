@@ -92,3 +92,11 @@ button.secondary { background: #eef1ed; color: var(--text-main); border: none; p
 .dashboard-chart-wrap { position: relative; width: 100%; min-height: 250px; height: 280px; }
 .dashboard-chart-wrap canvas { max-width: 100%; }
 @media (max-width: 700px) { .dashboard-chart-grid { grid-template-columns: 1fr; } .dashboard-chart-wrap { height: 240px; min-height: 220px; } }
+
+
+/* Attendance schedule configuration */
+.attendance-days { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 16px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 10px; }
+.attendance-days legend { padding: 0 6px; }
+.attendance-days label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.attendance-days input[type="checkbox"] { width: auto; margin: 0; }
+#attendance-policy-form .grid-2 { gap: 14px; }
