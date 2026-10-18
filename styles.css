@@ -274,3 +274,60 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .loan-rate-edit-form input { width:100%; min-width:0; }
 .fixed-rate-label { font-weight:750; padding:10px 12px; border:1px solid var(--border-color); border-radius:9px; }
 @media (max-width:680px) { .loan-rate-setting { grid-template-columns:1fr; } .loan-rate-edit-form { align-items:stretch; } }
+
+/* Brand identity, accessible motion and professional form studio */
+:root { --motion-fast:140ms; --motion-normal:220ms; }
+* { font-family:var(--font-family,Inter),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+html { scroll-behavior:smooth; }
+.logo-icon { width:48px;height:48px;border-radius:13px;background:linear-gradient(145deg,#e6c77f,#b18a42);color:#0a4935;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 4px 12px rgba(0,0,0,.16);padding:7px;flex:0 0 auto; }
+.logo-icon svg { display:block;width:100%;height:100%; }
+.logo-text h1 { letter-spacing:.8px; }
+.nav { transition:background var(--motion-fast) ease,color var(--motion-fast) ease,transform var(--motion-fast) ease; }
+.nav:hover { background:rgba(255,255,255,.18);transform:translateY(-1px); }
+.nav:focus-visible,button:focus-visible,a:focus-visible { outline:3px solid var(--accent-gold);outline-offset:2px; }
+.panel { animation:panel-enter 220ms ease both; }
+.metric-card,.responsibility-card,.loan-application-card { transition:box-shadow var(--motion-normal) ease,border-color var(--motion-normal) ease,transform var(--motion-normal) ease; }
+.metric-card:hover,.responsibility-card:hover,.loan-application-card:hover { border-color:var(--accent-gold);box-shadow:0 8px 22px rgba(18,38,27,.06); }
+button.primary,button.secondary { transition:transform var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease; }
+button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-shadow:0 5px 14px rgba(0,0,0,.09); }
+@keyframes panel-enter { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+.page-intro { color:var(--text-muted);line-height:1.65;max-width:850px;margin:-7px 0 18px; }
+.form-studio-layout { display:grid;grid-template-columns:minmax(280px,.9fr) minmax(300px,1.1fr);gap:20px;align-items:start; }
+.form-studio-editor { display:grid;gap:13px;min-width:0; }
+.form-studio-section-title { display:flex;align-items:center;gap:11px;margin:2px 0 3px; }
+.form-studio-section-title h3,.form-studio-preview-head h3 { font-size:15px;margin:0; }
+.fs-fields-editor { display:grid;gap:9px; }
+.fs-field-row { display:grid;grid-template-columns:auto minmax(100px,1fr) minmax(90px,.7fr) auto;align-items:end;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:11px;background:var(--panel-bg); }
+.fs-field-row label { font-size:11px;min-width:0; }
+.fs-field-row input:not([type=checkbox]),.fs-field-row select { padding:8px;font-size:12px;min-width:0; }
+.fs-field-row input[type=checkbox],.fs-check-row input { width:16px;height:16px;accent-color:var(--btn-green); }
+.fs-field-enabled,.fs-field-required { display:flex;align-items:center;gap:5px;white-space:nowrap;padding-bottom:8px; }
+.fs-add-field { display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.7fr);gap:10px;align-items:end;padding:12px;background:var(--input-bg);border:1px dashed var(--input-border);border-radius:12px; }
+.fs-add-field button { grid-column:1/-1;width:fit-content; }
+.fs-check-row { display:flex;flex-direction:row;align-items:center;gap:9px;font-weight:500; }
+.form-studio-actions { display:flex;flex-wrap:wrap;gap:8px;margin-top:5px; }
+.form-studio-actions button { min-width:0; }
+.form-studio-preview-column { min-width:0;position:sticky;top:12px; }
+.form-studio-preview-head { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px; }
+.form-studio-paper { padding:24px 20px;background:#fff;color:#17251e;border:1px solid #d8e0da;border-radius:5px;box-shadow:0 10px 32px rgba(20,35,25,.1);min-height:440px; }
+.fs-print-brand { display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:2px solid #0a4935; }
+.fs-print-mark { width:39px;height:39px;display:grid;place-items:center;border-radius:9px;background:#0a4935;color:#e6c77f;font-weight:850;font-size:22px; }
+.fs-print-brand strong { display:block;font-size:12px;letter-spacing:.25px; }
+.fs-print-brand small { display:block;color:#68756e;font-size:8px;margin-top:4px;letter-spacing:.8px; }
+.fs-print-title { text-align:center;margin:18px 0 12px; }
+.fs-print-title h1 { font-size:18px;line-height:1.3;margin:0 0 4px;color:#17251e; }
+.fs-print-title p,.fs-print-instructions { color:#5b665f;font-size:10px;line-height:1.5; }
+.fs-print-instructions { padding:9px;background:#f5f7f4;border:1px solid #dce5dd;margin-bottom:14px; }
+.fs-print-fields { display:grid;grid-template-columns:1fr 1fr;gap:12px 16px; }
+.fs-print-field { break-inside:avoid;min-width:0; }
+.fs-print-field label { display:block;font-weight:700;font-size:10px;margin-bottom:7px;color:#283a2e; }
+.fs-write-line { height:22px;border-bottom:1px solid #a6b1a8; }
+.fs-write-area { height:50px;border:1px solid #bdc8bf;border-radius:3px; }
+.fs-print-section { margin-top:18px;break-inside:avoid; }
+.fs-print-checklist { display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px;font-size:10px; }
+.fs-print-signatures { display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px;break-inside:avoid;font-size:10px; }
+.fs-print-signatures>div>div { height:27px;border-bottom:1px solid #7f8c83;margin-top:10px; }
+.fs-print-signatures small { display:block;font-weight:400;color:#5b665f;margin-top:5px; }
+@media(max-width:900px){.form-studio-layout{grid-template-columns:1fr}.form-studio-preview-column{position:static}}
+@media(max-width:560px){.fs-field-row{grid-template-columns:1fr 1fr}.fs-field-enabled,.fs-field-required{padding-bottom:0}.form-studio-preview-head{align-items:flex-start;flex-direction:column}.form-studio-paper{padding:15px 12px}.fs-print-fields{grid-template-columns:1fr}.fs-add-field{grid-template-columns:1fr}}
