@@ -339,23 +339,6 @@ window.switchPage = function(pageName) {
         </form>`
       )}
       ${panel(
-        "LOAN APPLICATION DOCUMENTS",
-        "Attach borrower and collateral evidence",
-        "Upload documents to an existing loan record. Examples: scanned IDs, land titles, chairperson letters, guarantor IDs, proof of income and valuation reports. Files are private and access is limited by staff branch permissions.",
-        `<form id="loan-document-form" onsubmit="handleLoanDocumentUpload(event)">
-          <label>Loan record UUID *<input type="text" name="loan_id" required placeholder="Paste the existing loan UUID"></label>
-          <label>Document category *
-            <select name="document_category" required>
-              <option value="national-id">Borrower national ID</option><option value="passport">Passport</option><option value="land-title">Land title / collateral ownership</option><option value="chairperson-letter">LC / chairperson letter</option><option value="guarantor-id">Guarantor identification</option><option value="income-proof">Proof of income / business</option><option value="valuation-report">Collateral valuation report</option><option value="other">Other supporting document</option>
-            </select>
-          </label>
-          <label>Scanned documents *<input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required></label>
-          <p class="muted">PDF, JPG or PNG; maximum 10 MB per file. Use an existing loan UUID and only upload documents you are authorized to handle.</p>
-          <button type="submit" class="primary">Upload loan documents</button>
-          <p id="loan-document-feedback" class="muted" aria-live="polite"></p>
-        </form>`
-      )}
-      ${panel(
         "BANK ACCOUNTS DIRECTORY",
         "Account status and stored balance",
         "The balance field below is the value stored on the account record; it is not independently reconciled against double-entry ledger postings. Do not use it as an audited balance until reconciliation is implemented.",
@@ -604,6 +587,30 @@ window.loadAttendancePolicy();
          <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
          <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
       )}
+    `;
+  }
+  else if (pageName === "Loans") {
+    c.innerHTML = `
+      <span class="category-tag">Credit operations</span>
+      <h2 class="page-heading">Loans & Credit</h2>
+      <p class="muted">Attach and manage supporting evidence for existing loan records. Loan approval, disbursement, and repayment workflows are not replaced by this document-upload panel.</p>
+            ${panel(
+              "LOAN APPLICATION DOCUMENTS",
+              "Attach borrower and collateral evidence",
+              "Upload documents to an existing loan record. Examples: scanned IDs, land titles, chairperson letters, guarantor IDs, proof of income and valuation reports. Files are private and access is limited by staff branch permissions.",
+              `<form id="loan-document-form" onsubmit="handleLoanDocumentUpload(event)">
+                <label>Loan record UUID *<input type="text" name="loan_id" required placeholder="Paste the existing loan UUID"></label>
+                <label>Document category *
+                  <select name="document_category" required>
+                    <option value="national-id">Borrower national ID</option><option value="passport">Passport</option><option value="land-title">Land title / collateral ownership</option><option value="chairperson-letter">LC / chairperson letter</option><option value="guarantor-id">Guarantor identification</option><option value="income-proof">Proof of income / business</option><option value="valuation-report">Collateral valuation report</option><option value="other">Other supporting document</option>
+                  </select>
+                </label>
+                <label>Scanned documents *<input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required></label>
+                <p class="muted">PDF, JPG or PNG; maximum 10 MB per file. Use an existing loan UUID and only upload documents you are authorized to handle.</p>
+                <button type="submit" class="primary">Upload loan documents</button>
+                <p id="loan-document-feedback" class="muted" aria-live="polite"></p>
+              </form>`
+            )}
     `;
   }
   else if (pageName === "Approvals") {
