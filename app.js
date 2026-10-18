@@ -1929,6 +1929,9 @@ window.sendStaffVoiceNote = async function() {
     if (feedback) feedback.textContent = "Voice note sent. Refreshing conversation…";
     await window.loadStaffChat();
   } catch (error) {
+    if (uploadedPath) {
+      try { await db.storage.from("staff-voice-notes").remove([uploadedPath]); } catch (cleanupError) {}
+    }
     if (feedback) feedback.textContent = "Voice note was not confirmed as sent. " + (error && error.message ? error.message : "Check your connection and try again.");
     staffVoiceSetButtons("ready");
   }
