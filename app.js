@@ -615,6 +615,16 @@ window.loadAttendancePolicy();
             <label>Guarantor name<input name="guarantor_name" maxlength="200"></label>
             <label>Guarantor phone<input name="guarantor_phone" maxlength="40" inputmode="tel"></label>
           </div>
+          <label>Document category
+            <select name="document_category">
+              <option value="national-id">Borrower national ID</option><option value="passport">Borrower passport</option>
+              <option value="chairperson-letter">LC / chairperson letter</option><option value="land-title">Land title / Kibanja evidence</option>
+              <option value="vehicle-logbook">Vehicle logbook / ownership evidence</option><option value="business-registration">Business registration / trading licence</option>
+              <option value="agriculture-evidence">Agriculture / farm evidence</option><option value="school-fees-invoice">School fees invoice / admission evidence</option>
+              <option value="guarantor-id">Guarantor identification</option><option value="income-evidence">Income / bank statement evidence</option>
+              <option value="valuation-report">Collateral valuation report</option><option value="other">Other supporting document</option>
+            </select>
+          </label>
           <label>Scanned supporting documents (optional)
             <input type="file" name="loan_documents" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple>
           </label>
@@ -623,7 +633,7 @@ window.loadAttendancePolicy();
           <p id="loan-application-feedback" class="muted" aria-live="polite"></p>
         </form>
       `)}
-      ${window.currentEmployeeRole==="general_manager" ? panel("LOAN PRODUCT RATE SETTINGS","General Manager controls","Set annual interest rates for new applications. Overdraft is permanently fixed at 5% per month.",'<div id="loan-product-rate-settings">Loading loan product rates…</div>') : ""}
+      ${window.currentEmployeeRole==="general_manager" ? panel("LOAN PRODUCT RATE SETTINGS","General Manager controls","Set the rate and period for new applications. Overdraft is permanently fixed at 5% per month.",'<div id="loan-product-rate-settings">Loading loan product rates…</div>') : ""}
       <section class="loan-applications-section">
         <div class="section-heading-row"><div><h3>Loan application register</h3><p class="muted">Real applications from the database; no sample figures.</p></div><button type="button" class="secondary" onclick="loadLoanApplications()">Refresh</button></div>
         <div id="loan-application-list" class="loan-application-list">Loading authorized loan applications…</div>
