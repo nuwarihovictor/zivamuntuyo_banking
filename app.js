@@ -185,47 +185,75 @@ window.switchPage = function(pageName) {
       ${panel(
         "COMMERCIAL ACCOUNT OPENING",
         "Open New Account",
-        "Select customer and account branch.",
+        "Submit an account application for a valid customer. Database permissions and approval rules determine whether it can be created.",
         `<form id="acc-form" onsubmit="handleAccountSubmit(event)">
-          <label>Customer UUID * 
+          <label>Customer UUID *
             <input type="text" name="customer_id" required placeholder="Enter Customer UUID">
           </label>
-          <label>Currency * 
-            <input type="text" name="currency_code" value="UGX" required>
+          <label>Currency *
+            <select name="currency_code" required>
+              <option value="UGX">UGX — Ugandan shilling</option>
+              <option value="USD">USD — US dollar</option>
+              <option value="KES">KES — Kenyan shilling</option>
+              <option value="TZS">TZS — Tanzanian shilling</option>
+              <option value="RWF">RWF — Rwandan franc</option>
+              <option value="BIF">BIF — Burundian franc</option>
+              <option value="CDF">CDF — Congolese franc</option>
+            </select>
           </label>
-          <button type="submit" class="primary">Open Account</button>
-          <p id="acc-feedback" class="muted"></p>
+          <button type="submit" class="primary">Submit Account Request</button>
+          <p id="acc-feedback" class="muted" aria-live="polite"></p>
         </form>`
       )}
       ${panel(
-        "ACTIVE BANK ACCOUNTS",
-        "Customer Accounts Ledger",
-        "Real-time operational accounts.",
-        `<div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
+        "BANK ACCOUNTS DIRECTORY",
+        "Account status and stored balance",
+        "The balance field below is the value stored on the account record; it is not independently reconciled against double-entry ledger postings. Do not use it as an audited balance until reconciliation is implemented.",
+        `<div class="notice-box">Balance integrity note: transaction requests should affect customer balances only after approved ledger posting. A stored account balance may be stale or not ledger-verified.</div>
+         <div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
       )}
     `;
 
     if (db) {
-      db.from("bank_accounts").select("*").then(({ data }) => {
-        const listEl = document.getElementById("acc-list");
-        if (!listEl) return;
-        if (data && data.length > 0) {
-          listEl.innerHTML = data.map(a => `
-            <div class="list-item">
-              <div>
-                <strong>${esc(a.account_number)}</strong><br>
-                <span class="muted">Balance: ${Number(a.balance || 0).toLocaleString()} ${esc(a.currency_code || "UGX")}</span>
+      db.from("bank_accounts")
+        .select("id, account_number, currency_code, status, balance, branch_id, opened_at, created_at")
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          const listEl = document.getElementById("acc-list");
+          if (!listEl) return;
+          if (error) {
+            listEl.innerHTML = `<p class="muted">Account records could not be loaded. Check that you are signed in and authorized for your branch. Details: ${esc(error.message)}</p>`;
+            return;
+          }
+          if (!data || data.length === 0) {
+            listEl.innerHTML = `<p class="muted">No bank accounts are visible for your access, or no accounts have been registered.</p>`;
+            return;
+          }
+          listEl.innerHTML = data.map(a => {
+            const balance = Number(a.balance);
+            const balanceText = Number.isFinite(balance)
+              ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : "Not available";
+            return `
+              <div class="list-item">
+                <div>
+                  <strong>${esc(a.account_number || "Account number unavailable")}</strong><br>
+                  <span class="muted">Stored balance: ${balanceText} ${esc((a.currency_code || "UGX").trim())}</span><br>
+                  <span class="muted">Account UUID: ${esc(a.id)}</span><br>
+                  <span class="muted">Branch UUID: ${esc(a.branch_id || "Not assigned")}</span>
+                </div>
+                <span class="badge-role">${esc(a.status || "unknown")}</span>
               </div>
-              <span class="badge-role">${esc(a.status || 'active')}</span>
-            </div>
-          `).join("");
-        } else {
-          listEl.innerHTML = `<p class="muted">No bank accounts registered yet.</p>`;
-        }
-      }).catch(() => {
-        const listEl = document.getElementById("acc-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No bank accounts registered yet.</p>`;
-      });
+            `;
+          }).join("");
+        })
+        .catch(() => {
+          const listEl = document.getElementById("acc-list");
+          if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented the account directory from loading. Please refresh and check your connection.</p>`;
+        });
+    } else {
+      const listEl = document.getElementById("acc-list");
+      if (listEl) listEl.innerHTML = `<p class="muted">Database client is unavailable. No account records were loaded.</p>`;
     }
   }
   else if (pageName === "Transactions") {
