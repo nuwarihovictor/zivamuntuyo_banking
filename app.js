@@ -1816,6 +1816,8 @@ window.startStaffVoiceRecording = async function() {
     window.staffVoiceMimeType = (recorder.mimeType || mime || "audio/webm").split(";")[0].toLowerCase();
     window.staffVoiceChannelAtStart = (document.getElementById("staff-chat-branch") || {}).value || "";
     window.staffVoiceStartedAt = Date.now();
+    if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+    window.staffVoicePreviewUrl = null;
     if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
     recorder.ondataavailable = event => { if (event.data && event.data.size) window.staffVoiceChunks.push(event.data); };
     recorder.onerror = () => {
