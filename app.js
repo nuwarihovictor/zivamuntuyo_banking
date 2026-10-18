@@ -1395,7 +1395,7 @@ window.handleCustomerSubmit = async function(e) {
       : "Registration failed. Check the required fields, your permissions and the database connection.";
     if (feedback) feedback.textContent = message;
   } else {
-    if (feedback) feedback.textContent = "Customer registered. Use this same customer profile for individual and any eligible joint account relationships.";
+    if (feedback) feedback.textContent = "Customer registered. This customer profile can be linked to one individual account and to joint accounts; a second individual account is not permitted.";
     form.reset();
     setTimeout(() => window.switchPage("Customers"), 1000);
   }
