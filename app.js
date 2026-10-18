@@ -2036,16 +2036,106 @@ window.reactivateDormantAccount = async function(accountId){
   }catch(err){if(feedback)feedback.textContent="Reactivation failed: "+(err?.message||"Unexpected error");}
 };
 
-function initApp() {
-  initAppearanceControls();
-  loadCurrentEmployeeGreeting();
-  document.querySelectorAll('.nav').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      window.switchPage(e.currentTarget.dataset.page);
+let appNavigationInitialized = false;
+let authenticatedUiVisible = false;
+
+function showLoginScreen(message) {
+  authenticatedUiVisible = false;
+  const login = document.getElementById("login-screen");
+  const nav = document.querySelector(".nav-bar");
+  const main = document.getElementById("main-content");
+  const footer = document.querySelector(".footer");
+  const signOut = document.getElementById("sign-out-button");
+  if (login) login.hidden = false;
+  if (nav) nav.hidden = true;
+  if (main) main.hidden = true;
+  if (footer) footer.hidden = true;
+  if (signOut) signOut.hidden = true;
+  const user = document.getElementById("signed-in-user");
+  if (user) user.textContent = "Signed out";
+  const feedback = document.getElementById("login-feedback");
+  if (feedback && message) feedback.textContent = message;
+}
+
+function showAuthenticatedWorkspace() {
+  const login = document.getElementById("login-screen");
+  const nav = document.querySelector(".nav-bar");
+  const main = document.getElementById("main-content");
+  const footer = document.querySelector(".footer");
+  const signOut = document.getElementById("sign-out-button");
+  if (login) login.hidden = true;
+  if (nav) nav.hidden = false;
+  if (main) main.hidden = false;
+  if (footer) footer.hidden = false;
+  if (signOut) signOut.hidden = false;
+  if (authenticatedUiVisible) return;
+  authenticatedUiVisible = true;
+  if (!appNavigationInitialized) {
+    document.querySelectorAll('.nav').forEach(btn => {
+      btn.addEventListener('click', (e) => window.switchPage(e.currentTarget.dataset.page));
     });
-  });
+    appNavigationInitialized = true;
+  }
+  loadCurrentEmployeeGreeting();
   window.switchPage("Dashboard");
   setTimeout(setWelcomeMessage,100);
+}
+
+async function handleStaffLogin(event) {
+  event.preventDefault();
+  const form = document.getElementById("login-form");
+  const feedback = document.getElementById("login-feedback");
+  const button = document.getElementById("login-submit");
+  if (!db) { if (feedback) feedback.textContent = "Secure database connection is unavailable. Contact the system administrator."; return; }
+  const email = document.getElementById("login-email")?.value?.trim() || "";
+  const password = document.getElementById("login-password")?.value || "";
+  if (!email || !password) { if (feedback) feedback.textContent = "Enter both your staff email and password."; return; }
+  if (button) { button.disabled = true; button.textContent = "Signing in…"; }
+  if (feedback) feedback.textContent = "Verifying your staff account…";
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (!data?.session) throw new Error("Sign-in was not completed. Please try again.");
+    if (feedback) feedback.textContent = "";
+  } catch (error) {
+    if (feedback) feedback.textContent = "Sign-in failed. Check your email and password, or contact your bank administrator. " + (error?.message || "");
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Sign in securely"; }
+  }
+}
+
+async function handleStaffSignOut() {
+  if (!db) return;
+  const button = document.getElementById("sign-out-button");
+  if (button) button.disabled = true;
+  try {
+    const { error } = await db.auth.signOut();
+    if (error) throw error;
+    showLoginScreen("You have signed out.");
+  } catch (error) {
+    alert("Sign-out failed. Please retry: " + (error?.message || "Unexpected error"));
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function initApp() {
+  initAppearanceControls();
+  const loginForm = document.getElementById("login-form");
+  if (loginForm) loginForm.addEventListener("submit", handleStaffLogin);
+  const signOutButton = document.getElementById("sign-out-button");
+  if (signOutButton) signOutButton.addEventListener("click", handleStaffSignOut);
+  if (!db) { showLoginScreen("Secure database connection is unavailable. Contact the system administrator."); return; }
+  showLoginScreen("");
+  db.auth.getSession().then(({ data, error }) => {
+    if (error) showLoginScreen("Could not verify the saved session. Please sign in again.");
+    else if (data?.session) showAuthenticatedWorkspace();
+    else showLoginScreen("");
+  }).catch(() => showLoginScreen("Could not verify the saved session. Please sign in again."));
+  db.auth.onAuthStateChange((event, session) => {
+    if (session) showAuthenticatedWorkspace();
+    else if (event === "SIGNED_OUT") showLoginScreen("You have signed out.");
+  });
 }
 
 if (document.readyState === 'loading') {
