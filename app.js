@@ -75,23 +75,34 @@ function switchPage(pageName) {
     `;
 
     if (db) {
-      db.from("branches").select("id, branch_code, branch_name, countries(country_name, currency_code)").then(({ data, error }) => {
+      db.from("branches").select("id, branch_code, branch_name, country_id").then(async ({ data: branches, error }) => {
         const listEl = document.getElementById("branch-list");
         if (!listEl) return;
         if (error) {
           listEl.innerHTML = `<p class="error">Error loading branches: ${esc(error.message)}</p>`;
           return;
         }
-        if (data && data.length > 0) {
-          listEl.innerHTML = data.map(b => `
-            <div class="list-item">
-              <div>
-                <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
-                <span class="muted">Country: ${esc(b.countries?.country_name || "N/A")} | Currency: ${esc(b.countries?.currency_code || "UGX")}</span>
+        
+        // Fetch countries separately to ensure clean mapping without join ambiguity
+        const { data: countries } = await db.from("countries").select("id, country_name, currency_code");
+        const countryMap = {};
+        if (countries) {
+          countries.forEach(co => { countryMap[co.id] = co; });
+        }
+
+        if (branches && branches.length > 0) {
+          listEl.innerHTML = branches.map(b => {
+            const co = countryMap[b.country_id] || {};
+            return `
+              <div class="list-item">
+                <div>
+                  <strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br>
+                  <span class="muted">Country: ${esc(co.country_name || "N/A")} | Currency: ${esc(co.currency_code || "UGX")}</span>
+                </div>
+                <span class="badge-role">Operational</span>
               </div>
-              <span class="badge-role">Operational</span>
-            </div>
-          `).join("");
+            `;
+          }).join("");
         } else {
           listEl.innerHTML = `<p class="muted">No branches configured yet.</p>`;
         }
@@ -111,25 +122,37 @@ function switchPage(pageName) {
     `;
 
     if (db) {
-      db.from("employee_profiles").select("id, full_name, email, status, staff_roles(role_name), branches(branch_name)").then(({ data, error }) => {
+      db.from("employee_profiles").select("id, full_name, email, status, role_id, home_branch_id").then(async ({ data: staff, error }) => {
         const listEl = document.getElementById("staff-list");
         if (!listEl) return;
         if (error) {
           listEl.innerHTML = `<p class="error">Error loading staff: ${esc(error.message)}</p>`;
           return;
         }
-        if (data && data.length > 0) {
-          listEl.innerHTML = data.map(s => `
+
+        const [rolesRes, branchRes] = await Promise.all([
+          db.from("staff_roles").select("id, role_name"),
+          db.from("branches").select("id, branch_name")
+        ]);
+
+        const roleMap = {};
+        if (rolesRes.data) rolesRes.data.forEach(r => { roleMap[r.id] = r.role_name; });
+        
+        const branchMap = {};
+        if (branchRes.data) branchRes.data.forEach(b => { branchMap[b.id] = b.branch_name; });
+
+        if (staff && staff.length > 0) {
+          listEl.innerHTML = staff.map(s => `
             <div class="list-item">
               <div>
                 <strong>${esc(s.full_name)}</strong> (${esc(s.email)})<br>
-                <span class="muted">Branch: ${esc(s.branches?.branch_name || "Central HQ")}</span>
+                <span class="muted">Branch: ${esc(branchMap[s.home_branch_id] || "Central HQ")}</span>
               </div>
-              <span class="badge-role">${esc(s.staff_roles?.role_name || "Staff")}</span>
+              <span class="badge-role">${esc(roleMap[s.role_id] || "Staff")}</span>
             </div>
           `).join("");
         } else {
-          listEl.innerHTML = `<p class="muted">No employee profiles registered. (Default Admin Bypass active for Nuwariho Victor).</p>`;
+          listEl.innerHTML = `<p class="muted">No employee profiles registered in database. (Default Admin Bypass active for Nuwariho Victor).</p>`;
         }
       });
     }
