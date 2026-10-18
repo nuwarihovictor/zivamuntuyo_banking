@@ -231,6 +231,21 @@ begin
 end;
 $function$;
 
+-- Ensure every financial activity category has the control accounts required by the GL posting trigger.
+-- Idempotent: existing configured account names and IDs are preserved.
+insert into public.ledger_accounts
+  (ledger_code, ledger_name, ledger_type, currency_code, branch_id, is_control_account, is_active)
+values
+  ('1000','Teller Till / Cash Asset','asset','UGX',null,true,true),
+  ('2100','Restricted Account Security Reserve','liability','UGX',null,true,true),
+  ('3000','Non-withdrawable Share Capital','equity','UGX',null,true,true),
+  ('4000','Account Opening and Service Fee Income','income','UGX',null,true,true),
+  ('4100','Loan Interest Income','income','UGX',null,true,true),
+  ('4200','Late Payment Penalty Income','income','UGX',null,true,true),
+  ('4300','Other Operating Income','income','UGX',null,true,true),
+  ('5000','Operating Expenses','expense','UGX',null,true,true)
+on conflict (ledger_code) do nothing;
+
 drop trigger if exists trg_post_financial_activity_to_gl on public.financial_activity_ledger;
 create trigger trg_post_financial_activity_to_gl
 after insert on public.financial_activity_ledger
