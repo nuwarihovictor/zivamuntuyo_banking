@@ -90,3 +90,9 @@ This is the source checklist for the next coordinated release. A feature is not 
 
 ## Current truth about readiness
 The release candidate is not production-ready yet. The new code is on a GitHub release branch, not live in Vercel. SQL files are drafts and have not been applied to the live Supabase database. Browser/device/printer/fingerprint tests have not been completed. Do not represent fingerprint scanning, one-to-one direct messages, live calling, or push delivery as available until their release gates pass.
+
+### Loan servicing and due-date management
+- [x] Loan application intake and supporting document workflow exists in the candidate UI.
+- [x] Added non-posting repayment schedule calculator preview; three illustrative monthly methods.
+- [x] Added loan servicing design and schema draft documentation.
+- [ ] No claim of complete loan servicing until authoritative schedules, due-date dashboard, repayments, allocation, arrears, collections, ledger integration and audit controls pass acceptance tests.
