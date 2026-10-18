@@ -93,6 +93,7 @@ function switchPage(pageName) {
     if (db) {
       db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
+        if (!listEl) return;
         if (error) {
           listEl.innerHTML = `<p style="color:#ef4444;">Error accessing records: ${esc(error.message)}</p>`;
           return;
@@ -135,7 +136,6 @@ function switchPage(pageName) {
           </select>
         </label>
 
-        <!-- Dynamic Container for Group Signatories or Fixed Deposit Terms -->
         <div id="dynamic-fields" style="display:flex; flex-direction:column; gap:12px;"></div>
 
         <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Submit Account Application</button>
@@ -154,15 +154,13 @@ function switchPage(pageName) {
         db.from("account_types").select("id, type_code, type_name").eq("is_active", true),
         db.from("branches").select("id, branch_code, branch_name").eq("is_active", true)
       ]).then(([custRes, typeRes, branchRes]) => {
-        window._accountTypesCache = typeRes.data || [];
-
         const custSelect = document.getElementById("sel-cust");
         if (custSelect && custRes.data) {
           custSelect.innerHTML = `<option value="">-- Select Customer --</option>` + custRes.data.map(c => `<option value="${c.id}">${esc(c.customer_number)} - ${esc(c.full_name)}</option>`).join("");
         }
         const typeSelect = document.getElementById("sel-acctype");
         if (typeSelect && typeRes.data) {
-          typeSelect.innerHTML = `<option value="">-- Select Account Type --</option>` + typeRes.data.map(t => `<option value="${t.id}" data-code="${t.type_code}">${esc(t.type_name)}</option>`).join("");
+          typeSelect.innerHTML = `<option value="">-- Select Account Type --</option>` + typeRes.data.map(t => `<option value="${t.id}" data-code="${esc(t.type_code)}">${esc(t.type_name)}</option>`).join("");
         }
         const branchSelect = document.getElementById("sel-branch");
         if (branchSelect && branchRes.data) {
@@ -172,7 +170,8 @@ function switchPage(pageName) {
 
       db.from("bank_accounts").select("id, account_number, status, currency_code, balance").then(({ data }) => {
         const listEl = document.getElementById("acc-list");
-        if (listEl && data && data.length > 0) {
+        if (!listEl) return;
+        if (data && data.length > 0) {
           listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
             <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Account Number</th><th style="padding:8px;">Currency</th><th style="padding:8px;">Balance (UGX)</th><th style="padding:8px;">Status</th></tr>
             ${data.map(a => `<tr style="border-bottom:1px solid #1e4637;">
@@ -182,7 +181,7 @@ function switchPage(pageName) {
               <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">${esc(a.status)}</span></td>
             </tr>`).join("")}
           </table></div>`;
-        } else if (listEl) {
+        } else {
           listEl.innerHTML = `<p style="color:#9ca3af;">No bank accounts registered yet.</p>`;
         }
       });
@@ -231,9 +230,9 @@ function switchPage(pageName) {
   }
 }
 
-// Dynamic field switcher for Group Accounts and Fixed Deposits
 window.toggleDynamicAccountFields = function(selectEl) {
   const container = document.getElementById("dynamic-fields");
+  if (!container) return;
   const selectedOption = selectEl.options[selectEl.selectedIndex];
   const typeCode = selectedOption ? selectedOption.getAttribute("data-code") : "";
 
@@ -280,13 +279,14 @@ window.toggleDynamicAccountFields = function(selectEl) {
   }
 };
 
-// Customer Registration Handler
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  feedback.style.color = "#d97706";
-  feedback.textContent = "Registering customer KYC profile...";
+  if (feedback) {
+    feedback.style.color = "#d97706";
+    feedback.textContent = "Registering customer KYC profile...";
+  }
 
   const formData = new FormData(form);
   const payload = {
@@ -301,28 +301,32 @@ window.handleCustomerSubmit = async function(e) {
 
   const { error } = await db.from("customers").insert([payload]);
   if (error) {
-    feedback.style.color = "#ef4444";
-    feedback.textContent = "Registration failed: " + error.message;
+    if (feedback) {
+      feedback.style.color = "#ef4444";
+      feedback.textContent = "Registration failed: " + error.message;
+    }
   } else {
-    feedback.style.color = "#4ade80";
-    feedback.textContent = "Customer successfully registered!";
+    if (feedback) {
+      feedback.style.color = "#4ade80";
+      feedback.textContent = "Customer successfully registered!";
+    }
     form.reset();
     setTimeout(() => switchPage("Customers"), 1000);
   }
 };
 
-// Account Opening Handler
 window.handleAccountSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("acc-feedback");
-  feedback.style.color = "#d97706";
-  feedback.textContent = "Processing account application...";
+  if (feedback) {
+    feedback.style.color = "#d97706";
+    feedback.textContent = "Processing account application...";
+  }
 
   const formData = new FormData(form);
   const metadata = {};
   
-  // Collect dynamic fields if present
   if (formData.get("chairperson")) {
     metadata.signatories = {
       chairperson: formData.get("chairperson"),
@@ -340,4 +344,7 @@ window.handleAccountSubmit = async function(e) {
 
   const payload = {
     customer_id: formData.get("customer_id"),
-    account_type_id: formData.g
+    account_type_id: formData.get("account_type_id"),
+    branch_id: formData.get("branch_id"),
+    currency_code: "UGX",
+    account_number: "ACC-" + M
