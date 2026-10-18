@@ -18,16 +18,15 @@ function esc(str) {
 function panel(title, subtitle, desc, contentHtml) {
   return `
     <div class="panel">
-      <h2 style="color:#fff; font-size:18px; margin-bottom:4px;">${esc(title)}</h2>
-      <p style="color:#9ca3af; font-size:13px; margin-bottom:12px;"><strong>${esc(subtitle)}</strong> — ${esc(desc)}</p>
-      <hr style="border:0; border-top:1px solid #1e4637; margin-bottom:16px;">
+      <h2>${esc(title)}</h2>
+      <p class="panel-desc"><strong>${esc(subtitle)}</strong> — ${esc(desc)}</p>
       ${contentHtml}
     </div>
   `;
 }
 
 function switchPage(pageName) {
-  document.querySelectorAll('.nav-btn').forEach(btn => {
+  document.querySelectorAll('.nav').forEach(btn => {
     if (btn.dataset.page === pageName) {
       btn.classList.add('active');
     } else {
@@ -39,114 +38,128 @@ function switchPage(pageName) {
   if (!c) return;
 
   if (pageName === "Dashboard") {
-    c.innerHTML = panel(
-      "EXECUTIVE COMMERCIAL DASHBOARD",
-      "Institutional Overview & Portfolio Health",
-      "Real-time metrics across all regional branches and core ledgers.",
-      `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px;">
-         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">Core Architecture</h3>
-           <p style="font-size:18px; font-weight:bold; margin-top:6px; color:#fff;">Tier-1 Commercial</p>
+    c.innerHTML = `
+      <span class="category-tag">Executive Overview</span>
+      <h2 class="page-heading">Dashboard</h2>
+      ${panel(
+        "EXECUTIVE COMMERCIAL DASHBOARD",
+        "Institutional Overview & Portfolio Health",
+        "Real-time metrics across all regional branches and core ledgers.",
+        `<div class="grid-2">
+           <div class="metric-card">
+             <div class="metric-sub">Core Architecture</div>
+             <div class="metric-val" style="font-size:20px;">Tier-1 Commercial</div>
+           </div>
+           <div class="metric-card">
+             <div class="metric-sub">Account Profiles</div>
+             <div class="metric-val" style="font-size:20px;">6 Standard Types</div>
+           </div>
          </div>
-         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">Account Profiles</h3>
-           <p style="font-size:18px; font-weight:bold; margin-top:6px; color:#fff;">6 Standard Types</p>
-         </div>
-         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="font-size:11px; color:#d97706; text-transform:uppercase;">Ledger Status</h3>
-           <p style="font-size:18px; font-weight:bold; color:#4ade80; margin-top:6px;">Balanced & Online</p>
-         </div>
-       </div>`
-    );
+         <div class="metric-card">
+           <div class="metric-sub">Ledger Status</div>
+           <div class="metric-val" style="color:#15803d; font-size:20px;">Balanced & Online</div>
+         </div>`
+      )}
+    `;
   } 
   else if (pageName === "Customers") {
-    c.innerHTML = panel(
-      "CUSTOMER ONBOARDING (CIF & KYC)",
-      "Register New Bank Customer",
-      "Capture verified customer identification details before account creation.",
-      `<form id="cust-form" style="display:flex; flex-direction:column; gap:12px; max-width:500px;" onsubmit="handleCustomerSubmit(event)">
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Full Legal Name * 
-          <input type="text" name="full_name" required placeholder="e.g. Nuwariho Victor" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">National ID (NIN) or Passport * 
-          <input type="text" name="nin_or_passport" required placeholder="CM12345678ABCD" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Phone Number * 
-          <input type="tel" name="phone_number" required placeholder="+256 700 000000" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Email Address 
-          <input type="email" name="email" placeholder="victor@zivamuntuyo.com" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Physical Address * 
-          <input type="text" name="address" required placeholder="Kampala, Uganda" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-        </label>
-        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Register Customer (CIF)</button>
-        <p id="cust-feedback" style="font-size:12px;"></p>
-      </form>`
-    ) + panel(
-      "VERIFIED CUSTOMER DIRECTORY",
-      "Active CIF Records",
-      "List of all registered bank customers.",
-      `<div id="cust-list"><p style="color:#9ca3af;">Loading customer records...</p></div>`
-    );
+    c.innerHTML = `
+      <span class="category-tag">CIF & KYC Module</span>
+      <h2 class="page-heading">Customers</h2>
+      ${panel(
+        "CUSTOMER ONBOARDING",
+        "Register New Bank Customer",
+        "Capture verified customer identification details before account creation.",
+        `<form id="cust-form" onsubmit="handleCustomerSubmit(event)">
+          <label>Full Legal Name * 
+            <input type="text" name="full_name" required placeholder="e.g. Nuwariho Victor">
+          </label>
+          <label>National ID (NIN) or Passport * 
+            <input type="text" name="nin_or_passport" required placeholder="CM12345678ABCD">
+          </label>
+          <label>Phone Number * 
+            <input type="tel" name="phone_number" required placeholder="+256 700 000000">
+          </label>
+          <label>Email Address 
+            <input type="email" name="email" placeholder="victor@zivamuntuyo.com">
+          </label>
+          <label>Physical Address * 
+            <input type="text" name="address" required placeholder="Kampala, Uganda">
+          </label>
+          <button type="submit" class="primary">Register Customer (CIF)</button>
+          <p id="cust-feedback" class="muted"></p>
+        </form>`
+      )}
+      ${panel(
+        "VERIFIED CUSTOMER DIRECTORY",
+        "Active CIF Records",
+        "List of all registered bank customers.",
+        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+      )}
+    `;
 
     if (db) {
       db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
         if (error) {
-          listEl.innerHTML = `<p style="color:#ef4444;">Error accessing records: ${esc(error.message)}</p>`;
+          listEl.innerHTML = `<p class="error">Error accessing records: ${esc(error.message)}</p>`;
           return;
         }
         if (data && data.length > 0) {
-          listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
-            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Customer Number</th><th style="padding:8px;">Full Name</th><th style="padding:8px;">NIN / ID</th><th style="padding:8px;">Phone</th></tr>
-            ${data.map(cust => `<tr style="border-bottom:1px solid #1e4637;">
-              <td style="padding:8px;"><strong>${esc(cust.customer_number)}</strong></td>
-              <td style="padding:8px;">${esc(cust.full_name)}</td>
-              <td style="padding:8px;">${esc(cust.nin_or_passport)}</td>
-              <td style="padding:8px;">${esc(cust.phone_number)}</td>
-            </tr>`).join("")}
-          </table></div>`;
+          listEl.innerHTML = data.map(cust => `
+            <div class="list-item">
+              <div>
+                <strong>${esc(cust.full_name)}</strong><br>
+                <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
+              </div>
+              <span class="badge-role">${esc(cust.phone_number)}</span>
+            </div>
+          `).join("");
         } else {
-          listEl.innerHTML = `<p style="color:#9ca3af;">No customer records found. Register a customer above to begin.</p>`;
+          listEl.innerHTML = `<p class="muted">No customer records found. Register a customer above to begin.</p>`;
         }
       });
     }
   }
   else if (pageName === "Accounts") {
-    c.innerHTML = panel(
-      "COMMERCIAL ACCOUNT OPENING WORKFLOW",
-      "Open New Account (6 Core Product Types)",
-      "Select a customer and product type. Dynamic fields will adapt for Group Signatories or Fixed Deposits.",
-      `<form id="acc-form" style="display:flex; flex-direction:column; gap:12px; max-width:500px;" onsubmit="handleAccountSubmit(event)">
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Customer * 
-          <select name="customer_id" id="sel-cust" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-            <option value="">Loading customers...</option>
-          </select>
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account Product Type * 
-          <select name="account_type_id" id="sel-acctype" required onchange="toggleDynamicAccountFields(this)" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-            <option value="">Loading product types...</option>
-          </select>
-        </label>
-        <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Home Branch * 
-          <select name="branch_id" id="sel-branch" required style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
-            <option value="">Loading branches...</option>
-          </select>
-        </label>
+    c.innerHTML = `
+      <span class="category-tag">Product Management</span>
+      <h2 class="page-heading">Accounts</h2>
+      ${panel(
+        "COMMERCIAL ACCOUNT OPENING",
+        "Open New Account (6 Core Product Types)",
+        "Select a customer and product type. Dynamic fields adapt for Group Signatories or Fixed Deposits.",
+        `<form id="acc-form" onsubmit="handleAccountSubmit(event)">
+          <label>Customer * 
+            <select name="customer_id" id="sel-cust" required>
+              <option value="">Loading customers...</option>
+            </select>
+          </label>
+          <label>Account Product Type * 
+            <select name="account_type_id" id="sel-acctype" required onchange="toggleDynamicAccountFields(this)">
+              <option value="">Loading product types...</option>
+            </select>
+          </label>
+          <label>Home Branch * 
+            <select name="branch_id" id="sel-branch" required>
+              <option value="">Loading branches...</option>
+            </select>
+          </label>
 
-        <div id="dynamic-fields" style="display:flex; flex-direction:column; gap:12px;"></div>
+          <div id="dynamic-fields"></div>
 
-        <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Submit Account Application</button>
-        <p id="acc-feedback" style="font-size:12px;"></p>
-      </form>`
-    ) + panel(
-      "ACTIVE BANK ACCOUNTS DIRECTORY",
-      "Customer Accounts Ledger",
-      "Real-time operational accounts.",
-      `<div id="acc-list"><p style="color:#9ca3af;">Loading accounts directory...</p></div>`
-    );
+          <button type="submit" class="primary">Submit Application</button>
+          <p id="acc-feedback" class="muted"></p>
+        </form>`
+      )}
+      ${panel(
+        "ACTIVE BANK ACCOUNTS",
+        "Customer Accounts Ledger",
+        "Real-time operational accounts.",
+        `<div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
+      )}
+    `;
 
     if (db) {
       Promise.all([
@@ -172,61 +185,54 @@ function switchPage(pageName) {
         const listEl = document.getElementById("acc-list");
         if (!listEl) return;
         if (data && data.length > 0) {
-          listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; text-align:left; border-collapse:collapse; font-size:13px;">
-            <tr style="color:#d97706; border-bottom:1px solid #1e4637;"><th style="padding:8px;">Account Number</th><th style="padding:8px;">Currency</th><th style="padding:8px;">Balance (UGX)</th><th style="padding:8px;">Status</th></tr>
-            ${data.map(a => `<tr style="border-bottom:1px solid #1e4637;">
-              <td style="padding:8px;"><strong>${esc(a.account_number)}</strong></td>
-              <td style="padding:8px;">${esc(a.currency_code || "UGX")}</td>
-              <td style="padding:8px;">${Number(a.balance || 0).toLocaleString()}</td>
-              <td style="padding:8px;"><span style="background:rgba(21,128,61,0.2); color:#4ade80; padding:2px 8px; border-radius:4px; font-size:11px;">${esc(a.status)}</span></td>
-            </tr>`).join("")}
-          </table></div>`;
+          listEl.innerHTML = data.map(a => `
+            <div class="list-item">
+              <div>
+                <strong>${esc(a.account_number)}</strong><br>
+                <span class="muted">Balance: ${Number(a.balance || 0).toLocaleString()} ${esc(a.currency_code || "UGX")}</span>
+              </div>
+              <span class="badge-role">${esc(a.status)}</span>
+            </div>
+          `).join("");
         } else {
-          listEl.innerHTML = `<p style="color:#9ca3af;">No bank accounts registered yet.</p>`;
+          listEl.innerHTML = `<p class="muted">No bank accounts registered yet.</p>`;
         }
       });
     }
   }
   else if (pageName === "Transactions") {
-    c.innerHTML = panel(
-      "TRANSACTION PROCESSING ENGINE",
-      "Double-Entry Ledger Posting",
-      "Execute deposits, withdrawals, and internal transfers.",
-      `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-         <form style="display:flex; flex-direction:column; gap:12px;" onsubmit="handleTransaction(event)">
-           <h3 style="color:#d97706; font-size:14px; margin-bottom:4px;">Post Teller Transaction</h3>
-           <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Account ID / UUID 
-             <input type="text" name="account_id" required placeholder="Enter Account UUID" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+    c.innerHTML = `
+      <span class="category-tag">Ledger Engine</span>
+      <h2 class="page-heading">Transactions</h2>
+      ${panel(
+        "TRANSACTION PROCESSING",
+        "Double-Entry Ledger Posting",
+        "Execute deposits, withdrawals, and internal transfers.",
+        `<form onsubmit="handleTransaction(event)">
+           <label>Account UUID * 
+             <input type="text" name="account_id" required placeholder="Enter Account UUID">
            </label>
-           <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Transaction Type 
-             <select name="tx_type" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+           <label>Transaction Type * 
+             <select name="tx_type">
                <option value="deposit">Deposit (Credit)</option>
                <option value="withdrawal">Withdrawal (Debit)</option>
              </select>
            </label>
-           <label style="font-size:12px; font-weight:600; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Amount (UGX) 
-             <input type="number" name="amount" required step="1000" placeholder="50000" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:10px; color:#fff;">
+           <label>Amount (UGX) * 
+             <input type="number" name="amount" required step="1000" placeholder="50000">
            </label>
-           <button type="submit" style="background:#15803d; color:#fff; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer; margin-top:6px;">Post to Ledger</button>
-           <p id="tx-feedback" style="font-size:12px;"></p>
-         </form>
-         <div style="background:rgba(0,0,0,0.25); padding:16px; border-radius:8px; border:1px solid #1e4637;">
-           <h3 style="color:#fff; font-size:14px; margin-bottom:8px;">Ledger Rules</h3>
-           <p style="color:#9ca3af; font-size:12px; line-height:1.5;">All transactions enforce double-entry validation. Withdrawals verify available balance and active signatory mandates prior to posting.</p>
-         </div>
-       </div>`
-    );
-  }
-  else if (pageName === "Approvals") {
-    c.innerHTML = panel(
-      "OFFICER APPROVALS & SIGNATORIES",
-      "Pending Authorizations",
-      "Review account creation requests and group signatory configurations.",
-      `<p style="color:#9ca3af; font-size:13px;">No pending items requiring authorization.</p>`
-    );
+           <button type="submit" class="primary">Post to Ledger</button>
+           <p id="tx-feedback" class="muted"></p>
+         </form>`
+      )}
+    `;
   }
   else {
-    c.innerHTML = panel(pageName.toUpperCase(), "Module Active", "Section operational.", `<p style="color:#9ca3af;">Module ready for commercial operations.</p>`);
+    c.innerHTML = `
+      <span class="category-tag">System Module</span>
+      <h2 class="page-heading">${pageName}</h2>
+      ${panel(pageName, "Module Active", "Section operational.", `<p class="muted">Module ready for commercial operations.</p>`)}
+    `;
   }
 }
 
@@ -238,39 +244,16 @@ window.toggleDynamicAccountFields = function(selectEl) {
 
   if (typeCode === "GRP") {
     container.innerHTML = `
-      <div style="background:rgba(0,0,0,0.2); padding:12px; border:1px solid #1e4637; border-radius:6px;">
-        <h4 style="color:#d97706; font-size:13px; margin-bottom:8px;">Group Signatory Mandates</h4>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Chairperson Name *
-          <input type="text" name="chairperson" required placeholder="Chairperson Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+      <div style="background:var(--input-bg); padding:12px; border:1px solid var(--input-border); border-radius:8px; margin:10px 0;">
+        <h4 style="font-size:13px; margin-bottom:8px;">Group Signatory Mandates</h4>
+        <label>Chairperson Name *
+          <input type="text" name="chairperson" required placeholder="Chairperson Full Name">
         </label>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Secretary Name *
-          <input type="text" name="secretary" required placeholder="Secretary Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        <label>Secretary Name *
+          <input type="text" name="secretary" required placeholder="Secretary Full Name">
         </label>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Treasurer Name *
-          <input type="text" name="treasurer" required placeholder="Treasurer Full Name" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
-        </label>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Withdrawal Approval Rule *
-          <select name="signatory_rule" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
-            <option value="any_one">Any One Signatory</option>
-            <option value="any_two">Any Two Signatories</option>
-            <option value="all_three">All Three Signatories Required</option>
-          </select>
-        </label>
-      </div>
-    `;
-  } else if (typeCode === "FIX") {
-    container.innerHTML = `
-      <div style="background:rgba(0,0,0,0.2); padding:12px; border:1px solid #1e4637; border-radius:6px;">
-        <h4 style="color:#d97706; font-size:13px; margin-bottom:8px;">Fixed Deposit Terms</h4>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">Tenure Period *
-          <select name="tenure_months" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
-            <option value="6">6 Months</option>
-            <option value="12" selected>12 Months</option>
-            <option value="24">24 Months</option>
-          </select>
-        </label>
-        <label style="font-size:12px; color:#d1d5db; display:flex; flex-direction:column; gap:4px;">Agreed Interest Rate (% p.a.) *
-          <input type="number" name="interest_rate" value="12.5" step="0.1" style="background:rgba(0,0,0,0.3); border:1px solid #1e4637; border-radius:6px; padding:8px; color:#fff;">
+        <label>Treasurer Name *
+          <input type="text" name="treasurer" required placeholder="Treasurer Full Name">
         </label>
       </div>
     `;
@@ -283,10 +266,7 @@ window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  if (feedback) {
-    feedback.style.color = "#d97706";
-    feedback.textContent = "Registering customer KYC profile...";
-  }
+  if (feedback) feedback.textContent = "Registering customer KYC profile...";
 
   const formData = new FormData(form);
   const payload = {
@@ -301,15 +281,9 @@ window.handleCustomerSubmit = async function(e) {
 
   const { error } = await db.from("customers").insert([payload]);
   if (error) {
-    if (feedback) {
-      feedback.style.color = "#ef4444";
-      feedback.textContent = "Registration failed: " + error.message;
-    }
+    if (feedback) feedback.textContent = "Registration failed: " + error.message;
   } else {
-    if (feedback) {
-      feedback.style.color = "#4ade80";
-      feedback.textContent = "Customer successfully registered!";
-    }
+    if (feedback) feedback.textContent = "Customer successfully registered!";
     form.reset();
     setTimeout(() => switchPage("Customers"), 1000);
   }
@@ -319,29 +293,9 @@ window.handleAccountSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("acc-feedback");
-  if (feedback) {
-    feedback.style.color = "#d97706";
-    feedback.textContent = "Processing account application...";
-  }
+  if (feedback) feedback.textContent = "Processing account application...";
 
   const formData = new FormData(form);
-  const metadata = {};
-  
-  if (formData.get("chairperson")) {
-    metadata.signatories = {
-      chairperson: formData.get("chairperson"),
-      secretary: formData.get("secretary"),
-      treasurer: formData.get("treasurer"),
-      rule: formData.get("signatory_rule")
-    };
-  }
-  if (formData.get("tenure_months")) {
-    metadata.fixed_deposit = {
-      tenure_months: formData.get("tenure_months"),
-      interest_rate: formData.get("interest_rate")
-    };
-  }
-
   const payload = {
     customer_id: formData.get("customer_id"),
     account_type_id: formData.get("account_type_id"),
@@ -349,5 +303,57 @@ window.handleAccountSubmit = async function(e) {
     currency_code: "UGX",
     account_number: "ACC-" + Math.floor(10000000 + Math.random() * 90000000),
     status: "active",
-    balance: 0.00,
-    metadata: Obje
+    balance: 0.00
+  };
+
+  const { error } = await db.from("bank_accounts").insert([payload]);
+  if (error) {
+    if (feedback) feedback.textContent = "Error: " + error.message;
+  } else {
+    if (feedback) feedback.textContent = "Account successfully opened!";
+    form.reset();
+    setTimeout(() => switchPage("Accounts"), 1200);
+  }
+};
+
+window.handleTransaction = async function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const feedback = document.getElementById("tx-feedback");
+  if (feedback) feedback.textContent = "Posting to ledger...";
+
+  const formData = new FormData(form);
+  const payload = {
+    transaction_reference: "TRX-" + Math.floor(10000000 + Math.random() * 90000000),
+    account_id: formData.get("account_id"),
+    transaction_type: formData.get("tx_type"),
+    amount: parseFloat(formData.get("amount")),
+    currency_code: "UGX",
+    narration: "Teller posting",
+    status: "posted"
+  };
+
+  const { error } = await db.from("transactions").insert([payload]);
+  if (error) {
+    if (feedback) feedback.textContent = "Transaction failed: " + error.message;
+  } else {
+    if (feedback) feedback.textContent = "Transaction successfully posted!";
+    form.reset();
+  }
+};
+
+function initApp() {
+  document.querySelectorAll('.nav').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      switchPage(e.currentTarget.dataset.page);
+    });
+  });
+  switchPage("Dashboard");
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+      }
+  
