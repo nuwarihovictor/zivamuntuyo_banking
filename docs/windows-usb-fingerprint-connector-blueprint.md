@@ -58,6 +58,19 @@ An event should include a stable event/idempotency key, registered device ID, ma
 - The attendance ingestion endpoint and database event schema must be reviewed and implemented server-side before the connector can submit official attendance events.
 - No database migration or attendance-write endpoint is enabled by this blueprint.
 
+
+
+## Provisional hardware shortlist (not yet purchased or tested)
+
+For initial vendor discussions, evaluate a **SecuGen Hamster Pro 20 (HU20 family)** or **Hamster Pro 10 (HU10)** USB reader first. SecuGen's official SDK and driver pages list these reader families and state Windows 10/11 support. This is a paper-based shortlist only: it does not guarantee local availability, price, SDK licensing terms, performance in this application, or compatibility of a particular unit/firmware. Confirm exact SKU, genuine supplier, SDK distribution rights, current drivers, and return policy before purchase.
+
+Official vendor references:
+- SDK and supported reader list: https://secugen.com/products/sdk/
+- Windows drivers and supported OS list: https://secugen.com/drivers/
+
+Do not purchase a generic reader advertised only as "USB fingerprint scanner" unless the seller provides the exact model and an official SDK/API with Windows 10 and Windows 11 support. A reader intended only for Windows Hello login may not expose the enrollment/matching API this attendance application requires.
+
+
 ## Device details needed to proceed
 
 Ask the supplier for a photo of the device label or its exact manufacturer/model number, and if available the firmware version and SDK/API documentation. Also confirm whether the reader is a USB biometric reader for PC software or a standalone USB attendance terminal. These products use different integration paths.
