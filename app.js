@@ -39,28 +39,37 @@ window.switchPage = function(pageName) {
 
   if (pageName === "Dashboard") {
     c.innerHTML = `
-      <span class="category-tag">Phase 1 & 2: Executive Overview</span>
+      <span class="category-tag">Executive overview</span>
       <h2 class="page-heading">Dashboard</h2>
       ${panel(
-        "INSTITUTIONAL PERFORMANCE & MULTI-BRANCH METRICS",
-        "Zivamuntuyo Financial Services Ltd — Central Ledger",
-        "Real-time operational overview across regional branches (Uganda, Kenya, Tanzania, Rwanda, Burundi, DRC).",
-        `<div class="grid-2">
-           <div class="metric-card">
-             <div class="metric-sub">Active Architecture</div>
-             <div class="metric-val" style="font-size:18px;">Tier-1 Commercial CBS</div>
+        "FINANCIAL PERFORMANCE",
+        "Live general-ledger overview",
+        "Charts use posted journal entries only. Amounts stay separated by currency, and no sample figures are displayed.",
+        `<div class="form-grid">
+           <label>Branch UUID (optional; limited to your authorized branch scope)
+             <input id="dashboard-branch-id" type="text" placeholder="All authorized branches">
+           </label>
+           <button type="button" class="secondary" onclick="loadDashboardCharts()">Refresh dashboard</button>
+         </div>
+         <div id="dashboard-feedback" class="muted" aria-live="polite">Loading live accounting data…</div>
+         <div id="dashboard-kpis" class="grid-2"></div>
+         <div class="grid-2 dashboard-chart-grid">
+           <div class="metric-card dashboard-chart-card">
+             <h3>Debits vs credits by currency</h3>
+             <p class="muted">Posted ledger totals; currencies are not combined.</p>
+             <div class="dashboard-chart-wrap"><canvas id="dashboard-debit-credit" role="img" aria-label="Bar chart comparing posted debits and credits by currency"></canvas></div>
            </div>
-           <div class="metric-card">
-             <div class="metric-sub">Security & RBAC</div>
-             <div class="metric-val" style="color:#063c2c; font-size:18px;">8 Staff Roles Active</div>
+           <div class="metric-card dashboard-chart-card">
+             <h3>Ledger activity by account type</h3>
+             <p class="muted">Absolute posted movement by ledger type, for the selected currency.</p>
+             <label>Chart currency <select id="dashboard-chart-currency" onchange="renderDashboardTypeChart()"></select></label>
+             <div class="dashboard-chart-wrap"><canvas id="dashboard-account-types" role="img" aria-label="Doughnut chart showing posted ledger movement by account type"></canvas></div>
            </div>
          </div>
-         <div class="metric-card">
-           <div class="metric-sub">General Ledger Status</div>
-           <div class="metric-val" style="color:#15803d; font-size:18px;">Balanced (Debits = Credits)</div>
-         </div>`
+         <p class="muted">Charts are operational summaries, not audited financial statements. A balanced total does not prove all transactions have been recorded.</p>`
       )}
     `;
+    window.loadDashboardCharts();
   } 
   else if (pageName === "Branches") {
     c.innerHTML = `
@@ -438,6 +447,98 @@ window.switchPage = function(pageName) {
     `;
   }
 }
+
+let dashboardDebitCreditChart = null;
+let dashboardAccountTypeChart = null;
+let dashboardChartRows = [];
+
+window.loadDashboardCharts = async function() {
+  const feedback = document.getElementById("dashboard-feedback");
+  const kpis = document.getElementById("dashboard-kpis");
+  const branchInput = document.getElementById("dashboard-branch-id");
+  if (!feedback || !kpis) return;
+  kpis.innerHTML = "";
+  dashboardChartRows = [];
+  if (!db) {
+    feedback.textContent = "Database connection unavailable. Charts require live posted-ledger data.";
+    return;
+  }
+  const branchId = branchInput ? branchInput.value.trim() : "";
+  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
+    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
+    return;
+  }
+  feedback.textContent = "Loading posted ledger data…";
+  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  if (error) {
+    feedback.textContent = "Live charts are not available yet. Install the secure list_trial_balance function in Supabase and verify accounting permissions. Details: " + error.message;
+    return;
+  }
+  dashboardChartRows = data || [];
+  if (!dashboardChartRows.length) {
+    feedback.textContent = "No active ledger account data was returned. Charts are intentionally empty rather than showing demo numbers.";
+    if (dashboardDebitCreditChart) { dashboardDebitCreditChart.destroy(); dashboardDebitCreditChart = null; }
+    if (dashboardAccountTypeChart) { dashboardAccountTypeChart.destroy(); dashboardAccountTypeChart = null; }
+    const currencySelect = document.getElementById("dashboard-chart-currency");
+    if (currencySelect) currencySelect.innerHTML = "";
+    return;
+  }
+  const groups = {};
+  dashboardChartRows.forEach(row => {
+    const currency = String(row.currency_code || "UNKNOWN").trim();
+    if (!groups[currency]) groups[currency] = { debit: 0, credit: 0, accounts: {} };
+    const group = groups[currency];
+    group.debit += Number(row.debit_total || 0);
+    group.credit += Number(row.credit_total || 0);
+    const type = String(row.ledger_type || "Unclassified");
+    if (!group.accounts[type]) group.accounts[type] = 0;
+    group.accounts[type] += Math.abs(Number(row.debit_total || 0) - Number(row.credit_total || 0));
+  });
+  const fmt = (n, cur) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " " + cur;
+  kpis.innerHTML = Object.entries(groups).map(([currency, g]) =>
+    '<div class="metric-card"><div class="metric-sub">Posted debits · ' + esc(currency) + '</div><div class="metric-val" style="font-size:18px;">' + esc(fmt(g.debit,currency)) + '</div><div class="muted">Posted credits: ' + esc(fmt(g.credit,currency)) + '</div></div>'
+  ).join("");
+  const currencySelect = document.getElementById("dashboard-chart-currency");
+  if (currencySelect) {
+    const previous = currencySelect.value;
+    currencySelect.innerHTML = Object.keys(groups).map(cur => '<option value="' + esc(cur) + '">' + esc(cur) + '</option>').join("");
+    if (groups[previous]) currencySelect.value = previous;
+  }
+  if (typeof Chart === "undefined") {
+    feedback.textContent = "Ledger data loaded, but the chart library did not load. Check your internet connection and reload.";
+    return;
+  }
+  if (dashboardDebitCreditChart) dashboardDebitCreditChart.destroy();
+  const currencyNames = Object.keys(groups);
+  dashboardDebitCreditChart = new Chart(document.getElementById("dashboard-debit-credit"), {
+    type: "bar",
+    data: { labels: currencyNames, datasets: [
+      { label: "Debits", data: currencyNames.map(cur => groups[cur].debit) },
+      { label: "Credits", data: currencyNames.map(cur => groups[cur].credit) }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: "bottom" } } }
+  });
+  window.renderDashboardTypeChart();
+  feedback.textContent = "Loaded " + dashboardChartRows.length + " ledger accounts from posted journals. Data refreshes when you select Refresh dashboard.";
+};
+
+window.renderDashboardTypeChart = function() {
+  const canvas = document.getElementById("dashboard-account-types");
+  const select = document.getElementById("dashboard-chart-currency");
+  if (!canvas || !select || typeof Chart === "undefined" || !dashboardChartRows.length) return;
+  const currency = select.value;
+  const groups = {};
+  dashboardChartRows.filter(row => String(row.currency_code || "UNKNOWN").trim() === currency).forEach(row => {
+    const type = String(row.ledger_type || "Unclassified");
+    groups[type] = (groups[type] || 0) + Math.abs(Number(row.debit_total || 0) - Number(row.credit_total || 0));
+  });
+  if (dashboardAccountTypeChart) dashboardAccountTypeChart.destroy();
+  dashboardAccountTypeChart = new Chart(canvas, {
+    type: "doughnut",
+    data: { labels: Object.keys(groups), datasets: [{ label: "Absolute net movement", data: Object.values(groups) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+  });
+};
 
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
