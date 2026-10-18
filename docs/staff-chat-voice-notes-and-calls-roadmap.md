@@ -6,19 +6,24 @@ Project: Zivamuntuyo Financial Services Ltd.
 
 Build voice notes first, then live voice calls, then optional video calls. Voice notes are a smaller and easier-to-test extension of the existing staff chat. Live calls require real-time signalling, network traversal and call lifecycle handling, so they are a larger project.
 
-This document is a roadmap only. It does not mean recording, uploading, or live calling is implemented.
+Implementation status: the branch now contains browser-side voice-note recording/preview/discard/upload/playback code and a private-storage SQL draft. These changes have not yet been tested against Supabase, applied to the project, merged, or deployed. Live calling remains design-only and is not available.
 
 ## Phase 1 — Voice notes
 
 ### Staff experience
+- [x] Add a Record voice note control to the team chat.
+- [x] Request browser microphone permission only after the user chooses to record.
+- [x] Show recording state and elapsed time, Stop, Play preview, Discard and Send controls.
+- [x] Let the sender preview the recording before sending.
+- [x] Display sent notes with sender, timestamp, duration and a Play/Pause control.
+- [x] Never autoplay audio.
+- [x] Use a 120-second duration cap and a 3 MB file-size cap.
+- [x] Show feedback for unsupported recording, denied microphone permission, and upload failures.
+- Add automated/browser tests before rollout.
+
+<!-- The checked items indicate code has been added, not that it has passed testing or been deployed. -->
+
 - Add a Record voice note control beside the text message box.
-- Ask the browser for microphone permission only after the user chooses to record.
-- Show a clear recording state, elapsed time, Stop, Play preview, Discard and Send controls.
-- Let the sender preview the recording before sending.
-- Display sent notes with sender, timestamp, duration and a Play/Pause control.
-- Never autoplay audio.
-- Start with a configurable short duration cap (proposed default: 120 seconds) and a file-size cap to limit bandwidth and storage.
-- Show clear errors when microphone permission is denied, recording is unsupported, upload fails, or the connection is lost.
 - Test supported Chrome and Edge versions on Windows 10 and Windows 11.
 
 ### Secure storage and authorization
