@@ -1983,6 +1983,8 @@ window.loadStaffChat = async function() {
     selector.innerHTML = '<option value="">Bank-wide messages</option>' +
       (branchResult.data || []).map(b => '<option value="' + esc(b.id) + '">' + esc(b.branch_name) + '</option>').join("");
     if ([...selector.options].some(o => o.value === currentValue)) selector.value = currentValue;
+    const channelTitle = document.getElementById("vicline-current-channel");
+    if (channelTitle) channelTitle.textContent = selector.value ? (selector.options[selector.selectedIndex]?.textContent || "Branch conversation") : "VIC LINE team";
     if (messageResult.error) {
       feedback.textContent = "Messages could not be loaded: " + messageResult.error.message;
       list.innerHTML = "";
@@ -2001,16 +2003,17 @@ window.loadStaffChat = async function() {
     list.innerHTML = merged.map(item => {
       const m = item.data;
       const sender = m.sender_name || m.sender_employee_number || "Staff member";
+      const initials = sender.trim().split(/\\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase() || "S";
       const time = m.created_at ? new Date(m.created_at).toLocaleString() : "";
       if (item.kind === "voice") {
         const player = item.url
           ? '<audio controls preload="none" aria-label="Voice note from ' + esc(sender) + '" src="' + esc(item.url) + '"></audio>'
           : '<p class="muted">Audio playback unavailable. Refresh and check your channel access.</p>';
-        return '<article class="list-item staff-chat-message staff-voice-message"><div class="staff-chat-message-heading"><strong>' + esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p class="staff-voice-label">🎙️ Voice note · ' + esc(staffVoiceFormatTime(m.duration_seconds)) + '</p>' + player + '</article>';
+        return '<article class="staff-chat-message staff-voice-message"><div class="vicline-message-avatar" aria-hidden="true">' + esc(initials) + '</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>' + esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><div class="vicline-bubble vicline-audio-bubble"><p class="staff-voice-label">🎙️ Voice note · ' + esc(staffVoiceFormatTime(m.duration_seconds)) + '</p>' + player + '</div></div></article>';
       }
-      return '<article class="list-item staff-chat-message"><div class="staff-chat-message-heading"><strong>' +
-        esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><p class="staff-chat-text">' +
-        esc(m.message_text) + '</p></article>';
+      return '<article class="staff-chat-message"><div class="vicline-message-avatar" aria-hidden="true">' + esc(initials) + '</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>' +
+        esc(sender) + '</strong><span class="muted">' + esc(time) + '</span></div><div class="vicline-bubble"><p class="staff-chat-text">' +
+        esc(m.message_text) + '</p></div></div></article>';
     }).join("") || '<p class="muted">No messages in this conversation yet. You can send the first message.</p>';
     feedback.textContent = merged.length + " item" + (merged.length === 1 ? "" : "s") + " loaded. Use Refresh messages to check for new replies.";
   } catch (error) {
