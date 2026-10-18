@@ -197,3 +197,30 @@ body[data-theme="light"] .nav.active { color:#17314e; background:#dbe8f6; }
 .responsibility-grid { gap:16px; }
 .responsibility-card { border-radius:14px; transition:transform .18s ease,box-shadow .18s ease; }
 @media(max-width:600px){.staff-module-tabs{display:grid;grid-template-columns:1fr;}.staff-module-tab{width:100%;}.nav-bar{gap:6px;}}
+
+/* Separate deposit and withdrawal workspaces to reduce teller selection errors */
+.transaction-module-tabs { display:flex; flex-wrap:wrap; gap:10px; padding:10px; margin:0 0 20px; border:1px solid var(--border-color); border-radius:14px; background:var(--panel-bg); }
+.transaction-module-tab { display:flex; align-items:center; gap:9px; padding:11px 16px; border:1px solid transparent; border-radius:10px; background:transparent; color:var(--text-main); font:inherit; font-weight:650; cursor:pointer; }
+.transaction-module-tab:hover { background:var(--input-bg); border-color:var(--border-color); }
+.transaction-module-tab.active { background:var(--accent-color,var(--g2,#0e5a40)); color:#fff; border-color:transparent; }
+.transaction-workflow-banner { display:flex; align-items:flex-start; gap:14px; padding:18px; margin-bottom:20px; border:1px solid var(--border-color); border-radius:16px; background:var(--panel-bg); }
+.transaction-workflow-banner.deposit { border-left:5px solid #21865a; }
+.transaction-workflow-banner.withdrawal { border-left:5px solid #c17b25; }
+.transaction-workflow-banner.overview { border-left:5px solid var(--accent-gold,#cba85a); }
+.transaction-workflow-icon { flex:0 0 44px; width:44px; height:44px; display:grid; place-items:center; border-radius:12px; background:var(--input-bg); font-size:21px; }
+.transaction-workflow-banner strong { display:block; font-size:16px; margin:1px 0 5px; }
+.transaction-workflow-banner p { margin:0 0 6px; color:var(--text-muted); }
+.transaction-workflow-banner small { display:block; line-height:1.6; color:var(--text-muted); }
+.transaction-entry-form { display:grid; gap:15px; }
+.transaction-entry-form label { display:flex; flex-direction:column; gap:7px; font-weight:600; }
+.transaction-entry-form input:not([type=checkbox]):not([type=hidden]) { width:100%; }
+.required-mark { color:#b45309; }
+.amount-input-wrap { display:flex; flex-direction:column; gap:5px; }
+.amount-input-wrap span { font-size:11px; font-weight:400; color:var(--text-muted); }
+.transaction-checklist { display:grid; gap:10px; border:1px solid var(--border-color); border-radius:12px; padding:14px; background:var(--input-bg); }
+.transaction-checklist>strong { font-size:13px; }
+.transaction-checklist label { display:flex; flex-direction:row; align-items:flex-start; gap:9px; font-weight:400; font-size:13px; line-height:1.5; }
+.transaction-checklist input[type=checkbox] { margin-top:3px; flex:0 0 auto; }
+.transaction-submit { min-height:46px; }
+.transaction-filters { align-items:end; }
+@media(max-width:600px) { .transaction-module-tabs { display:grid; grid-template-columns:1fr; } .transaction-module-tab { width:100%; } .transaction-workflow-banner { padding:13px; } }
