@@ -332,6 +332,27 @@ window.switchPage = function(pageName) {
       )}
     `;
   }
+  else if (pageName === "Approvals") {
+    c.innerHTML = `
+      <span class="category-tag">Maker-checker controls</span>
+      <h2 class="page-heading">Transaction Approvals</h2>
+      ${panel(
+        "PENDING CASH REQUESTS",
+        "Independent authorization required",
+        "Approval does not move money. A separate eligible employee must post the approved request to the ledger.",
+        `<button type="button" class="secondary" onclick="loadCashApprovals()">Refresh requests</button>
+         <div id="approval-feedback" class="muted" aria-live="polite">Loading transaction requests…</div>
+         <div id="pending-cash-requests"></div>`
+      )}
+      ${panel(
+        "APPROVED — AWAITING LEDGER POSTING",
+        "Separate posting control",
+        "Posting requires the UUID of an active asset cash ledger in the same currency and branch.",
+        `<div id="ready-posting-requests"><p class="muted">Loading approved requests…</p></div>`
+      )}
+    `;
+    window.loadCashApprovals();
+  }
   else if (pageName === "Accounting") {
     c.innerHTML = `
       <span class="category-tag">Phase 5 & 8: General Ledger & Trial Balance</span>
