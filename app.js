@@ -45,7 +45,7 @@ window.renderBranchManagementPage = function() {
     ${panel("BRANCH DIRECTORY & MANAGEMENT","Authorized branch administration","System administrators can add, edit, activate, or archive branches. Database permissions remain the final security control.",`
       <div id="branch-management-feedback" class="muted" role="status" aria-live="polite">Loading branch directory…</div>
       <div id="branch-management-list"></div>
-      <details class="panel" style="margin-top:18px">
+      <details id="branch-create-panel" class="panel branch-admin-controls" style="margin-top:18px">
         <summary style="cursor:pointer;font-weight:700">＋ Add a branch</summary>
         <form id="branch-create-form" class="form-grid" style="margin-top:14px" onsubmit="window.createBranch(event)">
           <label>Branch code<input name="branch_code" maxlength="30" required pattern="[A-Za-z0-9_-]+" placeholder="e.g. KASESE"></label>
@@ -67,16 +67,19 @@ window.loadBranchManagement = async function() {
   const list=document.getElementById("branch-management-list");
   const countrySelect=document.getElementById("branch-create-country");
   if(!db){if(feedback)feedback.textContent="Database connection unavailable.";return;}
-  const [branchResult,countryResult]=await Promise.all([
+  const [roleResult,branchResult,countryResult]=await Promise.all([
+    db.rpc("current_employee_role_code"),
     db.from("branches").select("id,country_id,branch_code,branch_name,address,timezone,is_head_office,is_active").order("is_active",{ascending:false}).order("is_head_office",{ascending:false}).order("branch_name"),
     db.from("countries").select("id,name").eq("is_active",true).order("name")
   ]);
+  const canManageBranches=!roleResult.error && roleResult.data==="system_admin";
+  document.querySelectorAll(".branch-admin-controls").forEach(el=>{el.hidden=!canManageBranches;});
   if(branchResult.error){if(feedback)feedback.textContent="Branch directory could not be loaded: "+branchResult.error.message;return;}
   if(countrySelect){
     if(countryResult.error){countrySelect.innerHTML='<option value="">Countries unavailable</option>';}
     else countrySelect.innerHTML='<option value="">Choose country</option>'+((countryResult.data||[]).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""));
   }
-  if(feedback)feedback.textContent=(branchResult.data||[]).length+" branch records visible. If you cannot manage branches, sign in with an authorized system administrator account.";
+  if(feedback)feedback.textContent=canManageBranches?((branchResult.data||[]).length+" branch records visible. Branch changes use administrator-only database functions. Buhwenju and historical duplicates cannot be reactivated."):((branchResult.data||[]).length+" branch records visible. Branch editing is available only to an active system administrator.");
   if(!list)return;
   list.innerHTML=(branchResult.data||[]).map(b=>`
     <details class="list-item" style="display:block;margin-top:10px" ${b.is_active?"":" "}>
@@ -84,7 +87,7 @@ window.loadBranchManagement = async function() {
         <span><strong>${esc(b.branch_name)} (${esc(b.branch_code)})</strong><br><span class="muted">${esc(b.address||"Address not configured")} · ${esc(b.timezone||"Africa/Kampala")}</span></span>
         <span class="branch-status-stack"><span class="badge-role">${b.is_head_office?"Head Office":"Branch"}</span><span class="branch-state ${b.is_active?"branch-state-active":"branch-state-inactive"}">${b.is_active?"Active":"Archived / inactive"}</span></span>
       </summary>
-      <form class="form-grid" style="margin-top:14px" onsubmit="window.updateBranch(event,'${esc(b.id)}')">
+      <form class="form-grid branch-admin-controls" style="margin-top:14px" onsubmit="window.updateBranch(event,'${esc(b.id)}')">
         <label>Branch code<input name="branch_code" maxlength="30" required pattern="[A-Za-z0-9_-]+" value="${esc(b.branch_code)}"></label>
         <label>Branch name<input name="branch_name" maxlength="120" required value="${esc(b.branch_name)}"></label>
         <label>Country<select name="country_id" required>${(countryResult.data||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===b.country_id?'selected':'')+'>'+esc(x.name)+'</option>').join("")}</select></label>
@@ -105,7 +108,7 @@ window.createBranch = async function(event) {
   const data=new FormData(form);
   const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on",is_active:true};
   if(feedback)feedback.textContent="Creating branch…";
-  const {error}=await db.from("branches").insert(payload);
+  const {error}=await db.rpc("admin_create_branch",{p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
   if(error){if(feedback)feedback.textContent="Branch was not created: "+error.message;return;}
   form.reset();await window.loadBranchManagement();
 };
@@ -117,7 +120,7 @@ window.updateBranch = async function(event,id) {
   const data=new FormData(form);
   const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
   if(feedback)feedback.textContent="Saving branch changes…";
-  const {error}=await db.from("branches").update(payload).eq("id",id);
+  const {error}=await db.rpc("admin_update_branch",{p_branch_id:id,p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
   if(error){if(feedback)feedback.textContent="Branch changes were not saved: "+error.message;return;}
   await window.loadBranchManagement();
 };
@@ -128,7 +131,7 @@ window.setBranchActive = async function(id,active) {
   const feedback=document.getElementById("branch-management-feedback");
   if(!db)return;
   if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
-  const {error}=await db.from("branches").update({is_active:active}).eq("id",id);
+  const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
   if(error){if(feedback)feedback.textContent="Branch status was not changed: "+error.message;return;}
   await window.loadBranchManagement();
 };
