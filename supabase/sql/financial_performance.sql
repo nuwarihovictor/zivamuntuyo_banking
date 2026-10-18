@@ -136,3 +136,104 @@ begin
 end; $$;
 revoke all on function public.get_financial_performance(uuid,date,date) from public,anon;
 grant execute on function public.get_financial_performance(uuid,date,date) to authenticated;
+
+-- Post operational financial activity into the double-entry general ledger.
+-- Only confirmed collection/expense events enter this ledger; no historical rows are backfilled.
+alter table public.ledger_journals
+  add column if not exists branch_id uuid references public.branches(id),
+  add column if not exists source_financial_activity_id uuid references public.financial_activity_ledger(id);
+
+create unique index if not exists ledger_journals_financial_activity_unique
+  on public.ledger_journals(source_financial_activity_id)
+  where source_financial_activity_id is not null;
+
+insert into public.ledger_accounts
+  (ledger_code,ledger_name,ledger_type,currency_code,branch_id,is_control_account,is_active)
+values
+  ('1000','Teller Till / Cash Asset','asset','UGX',null,true,true),
+  ('2000','Customer Deposit Liabilities','liability','UGX',null,true,true),
+  ('2100','Restricted Account Security Reserve','liability','UGX',null,true,true),
+  ('3000','Non-withdrawable Share Capital','equity','UGX',null,true,true),
+  ('4000','Account Opening and Service Fee Income','income','UGX',null,false,true),
+  ('4100','Loan Interest Income','income','UGX',null,false,true),
+  ('4200','Late Payment Penalty Income','income','UGX',null,false,true),
+  ('4300','Other Operating Income','income','UGX',null,false,true),
+  ('5000','Operating Expenses','expense','UGX',null,false,true)
+on conflict (ledger_code) do nothing;
+
+create or replace function public.post_financial_activity_to_general_ledger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  v_debit_code text;
+  v_credit_code text;
+  v_journal_type text := 'fee';
+  v_journal_id uuid;
+  v_debit_account uuid;
+  v_credit_account uuid;
+  v_amount numeric(14,2);
+  v_description text;
+begin
+  v_amount := round(new.amount,2);
+  v_description := coalesce(new.description,new.category) ||
+    case when new.receipt_number is not null then ' | Receipt/Voucher: ' || new.receipt_number else '' end;
+
+  if new.category = 'share_capital' and new.profit_loss_type = 'equity' and new.cash_in > 0 then
+    v_debit_code := '1000'; v_credit_code := '3000'; v_journal_type := 'other';
+  elsif new.category = 'security_reserve' and new.profit_loss_type = 'liability' and new.cash_in > 0 then
+    v_debit_code := '1000'; v_credit_code := '2100'; v_journal_type := 'other';
+  elsif new.category = 'account_security_fee' and new.profit_loss_type = 'income' and new.cash_in = 0 and new.cash_out = 0 then
+    v_debit_code := '2100'; v_credit_code := '4000'; v_journal_type := 'adjustment';
+  elsif new.profit_loss_type = 'expense' and new.cash_out > 0 then
+    v_debit_code := '5000'; v_credit_code := '1000'; v_journal_type := 'other';
+  elsif new.profit_loss_type = 'income' and new.cash_in > 0 then
+    v_debit_code := '1000';
+    v_credit_code := case
+      when new.category = 'loan_interest_income' then '4100'
+      when new.category = 'late_loan_penalty' then '4200'
+      when new.category = 'other_income' then '4300'
+      else '4000'
+    end;
+    v_journal_type := case when new.category = 'loan_interest_income' then 'interest' else 'fee' end;
+  else
+    raise exception 'Financial activity category %, classification %, cash-in %, cash-out % cannot be posted to the general ledger; review the mapping before recording it.',
+      new.category,new.profit_loss_type,new.cash_in,new.cash_out;
+  end if;
+
+  select id into v_debit_account from public.ledger_accounts
+   where ledger_code=v_debit_code and currency_code='UGX' and is_active and branch_id is null;
+  select id into v_credit_account from public.ledger_accounts
+   where ledger_code=v_credit_code and currency_code='UGX' and is_active and branch_id is null;
+  if v_debit_account is null or v_credit_account is null then
+    raise exception 'Required general-ledger accounts % and % are not configured.',v_debit_code,v_credit_code;
+  end if;
+
+  insert into public.ledger_journals
+    (journal_number,journal_type,transaction_date,value_date,currency_code,status,description,
+     created_by,posted_by,posted_at,branch_id,source_financial_activity_id)
+  values
+    ('FA-' || to_char(clock_timestamp() at time zone 'UTC','YYYYMMDDHH24MISS') || '-' ||
+       upper(substr(replace(new.id::text,'-',''),1,8)),
+     v_journal_type,now(),new.event_date,'UGX','posted',v_description,
+     new.recorded_by,new.recorded_by,now(),new.branch_id,new.id)
+  returning id into v_journal_id;
+
+  insert into public.ledger_entries
+    (journal_id,ledger_account_id,entry_side,amount,currency_code,branch_id,description)
+  values
+    (v_journal_id,v_debit_account,'debit',v_amount,'UGX',new.branch_id,v_description),
+    (v_journal_id,v_credit_account,'credit',v_amount,'UGX',new.branch_id,v_description);
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_post_financial_activity_to_gl on public.financial_activity_ledger;
+create trigger trg_post_financial_activity_to_gl
+after insert on public.financial_activity_ledger
+for each row execute function public.post_financial_activity_to_general_ledger();
+
+revoke all on function public.post_financial_activity_to_general_ledger() from public, anon, authenticated;
