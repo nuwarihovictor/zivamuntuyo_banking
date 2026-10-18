@@ -4,14 +4,55 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ZIVAMUNTUYO FINANCIAL SERVICES LTD - Banking System</title>
-  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-dark: #0a1f18;
+      --card-bg: #112d23;
+      --primary: #15803d;
+      --primary-hover: #166534;
+      --gold: #d97706;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --border: #1e4637;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
+    #app { width: 100%; max-width: 420px; }
+    
+    /* LOGIN CARD */
+    .card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .logo { background: linear-gradient(135deg, var(--gold), #b45309); color: #fff; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; }
+    .brand h1 { font-size: 18px; letter-spacing: 1px; color: #fff; }
+    .brand p { font-size: 10px; color: var(--gold); font-weight: 600; letter-spacing: 0.5px; }
+    
+    .tag { display: inline-block; background: rgba(217, 119, 6, 0.15); color: var(--gold); font-size: 10px; font-weight: bold; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid rgba(217, 119, 6, 0.3); }
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .muted { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .muted.small { font-size: 11px; margin-top: 16px; text-align: center; margin-bottom: 0; }
+    
+    /* FORM INPUTS */
+    form { display: flex; flex-direction: column; gap: 14px; }
+    label { font-size: 12px; font-weight: 600; color: #d1d5db; display: flex; flex-direction: column; gap: 6px; }
+    input { background-color: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 6px; padding: 12px; color: #fff; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: var(--gold); }
+    
+    /* BUTTONS */
+    button.primary { background-color: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; margin-top: 6px; }
+    button.primary:hover { background-color: var(--primary-hover); }
+    .error { color: var(--error); font-size: 12px; font-weight: 500; margin-top: 4px; }
+
+    /* WORKSPACE LAYOUT */
+    #workspace { display: none; width: 100%; }
+  </style>
 </head>
 <body>
   <div id="app">
-    <!-- LOGIN INTERFACE WITH ORIGINAL BRANDING & STYLES -->
+    <!-- LOGIN SCREEN -->
     <div id="login-screen">
-      <div class="card login-card">
+      <div class="card">
         <div class="brand">
           <div class="logo">Z</div>
           <div>
@@ -20,34 +61,36 @@
           </div>
         </div>
 
-        <div class="tag">SECURE ACCESS</div>
+        <span class="tag">SECURE ACCESS</span>
         <h2>Welcome back</h2>
         <p class="muted">Sign in with your authorized staff account.</p>
 
         <form id="login-form" autocomplete="off" action="javascript:void(0);" method="post">
-          <!-- Hidden inputs to stop browser autofill hijacking -->
+          <!-- Hidden inputs to neutralize mobile browser autofill hijacking -->
           <input type="text" name="fake_email" style="display:none !important;" tabindex="-1" />
           <input type="password" name="fake_password" style="display:none !important;" tabindex="-1" />
 
-          <label for="work-email">Work email</label>
-          <input 
-            type="email" 
-            id="work-email" 
-            name="staff_email" 
-            value="info.nuwarihovictor@gmail.com" 
-            autocomplete="one-time-code" 
-            required 
-          />
+          <label>Work email
+            <input 
+              type="email" 
+              id="work-email" 
+              name="staff_email" 
+              value="info.nuwarihovictor@gmail.com" 
+              autocomplete="one-time-code" 
+              required 
+            />
+          </label>
 
-          <label for="work-password">Password</label>
-          <input 
-            type="password" 
-            id="work-password" 
-            name="staff_password" 
-            placeholder="••••••••" 
-            autocomplete="one-time-code" 
-            required 
-          />
+          <label>Password
+            <input 
+              type="password" 
+              id="work-password" 
+              name="staff_password" 
+              placeholder="••••••••" 
+              autocomplete="one-time-code" 
+              required 
+            />
+          </label>
 
           <button type="submit" class="primary">Sign in securely &rarr;</button>
           <p id="login-msg" class="error"></p>
@@ -58,33 +101,8 @@
     </div>
 
     <!-- MAIN WORKSPACE -->
-    <div id="workspace" style="display: none;">
-      <header class="topbar">
-        <div class="brand-sm">
-          <span class="logo-sm">Z</span>
-          <strong>ZIVAMUNTUYO FINANCIAL SERVICES LTD</strong>
-        </div>
-        <div class="user-info">
-          <span id="user-display">Staff User</span>
-          <button id="btn-logout" class="secondary">Logout</button>
-        </div>
-      </header>
-
-      <div class="layout">
-        <nav class="sidebar">
-          <button class="nav-btn active" data-page="Dashboard">📊 Dashboard</button>
-          <button class="nav-btn" data-page="Customers">👥 Customers</button>
-          <button class="nav-btn" data-page="Accounts">🏦 Accounts</button>
-          <button class="nav-btn" data-page="Transactions">💰 Transactions</button>
-          <button class="nav-btn" data-page="Approvals">✅ Approvals</button>
-          <button class="nav-btn" data-page="Reports">📈 Reports</button>
-          <button class="nav-btn" data-page="Settings">⚙️ Settings</button>
-        </nav>
-
-        <main id="main-content" class="content">
-          <!-- Dynamic content loaded by app.js -->
-        </main>
-      </div>
+    <div id="workspace">
+      <!-- Dynamic workspace content loaded by app.js -->
     </div>
   </div>
 
