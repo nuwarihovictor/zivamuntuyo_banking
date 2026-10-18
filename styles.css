@@ -81,3 +81,14 @@ button.secondary { background: #eef1ed; color: var(--text-main); border: none; p
 .receipt-preview h3 { font-size: 14px; }
 .receipt-preview hr { border: 0; border-top: 1px dashed #888; margin: 10px 0; }
 #chat-preview-result { overflow-wrap: anywhere; }
+
+
+/* Responsive financial dashboard charts */
+.dashboard-chart-grid { align-items: stretch; margin-top: 16px; }
+.dashboard-chart-card { min-width: 0; }
+.dashboard-chart-card h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+.dashboard-chart-card label { display: block; font-size: 12px; color: var(--text-muted); margin: 12px 0; }
+.dashboard-chart-card select { display: block; width: 100%; margin-top: 6px; }
+.dashboard-chart-wrap { position: relative; width: 100%; min-height: 250px; height: 280px; }
+.dashboard-chart-wrap canvas { max-width: 100%; }
+@media (max-width: 700px) { .dashboard-chart-grid { grid-template-columns: 1fr; } .dashboard-chart-wrap { height: 240px; min-height: 220px; } }
