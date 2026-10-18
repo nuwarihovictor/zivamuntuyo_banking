@@ -606,7 +606,7 @@ window.loadAttendancePolicy();
           <div class="form-grid">
             <label>Requested amount *<input type="number" name="requested_amount" min="0.01" step="0.01" required></label>
             <label>Currency *<select name="currency_code" id="loan-currency-select" required><option value="">Loading currencies…</option></select></label>
-            <label>Annual interest (%) *<input type="number" name="interest_rate_annual" min="0" max="100" step="0.01" value="18" required></label>
+            <label>Loan product *<select name="loan_type" id="loan-type-select" onchange="updateSelectedLoanRate()" required><option value="">Loading loan products…</option></select></label><div class="loan-rate-notice" id="loan-rate-notice" aria-live="polite">The approved product rate will be applied automatically.</div>
             <label>Tenure (months) *<input type="number" name="tenure_months" min="1" max="360" step="1" value="12" required></label>
           </div>
           <label>Loan purpose *<textarea name="loan_purpose" rows="3" minlength="3" maxlength="2000" required placeholder="Explain how the funds will be used"></textarea></label>
@@ -1154,21 +1154,50 @@ window.uploadApplicationDocuments = async function(kind,recordId,files,category)
 
 window.loadLoanApplicationFormOptions = async function() {
   if(!db)return;
-  const branchSelect=document.getElementById("loan-branch-select"),currencySelect=document.getElementById("loan-currency-select");
+  const branchSelect=document.getElementById("loan-branch-select"),currencySelect=document.getElementById("loan-currency-select"),typeSelect=document.getElementById("loan-type-select");
   try{
-    const [branches,currencies]=await Promise.all([
+    const [branches,currencies,rates]=await Promise.all([
       db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
-      db.from("currencies").select("code").order("code")
+      db.from("currencies").select("code").eq("is_active",true).order("code"),
+      db.from("loan_product_rates").select("product_code,product_name,description,rate_percent,rate_period,editable_by_general_manager").order("product_name")
     ]);
-    if(branchSelect){
-      if(branches.error)branchSelect.innerHTML='<option value="">Branches unavailable</option>';
-      else branchSelect.innerHTML='<option value="">Choose branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
+    if(branchSelect)branchSelect.innerHTML=branches.error?'<option value="">Branches unavailable</option>':'<option value="">Choose branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
+    if(currencySelect)currencySelect.innerHTML=currencies.error?'<option value="">Currencies unavailable</option>':'<option value="">Choose currency</option>'+(currencies.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
+    if(rates.error){if(typeSelect)typeSelect.innerHTML='<option value="">Loan products unavailable</option>';const n=document.getElementById("loan-rate-notice");if(n)n.textContent="Loan product rates could not be loaded. Contact the General Manager.";}
+    else{
+      window.loanProductRateCache=rates.data||[];
+      if(typeSelect)typeSelect.innerHTML='<option value="">Choose loan product</option>'+window.loanProductRateCache.map(x=>'<option value="'+esc(x.product_code)+'">'+esc(x.product_name)+'</option>').join("");
+      window.updateSelectedLoanRate();await window.loadLoanProductRateSettings();
     }
-    if(currencySelect){
-      if(currencies.error)currencySelect.innerHTML='<option value="">Currencies unavailable</option>';
-      else currencySelect.innerHTML='<option value="">Choose currency</option>'+(currencies.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
-    }
-  }catch(e){if(branchSelect)branchSelect.innerHTML='<option value="">Unable to load branches</option>';if(currencySelect)currencySelect.innerHTML='<option value="">Unable to load currencies</option>';}
+  }catch(e){if(branchSelect)branchSelect.innerHTML='<option value="">Unable to load branches</option>';if(currencySelect)currencySelect.innerHTML='<option value="">Unable to load currencies</option>';const n=document.getElementById("loan-rate-notice");if(n)n.textContent="Unable to load loan products. Check the connection.";}
+};
+window.updateSelectedLoanRate=function(){
+ const select=document.getElementById("loan-type-select"),notice=document.getElementById("loan-rate-notice");if(!select||!notice)return;
+ const p=(window.loanProductRateCache||[]).find(x=>x.product_code===select.value);
+ if(!p){notice.textContent="The approved product rate will be applied automatically.";return;}
+ if(p.product_code==="overdraft"){notice.textContent="Fixed overdraft rate: 5% per month. This rate cannot be changed.";return;}
+ notice.textContent=p.rate_percent==null?"Interest rate not yet configured. The General Manager must set it before applications can be submitted.":("Current approved rate: "+p.rate_percent+"% "+(p.rate_period==="monthly"?"per month":"per year")+". Applied automatically.");
+};
+window.loadLoanProductRateSettings=async function(){
+ const host=document.getElementById("loan-product-rate-settings");if(!host||!db)return;
+ if(window.currentEmployeeRole!=="general_manager"){host.innerHTML="";return;}
+ const {data,error}=await db.from("loan_product_rates").select("product_code,product_name,description,rate_percent,rate_period,editable_by_general_manager,updated_at").order("product_name");
+ if(error){host.textContent="Unable to load product rates: "+error.message;return;}
+ host.innerHTML='<div class="loan-rate-settings-list">'+(data||[]).map(p=>'<article class="loan-rate-setting"><div><strong>'+esc(p.product_name)+'</strong><p class="muted">'+esc(p.description)+'</p></div>'+(p.product_code==="overdraft"?'<div class="fixed-rate-label">5% per month · permanently locked</div>':'<form class="loan-rate-edit-form" onsubmit="saveLoanProductRate(event)" data-product-code="'+esc(p.product_code)+'"><label>Interest rate ('+(p.rate_period==="monthly"?"% per month":"% per year")+')<input type="number" name="rate_percent" min="0" max="100" step="0.01" value="'+(p.rate_percent==null?"":esc(p.rate_percent))+'" required></label><button type="submit" class="secondary">Save rate</button></form>')+'<small class="muted">'+(p.rate_percent==null?"Not configured":"Current rate: "+p.rate_percent+"% "+(p.rate_period==="monthly"?"monthly":"annual"))+'</small></article>').join("")+'</div>';
+};
+window.saveLoanProductRate=async function(event){
+ event.preventDefault();const form=event.target,button=form.querySelector('button[type="submit"]'),code=form.dataset.productCode,value=Number(new FormData(form).get("rate_percent"));
+ if(window.currentEmployeeRole!=="general_manager"){alert("Only the General Manager may change loan product rates.");return;}
+ if(code==="overdraft"){alert("Overdraft is permanently fixed at 5% per month.");return;}
+ if(!Number.isFinite(value)||value<0||value>100){alert("Enter a rate between 0 and 100.");return;}
+ if(button)button.disabled=true;
+ try{
+  const {error}=await db.from("loan_product_rates").update({rate_percent:value}).eq("product_code",code);if(error)throw error;
+  const i=(window.loanProductRateCache||[]).findIndex(x=>x.product_code===code);if(i>=0)window.loanProductRateCache[i].rate_percent=value;
+  await window.loadLoanProductRateSettings();window.updateSelectedLoanRate();
+  alert("Rate saved. New applications will use this rate; existing applications keep their recorded terms.");
+ }catch(e){alert("Could not save the rate: "+(e?.message||"Check General Manager access."));}
+ finally{if(button)button.disabled=false;}
 };
 
 window.searchLoanCustomers = async function(input) {
@@ -1203,9 +1232,8 @@ window.handleLoanApplicationSubmit = async function(e) {
   if(button)button.disabled=true;if(feedback)feedback.textContent="Submitting application…";
   try{
     const {data,error}=await db.rpc("create_loan_application",{
-      p_customer_id:customerId,p_branch_id:String(fd.get("branch_id")||""),p_requested_amount:Number(fd.get("requested_amount")),
-      p_currency_code:String(fd.get("currency_code")||""),p_interest_rate_annual:Number(fd.get("interest_rate_annual")),
-      p_tenure_months:Number(fd.get("tenure_months")),p_loan_purpose:String(fd.get("loan_purpose")||""),
+      p_customer_id:customerId,p_branch_id:String(fd.get("branch_id")||""),p_loan_type:String(fd.get("loan_type")||""),p_requested_amount:Number(fd.get("requested_amount")),
+      p_currency_code:String(fd.get("currency_code")||""),p_tenure_months:Number(fd.get("tenure_months")),p_loan_purpose:String(fd.get("loan_purpose")||""),
       p_collateral_description:String(fd.get("collateral_description")||""),p_guarantor_name:String(fd.get("guarantor_name")||""),p_guarantor_phone:String(fd.get("guarantor_phone")||"")
     });
     if(error)throw error;
