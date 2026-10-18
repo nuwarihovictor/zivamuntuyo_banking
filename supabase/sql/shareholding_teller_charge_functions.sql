@@ -8,7 +8,7 @@ returns jsonb language plpgsql security definer set search_path=public,pg_temp a
 declare
  u uuid:=auth.uid(); role_code text:=public.current_employee_role_code(); b uuid; st text; c uuid;
  receipt text:='AOP-'||to_char(clock_timestamp() at time zone 'Africa/Kampala','YYYYMMDDHH24MISS')||'-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
- sec_receipt text:='SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
+ sec_receipt text:='SEC-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)));
  share_receipt text:='SHR-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
 begin
  if u is null then raise exception 'Sign-in required'; end if;
