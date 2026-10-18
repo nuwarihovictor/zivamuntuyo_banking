@@ -135,8 +135,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $function$
-DECLARE v_id uuid;
-DECLARE v_channel text := COALESCE(p_branch_id::text, 'global');
+DECLARE
+  v_id uuid;
+  v_channel text := COALESCE(p_branch_id::text, 'global');
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF NOT EXISTS (
