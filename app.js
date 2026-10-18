@@ -1013,7 +1013,7 @@ window.handleFinancialActivitySubmit=async function(e){
  const category=f.category.value;if(category==="operating_expense"&&!(["system_admin","bank_admin","branch_manager","accountant","general_manager"].includes(String(window.currentEmployeeRole||""))))throw new Error("Your role cannot record operating expenses.");
  const {data,error}=await db.rpc("record_financial_activity",{p_branch_id:branch,p_category:category,p_amount:Number(f.amount.value),p_description:f.description.value.trim(),p_receipt_number:f.receipt_number.value.trim()||null,p_customer_id:null,p_loan_application_id:f.loan_application_id?.value||null,p_event_date:f.event_date.value||null});
  if(error)throw error;const x=Array.isArray(data)?data[0]:data;if(feedback)feedback.textContent="Financial activity recorded: "+category.replaceAll("_"," ")+" · UGX "+Number(x.amount).toLocaleString()+". Reference "+(x.receipt_number||x.id)+".";
- const chosenBranch=branch;f.reset();document.getElementById("performance-branch").value=chosenBranch;await window.loadBankPerformance();
+ const chosenBranch=branch;f.reset();window.toggleFinanceLoanReference();document.getElementById("performance-branch").value=chosenBranch;await window.loadBankPerformance();
  }catch(err){if(feedback)feedback.textContent="Entry not recorded: "+err.message;}finally{if(button)button.disabled=false;}
 };
 
