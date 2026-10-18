@@ -769,6 +769,13 @@ window.loadAttendancePolicy();
     window.loadPerformanceBranchOptions();
     window.loadBankPerformance();
   }
+  else if (pageName === "DormantAccounts") {
+    c.innerHTML = '<span class="category-tag">Account lifecycle · risk & customer servicing</span><h2 class="page-heading">Dormant Accounts</h2><p class="page-intro">An account is considered dormant after 18 months without a posted transaction. Review the list, verify the customer, collect the UGX 22,000 reactivation fee, then reactivate. The fee is automatically posted to bank income.</p>' +
+      panel("DORMANCY REVIEW","Find accounts inactive for 18 months","This review marks eligible active accounts as dormant using their last posted transaction date, falling back to the opening/creation date. Review before communicating with customers.",'<div class="form-grid"><label>Branch filter (optional)<select id="dormant-branch"><option value="">All authorized branches</option></select></label><button type="button" class="primary" onclick="refreshDormantAccountReview()">Run 18-month dormancy review</button></div><p id="dormant-review-feedback" class="muted" aria-live="polite">Run a review to refresh account status.</p>') +
+      panel("DORMANT ACCOUNT REGISTER","Reactivation queue","The fee is UGX 22,000. Choose whether the customer pays cash at the teller or authorizes a deduction from their available account balance. A unique receipt/reference is required.",'<div id="dormant-account-list"><p class="muted">Loading dormant accounts…</p></div>');
+    window.loadDormantAccountList();
+    window.loadDormantBranchOptions();
+  }
   else if (pageName === "Reports") {
     c.innerHTML = `
       <span class="category-tag">Live ledger reports</span>
@@ -1968,6 +1975,53 @@ window.printAccountOpeningReceipt = function(){
   if(!win){alert("Allow pop-ups to print the account-opening receipt.");return;}
   win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · UGX 30,000</div><pre>"+text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
   win.document.close();
+};
+
+
+window.loadDormantBranchOptions = async function(){
+  if(!db)return;
+  const select=document.getElementById("dormant-branch"); if(!select)return;
+  const {data,error}=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+  if(error){select.innerHTML='<option value="">Branch list unavailable</option>';return;}
+  select.innerHTML='<option value="">All authorized branches</option>'+(data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+};
+window.loadDormantAccountList = async function(){
+  const el=document.getElementById("dormant-account-list"); if(!el)return;
+  if(!db){el.innerHTML='<p class="muted">Database connection is unavailable.</p>';return;}
+  el.innerHTML='<p class="muted">Loading dormant accounts…</p>';
+  const branch=document.getElementById("dormant-branch")?.value||"";
+  let q=db.from("bank_accounts").select("id,account_number,branch_id,balance,currency_code,status,opened_at,created_at").eq("status","dormant").order("account_number").limit(500);
+  if(branch)q=q.eq("branch_id",branch);
+  const {data,error}=await q;
+  if(error){el.innerHTML='<p class="muted">Dormant account list could not be loaded. Check branch permissions and account visibility. '+esc(error.message)+'</p>';return;}
+  if(!data||!data.length){el.innerHTML='<p class="muted">No dormant accounts in the selected scope. Run the dormancy review to identify accounts reaching 18 months without a posted transaction.</p>';return;}
+  el.innerHTML=data.map(a=>'<article class="loan-application-card dormant-account-card"><div class="loan-card-top"><div><strong>Account '+esc(a.account_number||"Number unavailable")+'</strong><p>Balance: UGX '+Number(a.balance||0).toLocaleString("en-UG")+' · Last opened: '+esc((a.opened_at||a.created_at||"").slice(0,10))+'</p><p class="muted">Account ID: '+esc(a.id)+'</p></div><span class="loan-status">Dormant</span></div><div class="form-grid"><label>Payment method<select id="dormant-method-'+esc(a.id)+'"><option value="cash">Cash paid to teller</option><option value="account_balance">Deduct from account balance</option></select></label><label>Receipt / payment reference<input id="dormant-receipt-'+esc(a.id)+'" minlength="4" maxlength="100" placeholder="Enter unique receipt ref" required></label></div><p class="muted">Reactivation fee: <strong>UGX 22,000</strong> · posted to bank income.</p><button type="button" class="primary" onclick="reactivateDormantAccount(\''+esc(a.id)+'\')">Collect fee &amp; reactivate</button></article>').join("");
+};
+window.refreshDormantAccountReview = async function(){
+  const feedback=document.getElementById("dormant-review-feedback");
+  const branch=document.getElementById("dormant-branch")?.value||null;
+  try{
+    if(!db)throw new Error("Database connection is not ready.");
+    if(!window.confirm("Run the 18-month dormancy review? Eligible active accounts will be marked dormant. No reactivation fees will be charged by this review."))return;
+    if(feedback)feedback.textContent="Checking posted transaction history…";
+    const {data,error}=await db.rpc("refresh_dormant_accounts",{p_branch_id:branch});
+    if(error)throw error;
+    if(feedback)feedback.textContent=Number(data?.accounts_marked_dormant||0)+" account(s) marked dormant. The 18-month rule was applied; no fees were collected.";
+    await window.loadDormantAccountList();
+  }catch(err){if(feedback)feedback.textContent="Dormancy review failed: "+(err?.message||"Unexpected error");}
+};
+window.reactivateDormantAccount = async function(accountId){
+  const feedback=document.getElementById("dormant-review-feedback");
+  const method=document.getElementById("dormant-method-"+accountId)?.value||"cash";
+  const receipt=document.getElementById("dormant-receipt-"+accountId)?.value?.trim()||"";
+  if(receipt.length<4){alert("Enter a unique receipt/reference of at least 4 characters.");return;}
+  if(!window.confirm("Confirm UGX 22,000 dormant-account reactivation fee?\nPayment method: "+(method==="cash"?"Cash paid to teller":"Deduct from account balance")+"\nThe fee will be posted to bank income and the account will be reactivated."))return;
+  try{
+    const {data,error}=await db.rpc("reactivate_dormant_account",{p_account_id:accountId,p_payment_method:method,p_receipt_reference:receipt});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Account "+(data?.account_number||"")+" reactivated. UGX 22,000 fee posted to bank income. Receipt reference: "+data.receipt_reference+".";
+    await window.loadDormantAccountList();
+  }catch(err){if(feedback)feedback.textContent="Reactivation failed: "+(err?.message||"Unexpected error");}
 };
 
 function initApp() {
