@@ -218,6 +218,26 @@ window.switchPage = function(pageName) {
           <label>Customer UUID *
             <input type="text" name="customer_id" required placeholder="Enter Customer UUID">
           </label>
+          <label>Branch *
+            <select name="branch_id" id="account-branch-id" required>
+              <option value="">Loading authorized branches…</option>
+            </select>
+          </label>
+          <label>Account ownership type *
+            <select name="account_type_id" id="account-type-id" required>
+              <option value="">Loading account types…</option>
+            </select>
+          </label>
+          <label>Account product *
+            <select name="product_type" required>
+              <option value="savings">Savings</option>
+              <option value="current">Current</option>
+              <option value="fixed_deposit">Fixed deposit</option>
+              <option value="business">Business product</option>
+              <option value="group">Group product</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
           <label>Currency *
             <select name="currency_code" required>
               <option value="UGX">UGX — Ugandan shilling</option>
@@ -243,6 +263,21 @@ window.switchPage = function(pageName) {
     `;
 
     if (db) {
+      Promise.all([
+        db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name"),
+        db.from("account_types").select("id,type_name,type_code").eq("is_active",true).order("type_name")
+      ]).then(([branchResult,typeResult])=>{
+        const branchSelect=document.getElementById("account-branch-id");
+        const typeSelect=document.getElementById("account-type-id");
+        if(branchSelect){
+          if(branchResult.error) branchSelect.innerHTML='<option value="">Branches unavailable</option>';
+          else branchSelect.innerHTML='<option value="">Choose branch</option>'+(branchResult.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+        }
+        if(typeSelect){
+          if(typeResult.error) typeSelect.innerHTML='<option value="">Account types unavailable</option>';
+          else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
+        }
+      });
       db.rpc("list_customer_account_balance_reconciliation")
         .then(({ data, error }) => {
           const listEl = document.getElementById("acc-list");
@@ -831,13 +866,17 @@ window.handleAccountSubmit = async function(e) {
   const form = e.target;
   const feedback = document.getElementById("acc-feedback");
   if (feedback) feedback.textContent = "Processing account application...";
+  if (!db) { if (feedback) feedback.textContent = "Database connection is unavailable. No account was created."; return; }
 
   const formData = new FormData(form);
   const payload = {
-    customer_id: formData.get("customer_id"),
+    customer_id: String(formData.get("customer_id")||"").trim(),
+    branch_id: formData.get("branch_id"),
+    account_type_id: formData.get("account_type_id"),
+    product_type: formData.get("product_type") || "savings",
     currency_code: formData.get("currency_code") || "UGX",
     account_number: "ACC-" + Math.floor(10000000 + Math.random() * 90000000),
-    status: "active",
+    status: "pending_approval",
     balance: 0.00
   };
 
@@ -845,7 +884,7 @@ window.handleAccountSubmit = async function(e) {
   if (error) {
     if (feedback) feedback.textContent = "Error: " + error.message;
   } else {
-    if (feedback) feedback.textContent = "Account successfully opened!";
+    if (feedback) feedback.textContent = "Account request submitted. Confirm the approval workflow before activating the account.";
     form.reset();
     setTimeout(() => window.switchPage("Accounts"), 1200);
   }
