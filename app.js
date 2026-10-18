@@ -305,7 +305,28 @@ window.switchPage = function(pageName) {
            <p id="tx-feedback" class="muted"></p>
          </form>`
       )}
+      ${panel(
+        "TRANSACTION MONITOR",
+        "Recent transaction activity",
+        "Authorized staff can review pending, approved and posted journal requests. This list is read-only; posting remains in the approval workflow.",
+        `<div class="form-grid">
+          <label>Branch UUID (optional)<input id="monitor-branch-id" type="text" placeholder="All authorized branches"></label>
+          <label>Status
+            <select id="monitor-status">
+              <option value="">All statuses</option>
+              <option value="pending_approval">Pending approval</option>
+              <option value="approved">Approved</option>
+              <option value="posted">Posted</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" onclick="loadTransactionMonitor()">Refresh activity</button>
+        </div>
+        <p id="transaction-monitor-feedback" class="muted" aria-live="polite">Loading transaction activity…</p>
+        <div id="transaction-monitor-list"></div>`
+      )}
     `;
+    window.loadTransactionMonitor();
   }
   else if (pageName === "Attendance") {
     c.innerHTML = `
@@ -485,7 +506,30 @@ window.switchPage = function(pageName) {
          <p class="muted">Income statement and balance sheet classifications require a reviewed chart of accounts. No estimates or demo figures are displayed.</p>`
       )}
     `;
-    window.loadFinancialReports();
+    window.loadTransactionMonitor = async function() {
+  const feedback=document.getElementById("transaction-monitor-feedback");
+  const list=document.getElementById("transaction-monitor-list");
+  if(!feedback||!list)return;
+  const branchInput=document.getElementById("monitor-branch-id");
+  const statusInput=document.getElementById("monitor-status");
+  const branchId=branchInput?branchInput.value.trim():"";
+  const status=statusInput?statusInput.value:"";
+  if(branchId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)){
+    feedback.textContent="Enter a valid branch UUID or leave the field blank.";return;
+  }
+  if(!db){feedback.textContent="Database connection unavailable.";list.innerHTML="";return;}
+  feedback.textContent="Loading recent journal activity…";list.innerHTML="";
+  const {data,error}=await db.rpc("list_transaction_monitoring",{p_branch_id:branchId||null,p_status:status||null,p_limit:100});
+  if(error){feedback.textContent="Transaction monitor needs the secure list_transaction_monitoring SQL function installed in Supabase. Details: "+error.message;return;}
+  if(!data||!data.length){feedback.textContent="No transactions matched this filter.";return;}
+  feedback.textContent="Showing "+data.length+" recent records. Only posted entries count toward financial reports.";
+  list.innerHTML=data.map(r=>{
+    const amount=Number(r.amount||0).toLocaleString(undefined,{maximumFractionDigits:2})+" "+esc(r.currency_code||"");
+    return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><span class="badge-role">'+esc(r.status||"unknown")+'</span></div>';
+  }).join("");
+};
+
+window.loadFinancialReports();
   }
   else {
     c.innerHTML = `
