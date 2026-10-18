@@ -1160,7 +1160,7 @@ window.loadLoanApplicationFormOptions = async function() {
     const [branches,currencies,rates]=await Promise.all([
       db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
       db.from("currencies").select("code").eq("is_active",true).order("code"),
-      db.from("loan_product_rates").select("product_code,product_name,description,rate_percent,rate_period,editable_by_general_manager").order("product_name")
+      db.rpc("list_loan_product_rates")
     ]);
     if(branchSelect)branchSelect.innerHTML=branches.error?'<option value="">Branches unavailable</option>':'<option value="">Choose branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+'</option>').join("");
     if(currencySelect)currencySelect.innerHTML=currencies.error?'<option value="">Currencies unavailable</option>':'<option value="">Choose currency</option>'+(currencies.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
@@ -1182,22 +1182,23 @@ window.updateSelectedLoanRate=function(){
 window.loadLoanProductRateSettings=async function(){
  const host=document.getElementById("loan-product-rate-settings");if(!host||!db)return;
  if(window.currentEmployeeRole!=="general_manager"){host.innerHTML="";return;}
- const {data,error}=await db.from("loan_product_rates").select("product_code,product_name,description,rate_percent,rate_period,editable_by_general_manager,updated_at").order("product_name");
+ const {data,error}=await db.rpc("list_loan_product_rates");
  if(error){host.textContent="Unable to load product rates: "+error.message;return;}
- host.innerHTML='<div class="loan-rate-settings-list">'+(data||[]).map(p=>'<article class="loan-rate-setting"><div><strong>'+esc(p.product_name)+'</strong><p class="muted">'+esc(p.description)+'</p></div>'+(p.product_code==="overdraft"?'<div class="fixed-rate-label">5% per month · permanently locked</div>':'<form class="loan-rate-edit-form" onsubmit="saveLoanProductRate(event)" data-product-code="'+esc(p.product_code)+'"><label>Interest rate ('+(p.rate_period==="monthly"?"% per month":"% per year")+')<input type="number" name="rate_percent" min="0" max="100" step="0.01" value="'+(p.rate_percent==null?"":esc(p.rate_percent))+'" required></label><button type="submit" class="secondary">Save rate</button></form>')+'<small class="muted">'+(p.rate_percent==null?"Not configured":"Current rate: "+p.rate_percent+"% "+(p.rate_period==="monthly"?"monthly":"annual"))+'</small></article>').join("")+'</div>';
+ host.innerHTML='<div class="loan-rate-settings-list">'+(data||[]).map(p=>'<article class="loan-rate-setting"><div><strong>'+esc(p.product_name)+'</strong><p class="muted">'+esc(p.description)+'</p></div>'+(p.product_code==="overdraft"?'<div class="fixed-rate-label">5% per month · permanently locked</div>':'<form class="loan-rate-edit-form" onsubmit="saveLoanProductRate(event)" data-product-code="'+esc(p.product_code)+'"><label>Interest rate (%)<input type="number" name="rate_percent" min="0" max="100" step="0.01" value="'+(p.rate_percent==null?"":esc(p.rate_percent))+'" required></label><label>Rate period<select name="rate_period"><option value="annual" '+(p.rate_period==="annual"?"selected":"")+'>Per year</option><option value="monthly" '+(p.rate_period==="monthly"?"selected":"")+'>Per month</option></select></label><label>Reason for change<input name="reason" minlength="8" maxlength="500" required placeholder="Reason for changing policy"></label><button type="submit" class="secondary">Save rate</button><small class="rate-save-status muted" aria-live="polite"></small></form>')+'<small class="muted">'+(p.rate_percent==null?"Not configured":"Current rate: "+p.rate_percent+"% "+(p.rate_period==="monthly"?"monthly":"annual"))+'</small></article>').join("")+'</div>';
 };
 window.saveLoanProductRate=async function(event){
- event.preventDefault();const form=event.target,button=form.querySelector('button[type="submit"]'),code=form.dataset.productCode,value=Number(new FormData(form).get("rate_percent"));
- if(window.currentEmployeeRole!=="general_manager"){alert("Only the General Manager may change loan product rates.");return;}
- if(code==="overdraft"){alert("Overdraft is permanently fixed at 5% per month.");return;}
- if(!Number.isFinite(value)||value<0||value>100){alert("Enter a rate between 0 and 100.");return;}
- if(button)button.disabled=true;
+ event.preventDefault();const form=event.target,button=form.querySelector('button[type="submit"]'),status=form.querySelector(".rate-save-status"),fd=new FormData(form),code=form.dataset.productCode,value=Number(fd.get("rate_percent")),period=String(fd.get("rate_period")||"annual"),reason=String(fd.get("reason")||"");
+ if(window.currentEmployeeRole!=="general_manager"){if(status)status.textContent="Only the General Manager may change rates.";return;}
+ if(code==="overdraft"){if(status)status.textContent="Overdraft is permanently fixed at 5% per month.";return;}
+ if(!Number.isFinite(value)||value<0||value>100){if(status)status.textContent="Enter a rate between 0 and 100.";return;}
+ if(reason.trim().length<8){if(status)status.textContent="Give a reason of at least 8 characters.";return;}
+ if(button)button.disabled=true;if(status)status.textContent="Saving rate and audit record…";
  try{
-  const {error}=await db.from("loan_product_rates").update({rate_percent:value}).eq("product_code",code);if(error)throw error;
-  const i=(window.loanProductRateCache||[]).findIndex(x=>x.product_code===code);if(i>=0)window.loanProductRateCache[i].rate_percent=value;
-  await window.loadLoanProductRateSettings();window.updateSelectedLoanRate();
-  alert("Rate saved. New applications will use this rate; existing applications keep their recorded terms.");
- }catch(e){alert("Could not save the rate: "+(e?.message||"Check General Manager access."));}
+  const {error}=await db.rpc("update_loan_product_rate",{p_product_code:code,p_interest_rate:value,p_rate_period:period,p_reason:reason.trim()});
+  if(error)throw error;
+  if(status)status.textContent="Rate saved. New applications use the new rate; existing applications retain their recorded terms.";
+  await window.loadLoanApplicationFormOptions();
+ }catch(e){if(status)status.textContent="Rate not changed: "+(e?.message||"Check General Manager access.");}
  finally{if(button)button.disabled=false;}
 };
 
