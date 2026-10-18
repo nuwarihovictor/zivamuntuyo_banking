@@ -113,6 +113,10 @@ BEGIN
   IF coalesce(p_is_head_office, false) AND NOT v_old.is_active THEN
     RAISE EXCEPTION 'An inactive branch cannot be marked as head office';
   END IF;
+  IF v_old.is_head_office AND v_old.is_active AND NOT coalesce(p_is_head_office, false)
+     AND NOT EXISTS (SELECT 1 FROM public.branches b WHERE b.id <> p_branch_id AND b.is_active AND b.is_head_office) THEN
+    RAISE EXCEPTION 'Assign another active head office before removing the current head office designation';
+  END IF;
 
   IF coalesce(p_is_head_office, false) THEN
     UPDATE public.branches SET is_head_office = false, updated_at = now()
