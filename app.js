@@ -488,6 +488,84 @@ window.handleTransaction = async function(e) {
   }
 };
 
+window.loadCashApprovals = async function() {
+  const pendingEl = document.getElementById("pending-cash-requests");
+  const readyEl = document.getElementById("ready-posting-requests");
+  const feedback = document.getElementById("approval-feedback");
+  if (!pendingEl || !readyEl || !db) return;
+  pendingEl.textContent = "Loading pending requests…";
+  readyEl.textContent = "Loading approved requests…";
+  const pending = await db.rpc("list_pending_cash_transaction_requests", { p_branch_id: null });
+  if (pending.error) {
+    pendingEl.textContent = "Could not load requests: " + pending.error.message;
+  } else {
+    const rows = pending.data || [];
+    pendingEl.innerHTML = rows.length ? rows.map(r =>
+      '<div class="list-item"><div><strong>' + esc(r.journal_number) + '</strong> — ' + esc(r.transaction_type) +
+      '<br><span class="muted">Account: ' + esc(r.account_number) + ' | Branch: ' + esc(r.branch_name) +
+      '</span><br><strong>' + Number(r.amount).toLocaleString() + ' ' + esc(r.currency_code) +
+      '</strong></div><button type="button" class="primary" data-approve-journal="' + esc(r.journal_id) +
+      '">Approve request</button></div>'
+    ).join("") : '<p class="muted">No pending requests available for your access.</p>';
+  }
+  const ready = await db.rpc("list_cash_transactions_ready_to_post", { p_branch_id: null });
+  if (ready.error) {
+    readyEl.textContent = "Could not load approved requests: " + ready.error.message;
+  } else {
+    const rows = ready.data || [];
+    readyEl.innerHTML = rows.length ? rows.map(r =>
+      '<div class="list-item"><div><strong>' + esc(r.journal_number) + '</strong> — ' + esc(r.transaction_type) +
+      '<br><span class="muted">Account: ' + esc(r.account_number) + ' | Branch: ' + esc(r.branch_name) +
+      '</span><br><strong>' + Number(r.amount).toLocaleString() + ' ' + esc(r.currency_code) +
+      '</strong></div><div><label>Cash ledger UUID<input data-cash-ledger="' + esc(r.journal_id) +
+      '" type="text" placeholder="Active asset ledger UUID"></label><button type="button" class="primary" data-post-journal="' +
+      esc(r.journal_id) + '">Post to ledger</button></div></div>'
+    ).join("") : '<p class="muted">No approved requests are ready for posting. Requester and approver cannot post the same transaction.</p>';
+  }
+  if (feedback) feedback.textContent = "Lists refreshed. Money moves only after successful ledger posting.";
+};
+
+window.approveCashRequest = async function(journalId) {
+  if (!db || !journalId) return;
+  if (!confirm("Approve this request? You cannot approve a request you created. Posting is a separate step.")) return;
+  const feedback = document.getElementById("approval-feedback");
+  if (feedback) feedback.textContent = "Submitting approval…";
+  const result = await db.rpc("approve_cash_transaction_request", { p_journal_id: journalId });
+  if (result.error) {
+    if (feedback) feedback.textContent = "Approval failed: " + result.error.message;
+    return;
+  }
+  if (feedback) feedback.textContent = "Approved. It still requires ledger posting by another eligible employee.";
+  await window.loadCashApprovals();
+};
+
+window.postApprovedCashRequest = async function(journalId) {
+  if (!db || !journalId) return;
+  const input = document.querySelector('[data-cash-ledger="' + journalId + '"]');
+  const cashLedgerId = input ? input.value.trim() : "";
+  if (!cashLedgerId) { alert("Enter the active cash ledger UUID first."); return; }
+  if (!confirm("Post this approved transaction? Verify account, amount, currency, branch and ledger before continuing.")) return;
+  const feedback = document.getElementById("approval-feedback");
+  if (feedback) feedback.textContent = "Posting transaction…";
+  const result = await db.rpc("post_approved_cash_transaction", {
+    p_journal_id: journalId,
+    p_cash_ledger_account_id: cashLedgerId
+  });
+  if (result.error) {
+    if (feedback) feedback.textContent = "Posting blocked: " + result.error.message;
+    return;
+  }
+  if (feedback) feedback.textContent = "Ledger posting completed. Verify the posted record before printing a transaction receipt.";
+  await window.loadCashApprovals();
+};
+
+document.addEventListener("click", function(event) {
+  const approveButton = event.target.closest("[data-approve-journal]");
+  if (approveButton) window.approveCashRequest(approveButton.getAttribute("data-approve-journal"));
+  const postButton = event.target.closest("[data-post-journal]");
+  if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
+});
+
 window.previewStaffMessage = function() {
   const input = document.getElementById("chat-preview");
   const output = document.getElementById("chat-preview-result");
