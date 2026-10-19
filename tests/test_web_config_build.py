@@ -33,8 +33,11 @@ class WebConfigBuildTests(unittest.TestCase):
     def test_missing_environment_is_fail_closed_with_empty_config(self):
         result, content = run_build({"VERCEL_ENV": "preview"})
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('supabaseUrl:""', content)
-        self.assertIn('supabaseAnonKey:""', content)
+        self.assertIsNotNone(content)
+        config_match = __import__("re").search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        self.assertIsNotNone(config_match, content)
+        config = json.loads(config_match.group(1))
+        self.assertEqual(config, {"supabaseUrl": "", "supabaseAnonKey": ""})
 
     def test_preview_refuses_production_database_url(self):
         result, content = run_build({

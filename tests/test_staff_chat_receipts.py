@@ -118,6 +118,40 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn('!Number.isFinite(amount)||amount<=0', receipt)
         self.assertIn('if(!printWindow)', receipt)
 
+    def test_cash_approval_lists_handle_missing_backend_and_independent_list_errors(self):
+        start = self.app.index("window.loadCashApprovals = async function()")
+        end = self.app.index("window.approveCashRequest = async function", start)
+        loader = self.app[start:end]
+        self.assertIn('if (!db)', loader)
+        self.assertIn('const safeRpc = async (name)', loader)
+        self.assertIn('Promise.all([', loader)
+        self.assertIn('if (pending.error)', loader)
+        self.assertIn('if (ready.error)', loader)
+        self.assertIn('One or more cash approval lists could not be refreshed.', loader)
+
+    def test_approval_and_post_buttons_prevent_double_submit_and_recover_on_errors(self):
+        approve_start = self.app.index("window.approveCashRequest = async function")
+        post_start = self.app.index("window.postApprovedCashRequest = async function", approve_start)
+        listener_start = self.app.index('document.addEventListener("click", function(event) {', post_start)
+        approve = self.app[approve_start:post_start]
+        post = self.app[post_start:listener_start]
+        self.assertIn('if (button) button.disabled = true', approve)
+        self.assertIn('finally {', approve)
+        self.assertIn('if (button) button.disabled = false', approve)
+        self.assertIn('if (button) button.disabled = true', post)
+        self.assertIn('uuidPattern.test(cashLedgerId)', post)
+        self.assertIn('finally {', post)
+        self.assertIn('Refresh the approvals list and reconcile the transaction before retrying.', post)
+        self.assertIn('window.approveCashRequest(approveButton.getAttribute("data-approve-journal"), approveButton)', self.app)
+        self.assertIn('window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"), postButton)', self.app)
+
+    def test_successful_post_prints_receipt_for_deposits_and_withdrawals(self):
+        start = self.app.index("window.postApprovedCashRequest = async function")
+        end = self.app.index('document.addEventListener("click", function(event) {', start)
+        posting = self.app[start:end]
+        self.assertIn('["deposit","withdrawal"].includes(String(receiptDataButton.dataset.receiptType||"").toLowerCase())', posting)
+        self.assertIn('window.printTransactionReceipt(receiptDataButton)', posting)
+
     def test_receipt_reprints_are_labelled_and_counted_in_current_transaction_list(self):
         start = self.app.index('window.printTransactionReceipt = function')
         end = self.app.index('document.addEventListener("click",function(event){', start)
