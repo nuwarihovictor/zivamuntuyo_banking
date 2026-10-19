@@ -193,6 +193,16 @@ The draft migration `20261019080000_staff_chat_active_employee_rls.sql` creates 
 The disposable PostgreSQL workflow now parses/applies this migration and tests active/inactive employee RLS. These are isolated fixture tests, not a production-schema integration test. Before release, confirm the actual production `employee_profiles` foreign-key semantics and grants, apply to an approved staging environment, test with real staff sessions, and verify that the Data API exposes the table only with RLS enabled. Never put passwords, PINs, or customer financial details in chat.
 
 
+## Cash transaction authorization and ledger regression checklist (added 2026-10-19)
+
+- Verify that an inactive employee cannot request or post a cash transaction, even if the browser hides the action.
+- Verify branch access is checked server-side for both request and posting, including attempts to change the account or cash-ledger IDs in the RPC payload.
+- Verify posting requires an approved, pending request and a poster distinct from both requester and approver.
+- Attempt duplicate posting and concurrent posting; the account/journal row locks and existing-ledger-entry guard must prevent duplicate balance changes and duplicate ledger legs.
+- Verify withdrawals fail for insufficient available balance and that only active asset cash ledgers in the correct currency and branch are accepted.
+- Inject an error after the first ledger leg and confirm the entire function call rolls back both ledger entries, the account balance update, and posted status.
+- Before release, compare the complete live definitions of `create_cash_transaction_request` and `post_approved_cash_transaction` with the draft migration, and review every caller, owner, grant, approval rule, and ledger trigger. Fixture-level success alone is not production approval.
+
 ## Browser output-encoding regression checklist (added 2026-10-19)
 
 - Confirm dynamic text and attribute values escape ampersands, angle brackets, double quotes, and apostrophes before being inserted into HTML.
