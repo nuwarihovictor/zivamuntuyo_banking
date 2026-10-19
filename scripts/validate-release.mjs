@@ -52,6 +52,12 @@ assert.ok(existsSync("supabase/tests/financial_integrity_diagnostics.sql"), "Rea
 const diagnostics = readFileSync("supabase/tests/financial_integrity_diagnostics.sql", "utf8");
 assert.match(diagnostics, /posted_journal_unbalanced/, "Financial diagnostics must check posted journal balance");
 assert.match(diagnostics, /stored_account_balance_differs_from_ledger/, "Financial diagnostics must compare stored and ledger balances");
+assert.match(app, /window\.clockInMyAttendance/, "Attendance page must expose manual web clock-in");
+assert.match(app, /window\.clockOutMyAttendance/, "Attendance page must expose manual web clock-out");
+assert.ok(existsSync("supabase/sql/staff_attendance_clock_rpc_draft.sql"), "Secure manual attendance RPC draft must be present");
+const attendanceSql = readFileSync("supabase/sql/staff_attendance_clock_rpc_draft.sql", "utf8");
+assert.match(attendanceSql, /clock_in_method,\s*status/, "Manual attendance records must record method and status");
+assert.match(attendanceSql, /REVOKE ALL ON FUNCTION public\.clock_in_my_attendance/, "Attendance RPCs must revoke default public execution");
 
 
 const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
