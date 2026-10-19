@@ -17,7 +17,7 @@ class FinancialReportRegressionTests(unittest.TestCase):
         reports = self.app[start:end]
         self.assertIn('db.rpc("list_trial_balance", { p_branch_id: branchId || null })', reports)
         self.assertIn("window.validateTrialBalanceRows(rows)", reports)
-        self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("summary.innerHTML"))
+        self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("summary.innerHTML = integrityNotice"))
         self.assertIn("No report figures are being shown", reports)
 
     def test_report_totals_are_grouped_by_currency_not_added_across_currencies(self):
