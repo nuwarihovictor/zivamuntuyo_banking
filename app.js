@@ -348,23 +348,44 @@ window.switchPage = function(pageName) {
         "Register New Bank Customer",
         "Capture verified customer identification details before account creation.",
         `<form id="cust-form" onsubmit="handleCustomerSubmit(event)">
-          <label>Full Legal Name * 
-            <input type="text" name="full_name" required placeholder="e.g. Nuwariho Victor">
+          <label>Customer type *
+            <select name="customer_type" required>
+              <option value="individual">Individual</option>
+              <option value="business">Business</option>
+              <option value="organization">Organization</option>
+            </select>
           </label>
-          <label>National ID (NIN) or Passport * 
-            <input type="text" name="nin_or_passport" required placeholder="CM12345678ABCD">
+          <label>Full Legal Name / Registered Name *
+            <input type="text" name="full_name" maxlength="200" required autocomplete="name" placeholder="Full legal or registered name">
           </label>
-          <label>Phone Number * 
-            <input type="tel" name="phone_number" required placeholder="+256 700 000000">
+          <label>Identification type *
+            <select name="identification_type" required>
+              <option value="national_id">National ID (NIN)</option>
+              <option value="passport">Passport</option>
+              <option value="business_registration">Business registration</option>
+              <option value="other">Other approved identification</option>
+            </select>
           </label>
-          <label>Email Address 
-            <input type="email" name="email" placeholder="victor@zivamuntuyo.com">
+          <label>Identification number *
+            <input type="text" name="identification_number" maxlength="120" required autocomplete="off" placeholder="Enter verified identification number">
           </label>
-          <label>Physical Address * 
-            <input type="text" name="address" required placeholder="Kampala, Uganda">
+          <label>Phone Number *
+            <input type="tel" name="phone_number" maxlength="50" required autocomplete="tel" placeholder="+256 700 000000">
           </label>
-          <button type="submit" class="primary">Register Customer (CIF)</button>
-          <p id="cust-feedback" class="muted"></p>
+          <label>Email Address
+            <input type="email" name="email" maxlength="254" autocomplete="email" placeholder="customer@example.com">
+          </label>
+          <label>Physical Address *
+            <input type="text" name="physical_address" maxlength="500" required autocomplete="street-address" placeholder="Town / street / locality">
+          </label>
+          <label>Branch responsible for KYC review *
+            <select name="branch_id" id="customer-branch-id" required>
+              <option value="">Loading authorized branches…</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Submit Customer for KYC Review</button>
+          <p id="cust-feedback" class="muted" role="status" aria-live="polite"></p>
+          <p class="muted">New customers remain pending review until an authorized officer approves them. A pending customer cannot open an account.</p>
         </form>`
       )}
       ${panel(
@@ -375,6 +396,7 @@ window.switchPage = function(pageName) {
       )}
     `;
 
+    window.loadCustomerRegistrationOptions();
     window.loadCustomerDirectory();
   }
   else if (pageName === "Accounts") {
@@ -1210,6 +1232,21 @@ window.exportFinancialReportsCsv = function() {
   if (feedback) feedback.textContent = "Exported " + rows.length + " authorized trial-balance rows. Keep the file confidential.";
 };
 
+window.validateTrialBalanceRows = function(rows) {
+  if (!Array.isArray(rows)) return { ok: false, message: "The database returned an invalid report format." };
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index] || {};
+    if (!String(row.currency_code || "").trim()) return { ok: false, message: "A ledger row has no currency code. Report totals were withheld." };
+    for (const field of ["debit_total", "credit_total", "net_balance"]) {
+      if (row[field] === null || row[field] === undefined || String(row[field]).trim() === "" ||
+          !Number.isFinite(Number(row[field]))) {
+        return { ok: false, message: "A ledger row contains an invalid " + field + ". Report totals were withheld." };
+      }
+    }
+  }
+  return { ok: true, rows };
+};
+
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
   const exportButton = document.getElementById("reports-export-csv");
@@ -1231,22 +1268,34 @@ window.loadFinancialReports = async function() {
     return;
   }
   feedback.textContent = "Loading posted ledger totals…";
-  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
-  if (error) {
-    feedback.textContent = "Reports could not load. Install the secure list_trial_balance SQL function in Supabase and check your accounting role. Details: " + error.message;
+  let response;
+  try {
+    response = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  } catch (error) {
+    feedback.textContent = "Reports could not be loaded. Check accounting permissions and connection, then retry.";
     return;
   }
-  const rows = data || [];
+  const { data, error } = response || {};
+  if (error) {
+    feedback.textContent = "Reports could not load. Check accounting permissions and connection, then retry. " + (error.message || "");
+    return;
+  }
+  const rows = Array.isArray(data) ? data : [];
+  const validation = window.validateTrialBalanceRows(rows);
+  if (!validation.ok) {
+    feedback.textContent = validation.message;
+    return;
+  }
   window._financialReportRows = rows;
   if (exportButton) exportButton.disabled = rows.length === 0;
   if (!rows.length) {
     feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
     return;
   }
-  const currencies = {};
+  const currencies = Object.create(null);
   rows.forEach(row => {
-    const currency = String(row.currency_code || "UNKNOWN").trim();
-    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: {} };
+    const currency = String(row.currency_code).trim();
+    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: Object.create(null) };
     const group = currencies[currency];
     group.debit += Number(row.debit_total || 0);
     group.credit += Number(row.credit_total || 0);
@@ -1258,7 +1307,14 @@ window.loadFinancialReports = async function() {
     group.accounts[type].count++;
   });
   const money = (n, currency) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
-  summary.innerHTML = Object.entries(currencies).map(([currency, g]) =>
+  const currencyEntries = Object.entries(currencies);
+  const unbalancedCurrencies = currencyEntries.filter(([, group]) => Math.abs(group.debit - group.credit) >= 0.005);
+  const integrityNotice = unbalancedCurrencies.length
+    ? '<div class="list-item" role="alert"><strong>STOP: trial balance is out of balance.</strong> ' +
+      unbalancedCurrencies.map(([currency, group]) => esc(currency) + " difference: " + esc(money(group.debit - group.credit, currency))).join("; ") +
+      '. Do not treat this report as reconciled until the difference is investigated.</div>'
+    : '<div class="list-item" role="status"><strong>Debit and credit totals match</strong> for each currency returned. Independent reconciliation is still required.</div>';
+  summary.innerHTML = integrityNotice + currencyEntries.map(([currency, g]) =>
     '<div class="metric-card"><div class="metric-sub">Posted ledger • ' + esc(currency) + '</div>' +
     '<div class="metric-val" style="font-size:17px;">Debits: ' + esc(money(g.debit, currency)) + '</div>' +
     '<div class="metric-val" style="font-size:17px;">Credits: ' + esc(money(g.credit, currency)) + '</div>' +
@@ -1293,17 +1349,29 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loading posted journal entries…";
   list.innerHTML = "";
   totalsEl.innerHTML = "";
-  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
-  if (error) {
-    feedback.textContent = "Trial balance could not be loaded. The secure list_trial_balance database function must be installed and your employee role must have accounting access. Details: " + error.message;
+  let response;
+  try {
+    response = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  } catch (error) {
+    feedback.textContent = "Trial balance could not be loaded. Check accounting permissions and connection, then retry.";
     return;
   }
-  const rows = data || [];
+  const { data, error } = response || {};
+  if (error) {
+    feedback.textContent = "Trial balance could not be loaded. Check accounting permissions and connection, then retry. " + (error.message || "");
+    return;
+  }
+  const rows = Array.isArray(data) ? data : [];
   if (!rows.length) {
     feedback.textContent = "No active ledger accounts were found for your authorized branch scope. This is not a confirmation that the books are balanced.";
     return;
   }
-  const grouped = {};
+  const validation = window.validateTrialBalanceRows(rows);
+  if (!validation.ok) {
+    feedback.textContent = validation.message;
+    return;
+  }
+  const grouped = Object.create(null);
   rows.forEach(row => {
     const currency = String(row.currency_code || "UNKNOWN").trim();
     if (!grouped[currency]) grouped[currency] = { debit: 0, credit: 0, rows: [] };
@@ -1334,30 +1402,97 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loaded " + rows.length + " active ledger account(s) using posted journals only. Figures are grouped by currency.";
 };
 
+window.loadCustomerRegistrationOptions = async function() {
+  const select = document.getElementById("customer-branch-id");
+  const feedback = document.getElementById("cust-feedback");
+  if (!select) return;
+  if (!db) {
+    select.innerHTML = '<option value="">Database unavailable</option>';
+    select.disabled = true;
+    if (feedback) feedback.textContent = "Customer registration is unavailable until the database connection is restored.";
+    return;
+  }
+  select.disabled = true;
+  try {
+    const { data, error } = await db.from("branches")
+      .select("id,branch_name,branch_code")
+      .eq("is_active", true)
+      .order("branch_name");
+    if (error) throw error;
+    const branches = Array.isArray(data) ? data : [];
+    if (!branches.length) {
+      select.innerHTML = '<option value="">No authorized active branches</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Choose responsible branch</option>' +
+      branches.map(branch => '<option value="' + esc(branch.id) + '">' +
+        esc(branch.branch_name) + ' (' + esc(branch.branch_code) + ')</option>').join("");
+    select.disabled = false;
+  } catch (error) {
+    select.innerHTML = '<option value="">Branches unavailable — contact administrator</option>';
+    if (feedback) feedback.textContent = "Authorized branches could not be loaded. Customer registration is paused; retry after checking permissions and connection.";
+  }
+};
+
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  if (feedback) feedback.textContent = "Registering customer KYC profile...";
-
+  const button = form.querySelector('button[type="submit"]');
+  if (!db) {
+    if (feedback) feedback.textContent = "Database connection unavailable. No customer record was submitted.";
+    return;
+  }
+  if (!form.reportValidity()) return;
   const formData = new FormData(form);
-  const payload = {
-    customer_number: "CUST-" + Math.floor(100000 + Math.random() * 900000),
-    full_name: formData.get("full_name"),
-    nin_or_passport: formData.get("nin_or_passport"),
-    phone_number: formData.get("phone_number"),
-    email: formData.get("email"),
-    address: formData.get("address"),
-    status: "active"
-  };
-
-  const { error } = await db.from("customers").insert([payload]);
-  if (error) {
-    if (feedback) feedback.textContent = "Registration failed: " + error.message;
-  } else {
-    if (feedback) feedback.textContent = "Customer successfully registered!";
+  const branchId = String(formData.get("branch_id") || "").trim();
+  const customerType = String(formData.get("customer_type") || "").trim();
+  const identificationType = String(formData.get("identification_type") || "").trim();
+  const fullName = String(formData.get("full_name") || "").trim();
+  const identificationNumber = String(formData.get("identification_number") || "").trim();
+  const physicalAddress = String(formData.get("physical_address") || "").trim();
+  if (!branchId || !["individual", "business", "organization"].includes(customerType) ||
+      !["national_id", "passport", "business_registration", "other"].includes(identificationType) ||
+      !fullName || !identificationNumber || !physicalAddress) {
+    if (feedback) feedback.textContent = "Complete all required customer, identification, address, and branch fields.";
+    return;
+  }
+  const cryptoApi = window.crypto;
+  if (!cryptoApi || typeof cryptoApi.getRandomValues !== "function") {
+    if (feedback) feedback.textContent = "Secure customer-number generation is unavailable in this browser. Use the approved HTTPS browser and retry.";
+    return;
+  }
+  const randomBytes = new Uint8Array(16);
+  cryptoApi.getRandomValues(randomBytes);
+  const customerNumber = "CUST-" + Array.from(randomBytes, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+  if (button) button.disabled = true;
+  if (feedback) feedback.textContent = "Submitting customer details for KYC review…";
+  try {
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) throw new Error("Sign in with an authorized staff account before registering a customer.");
+    const payload = {
+      customer_number: customerNumber,
+      customer_type: customerType,
+      full_name: fullName,
+      identification_type: identificationType,
+      identification_number: identificationNumber,
+      phone_number: String(formData.get("phone_number") || "").trim(),
+      email: String(formData.get("email") || "").trim() || null,
+      physical_address: physicalAddress,
+      branch_id: branchId,
+      created_by: authData.user.id,
+      status: "pending_review"
+    };
+    const { error } = await db.from("customers").insert([payload]);
+    if (error) throw error;
+    if (feedback) feedback.textContent = "Customer submitted for KYC review. Reference: " + customerNumber + ". The customer remains pending review and cannot open an account until approved.";
     form.reset();
-    setTimeout(() => window.switchPage("Customers"), 1000);
+    await window.loadCustomerRegistrationOptions();
+    window.setTimeout(() => window.switchPage("Customers"), 1200);
+  } catch (error) {
+    if (feedback) feedback.textContent = "Customer registration was not confirmed. Check branch permissions and required fields before retrying. " + (error?.message || "Unexpected error");
+  } finally {
+    if (button) button.disabled = false;
   }
 };
 

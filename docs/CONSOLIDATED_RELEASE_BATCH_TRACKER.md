@@ -50,3 +50,11 @@
 ## Release decision
 
 **Current decision: NO-GO.** Code work can continue in this batch, but real printer/fingerprint/Windows testing and production-shaped staging evidence cannot be honestly completed without the required environment and hardware. The finished release requires all applicable evidence and explicit approval.
+
+
+## Combined implementation batch — customer onboarding and accounting integrity
+
+- Read-only production schema inspection confirmed `customers.customer_type`, `identification_type`, `identification_number`, `physical_address`, `branch_id`, and `created_by` are the relevant columns; `customer_type` and `branch_id` are required by the schema / insert policy. The prior UI sent mismatched column names, omitted required fields, attempted to mark customers active immediately, and generated a six-digit customer reference. Draft UI now aligns its insert payload to the current schema, requires a visible active branch, records the authenticated creator, uses cryptographic randomness for the unique customer reference, and submits new customers as `pending_review`.
+- Trial balance/report UI now validates currency and numeric fields before calculation or export, handles rejected RPC calls, and displays an accessible stop warning if any currency's debit/credit totals differ. Currency totals remain separate; the notice does not replace independent reconciliation.
+- Added regression tests for customer schema alignment and financial-report integrity.
+- Production inspection was read-only. No production data, schema, migrations, merge, or deployment were changed by this batch. Exact-head CI and staging verification remain required.
