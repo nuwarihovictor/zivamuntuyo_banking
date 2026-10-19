@@ -105,7 +105,7 @@ TO authenticated;
 CREATE OR REPLACE FUNCTION public.record_financial_activity(
   uuid,text,numeric,text,text,uuid,uuid,date
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp AS $ BEGIN RETURN; END $;
+SET search_path = public, pg_temp AS $$ BEGIN RETURN; END $$;
 
 CREATE OR REPLACE FUNCTION public.create_cash_transaction_request(
   p_account_id uuid, p_transaction_type text, p_amount numeric, p_description text DEFAULT NULL
