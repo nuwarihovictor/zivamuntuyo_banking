@@ -245,6 +245,22 @@ END;
 $function$;
 
 
+-- Fault-injection hook for atomic-posting recovery tests. Disabled unless the test
+-- session explicitly sets test.fail_customer_leg = 'on'.
+CREATE OR REPLACE FUNCTION public.test_fail_customer_ledger_leg()
+RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF current_setting('test.fail_customer_leg', true) = 'on'
+     AND NEW.description = 'Customer account leg' THEN
+    RAISE EXCEPTION 'Injected failure on customer ledger leg' USING ERRCODE='P0001';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+CREATE TRIGGER test_fail_customer_ledger_leg_before_insert
+BEFORE INSERT ON public.ledger_entries
+FOR EACH ROW EXECUTE FUNCTION public.test_fail_customer_ledger_leg();
+
 INSERT INTO public.branches(id,branch_code,branch_name,is_head_office,is_active,address)
 VALUES ('10000000-0000-0000-0000-000000000001','HQ','Head Office',true,true,'private address');
 INSERT INTO public.account_types(id,type_code,type_name,is_active) VALUES
