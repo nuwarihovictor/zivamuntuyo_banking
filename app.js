@@ -990,11 +990,14 @@ window.loadAttendancePolicy();
            </label>
            <button type="button" class="secondary" onclick="loadFinancialReports()">Refresh reports</button>
            <button type="button" class="secondary" id="reports-export-csv" onclick="window.exportFinancialReportsCsv()" disabled>Export trial balance CSV</button>
+           <button type="button" class="secondary" id="reports-export-statements-csv" onclick="window.exportFinancialStatementsCsv()" disabled>Export statement summary CSV</button>
          </div>
          <div id="reports-feedback" class="muted" aria-live="polite">Loading ledger report…</div>
          <div id="reports-summary"></div>
          <div id="reports-detail"></div>
-         <p class="muted">Income statement and balance sheet classifications require a reviewed chart of accounts. No estimates or demo figures are displayed.</p>`
+         <section class="panel"><h3>Cumulative income statement view</h3><div id="reports-income-statement"></div></section>
+         <section class="panel"><h3>Balance sheet view</h3><div id="reports-balance-sheet"></div></section>
+         <p class="muted">Statement views are calculated from configured ledger types and all posted balances (not a date-filtered period). Verify the chart of accounts, closing entries, and reconciliation before using them as formal financial statements.</p>`
       )}
     `;
 
@@ -1289,17 +1292,54 @@ window.validateTrialBalanceRows = function(rows) {
   return { ok: true, rows };
 };
 
+window.exportFinancialStatementsCsv = function() {
+  const feedback = document.getElementById("reports-feedback");
+  const button = document.getElementById("reports-export-statements-csv");
+  const rows = Array.isArray(window._financialStatementRows) ? window._financialStatementRows : [];
+  if (!rows.length) {
+    if (feedback) feedback.textContent = "No loaded statement rows to export. Refresh reports first.";
+    if (button) button.disabled = true;
+    return;
+  }
+  const csvCell = value => {
+    let text = value == null ? "" : String(value);
+    if (/^[-=+@\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const columns = [["statement", "statement"], ["currency_code", "currency_code"], ["line_item", "line_item"], ["amount", "amount"]];
+  const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
+  rows.forEach(row => lines.push(columns.map(([key]) => csvCell(row[key])).join(",")));
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n") + "\r\n"], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "zivamuntuyo-financial-statement-summary-" + new Date().toISOString().slice(0,10) + ".csv";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (feedback) feedback.textContent = "Exported " + rows.length + " statement summary rows. These are cumulative posted balances, not date-filtered statutory statements.";
+};
+
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
   const exportButton = document.getElementById("reports-export-csv");
+  const statementsExportButton = document.getElementById("reports-export-statements-csv");
+  const incomeEl = document.getElementById("reports-income-statement");
+  const balanceSheetEl = document.getElementById("reports-balance-sheet");
   window._financialReportRows = [];
+  window._financialStatementRows = [];
   if (exportButton) exportButton.disabled = true;
+  if (statementsExportButton) statementsExportButton.disabled = true;
   const summary = document.getElementById("reports-summary");
   const detail = document.getElementById("reports-detail");
   const branchInput = document.getElementById("reports-branch-id");
   if (!feedback || !summary || !detail) return;
   summary.innerHTML = "";
   detail.innerHTML = "";
+  if (incomeEl) incomeEl.innerHTML = "";
+  if (balanceSheetEl) balanceSheetEl.innerHTML = "";
   if (!db) {
     feedback.textContent = "Database connection unavailable. No report figures are being shown.";
     return;
@@ -1351,6 +1391,55 @@ window.loadFinancialReports = async function() {
   const money = (n, currency) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
   const currencyEntries = Object.entries(currencies);
   const unbalancedCurrencies = currencyEntries.filter(([, group]) => Math.abs(group.debit - group.credit) >= 0.005);
+  const statementRows = [];
+  const incomeMarkup = [];
+  const balanceMarkup = [];
+  currencyEntries.forEach(([currency, group]) => {
+    const accounts = group.accounts;
+    const amount = (type, side) => {
+      const totals = accounts[type];
+      if (!totals) return 0;
+      return side === "debit" ? totals.debit - totals.credit : totals.credit - totals.debit;
+    };
+    const income = amount("income", "credit");
+    const expenses = amount("expense", "debit");
+    const netResult = income - expenses;
+    const assets = amount("asset", "debit");
+    const liabilities = amount("liability", "credit");
+    const equity = amount("equity", "credit");
+    const totalClaims = liabilities + equity + netResult;
+    const difference = assets - totalClaims;
+    const push = (statement, line, value) => statementRows.push({
+      statement, currency_code: currency, line_item: line, amount: Number(value.toFixed(2))
+    });
+    push("income_statement", "Income", income);
+    push("income_statement", "Expenses", expenses);
+    push("income_statement", "Net surplus / (deficit)", netResult);
+    push("balance_sheet", "Assets", assets);
+    push("balance_sheet", "Liabilities", liabilities);
+    push("balance_sheet", "Equity", equity);
+    push("balance_sheet", "Unclosed earnings (income less expenses)", netResult);
+    push("balance_sheet", "Liabilities + equity + unclosed earnings", totalClaims);
+    push("balance_sheet", "Balance sheet difference (assets less claims)", difference);
+    incomeMarkup.push(
+      '<h4>' + esc(currency) + '</h4>' +
+      '<div class="list-item"><span>Income</span><strong>' + esc(money(income, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Expenses</span><strong>' + esc(money(expenses, currency)) + '</strong></div>' +
+      '<div class="list-item"><strong>Net surplus / (deficit)</strong><strong>' + esc(money(netResult, currency)) + '</strong></div>'
+    );
+    const balanceStatus = Math.abs(difference) < 0.005
+      ? '<div class="list-item" role="status">Assets match liabilities, equity, and unclosed earnings for this currency. Independent reconciliation is still required.</div>'
+      : '<div class="list-item" role="alert"><strong>Balance sheet difference:</strong> ' + esc(money(difference, currency)) + '. Stop and reconcile this currency before relying on the statement.</div>';
+    balanceMarkup.push(
+      '<h4>' + esc(currency) + '</h4>' +
+      '<div class="list-item"><span>Assets</span><strong>' + esc(money(assets, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Liabilities</span><strong>' + esc(money(liabilities, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Equity</span><strong>' + esc(money(equity, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Unclosed earnings</span><strong>' + esc(money(netResult, currency)) + '</strong></div>' +
+      '<div class="list-item"><strong>Liabilities + equity + unclosed earnings</strong><strong>' + esc(money(totalClaims, currency)) + '</strong></div>' +
+      balanceStatus
+    );
+  });
   const integrityNotice = unbalancedCurrencies.length
     ? '<div class="list-item" role="alert"><strong>STOP: trial balance is out of balance.</strong> ' +
       unbalancedCurrencies.map(([currency, group]) => esc(currency) + " difference: " + esc(money(group.debit - group.credit, currency))).join("; ") +
@@ -1370,7 +1459,11 @@ window.loadFinancialReports = async function() {
       ' | Net debit: ' + esc(money(t.debit - t.credit, currency)) + '</span></div></div>'
     ).join("")
   ).join("");
-  feedback.textContent = "Report loaded from " + rows.length + " active ledger accounts and posted journal entries. Currency totals are not combined.";
+  if (incomeEl) incomeEl.innerHTML = incomeMarkup.join("");
+  if (balanceSheetEl) balanceSheetEl.innerHTML = balanceMarkup.join("");
+  window._financialStatementRows = statementRows;
+  if (statementsExportButton) statementsExportButton.disabled = statementRows.length === 0;
+  feedback.textContent = "Report loaded from " + rows.length + " active ledger accounts and posted journal entries. Currency totals are not combined; statement views are cumulative and need reconciliation.";
 };
 
 window.loadTrialBalance = async function() {

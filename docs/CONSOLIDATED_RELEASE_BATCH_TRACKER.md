@@ -65,3 +65,9 @@
 - KYC review is now a complete draft workflow: authorized reviewers can approve/reject only pending records, must provide a reason, and the database function records the decision in audit_events under an empty search_path. The new migration also revokes anonymous direct access to customer records. Disposable PostgreSQL assertions cover approve/reject, repeat-decision denial, cross-branch denial, unauthorized-role denial, audit rows, and anon grants.
 
 - The active Supabase project list currently shows the separate candidate project as inactive, so production-shaped staging has not been performed. No attempt was made to activate or modify it.
+
+
+## Financial statements added to the combined batch
+
+- The live ledger schema constrains `ledger_type` to asset, liability, equity, income, and expense. The report page now builds per-currency cumulative income-statement and balance-sheet views from the same validated posted-ledger RPC rows, displays reconciliation warnings, and provides a formula-safe CSV summary export.
+- These are cumulative posted balances, not date-filtered statutory statements. Review account mappings, opening balances, closing entries, and reconciliations in production-shaped staging before treating them as formal financial statements.

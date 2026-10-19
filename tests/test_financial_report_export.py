@@ -32,6 +32,26 @@ class FinancialReportExportTests(unittest.TestCase):
         self.assertIn('new Blob(["\\uFEFF" + lines.join("\\r\\n") + "\\r\\n"]', handler)
         self.assertIn("URL.revokeObjectURL(url)", handler)
 
+
+    def test_statement_views_are_built_per_currency_from_configured_ledger_types(self):
+        self.assertIn('id="reports-income-statement"', self.app)
+        self.assertIn('id="reports-balance-sheet"', self.app)
+        self.assertIn('const income = amount("income", "credit")', self.app)
+        self.assertIn('const expenses = amount("expense", "debit")', self.app)
+        self.assertIn('const assets = amount("asset", "debit")', self.app)
+        self.assertIn('const liabilities = amount("liability", "credit")', self.app)
+        self.assertIn('const equity = amount("equity", "credit")', self.app)
+        self.assertIn("Balance sheet difference", self.app)
+        self.assertIn("Currency totals are not combined", self.app)
+
+    def test_statement_csv_export_is_disabled_until_rows_load_and_escapes_formulas(self):
+        self.assertIn('id="reports-export-statements-csv" onclick="window.exportFinancialStatementsCsv()" disabled', self.app)
+        handler = self.app.split("window.exportFinancialStatementsCsv = function()", 1)[1].split("window.loadFinancialReports = async function()", 1)[0]
+        self.assertIn("window._financialStatementRows", handler)
+        self.assertIn('/^[-=+@\\t\\r]/.test(text)', handler)
+        self.assertIn('type:"text/csv;charset=utf-8;"', handler)
+        self.assertIn("No loaded statement rows to export.", handler)
+
     def test_no_report_data_cannot_be_exported_as_a_valid_report(self):
         handler = self.app.split("window.exportFinancialReportsCsv = function()", 1)[1].split("window.loadFinancialReports = async function()", 1)[0]
         self.assertIn("No loaded trial-balance rows to export.", handler)
