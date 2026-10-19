@@ -54,7 +54,7 @@ const receiptEnd = app.indexOf("window.printDormantReactivationReceipt", receipt
 assert.ok(receiptStart >= 0 && receiptEnd > receiptStart, "Account-opening receipt printer must exist");
 const receiptCode = app.slice(receiptStart, receiptEnd);
 assert.match(receiptCode, /r\.receipt_number/, "Account-opening receipt must use the server-returned receipt number");
-assert.match(receiptCode, /r\.collection_status===\"received\"/, "Account-opening receipt must require server-confirmed collection status");
+assert.match(receiptCode, /r\.collection_status!==\"received\"/, "Account-opening receipt must reject missing server-confirmed collection status");
 assert.doesNotMatch(receiptCode, /TOTAL RECEIVED: UGX 30,000/, "Receipt must not hard-code the paid amount");
 assert.ok(existsSync("supabase/sql/joint_account_holders_and_approval_guard.sql"), "Joint account database safeguards must be checked into the repository");
 const jointSql = readFileSync("supabase/sql/joint_account_holders_and_approval_guard.sql", "utf8");
