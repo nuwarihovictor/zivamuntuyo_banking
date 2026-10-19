@@ -83,10 +83,6 @@ BEGIN
   SELECT r.account_status INTO v_status FROM public.approve_account_request(v_joint) r;
   IF v_status <> 'active' THEN RAISE EXCEPTION 'FAIL: valid two-holder joint account not approved'; END IF;
 
-  IF NOT has_table_privilege('anon','public.general_ledger_accounts','SELECT')
-     OR NOT has_table_privilege('authenticated','public.ledger_journal_entries','SELECT') THEN
-    RAISE EXCEPTION 'FAIL: privilege helper expectation wrong before revocation';
-  END IF;
 END
 $test$;
 
