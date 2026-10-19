@@ -51,6 +51,8 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("event_source = 'manual'", self.attendance_migration)
         self.assertIn("enforce_staff_attendance_transition", self.attendance_migration)
         self.assertIn("Employee is already clocked in", self.attendance_migration)
+        self.assertIn("REVOKE ALL ON TABLE public.staff_attendance_events FROM PUBLIC, anon, authenticated", self.attendance_migration)
+        self.assertNotIn("service_role", (ROOT / "app.js").read_text(encoding="utf-8").lower())
 
 
 if __name__ == "__main__":
