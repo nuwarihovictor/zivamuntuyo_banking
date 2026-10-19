@@ -101,3 +101,9 @@ The integration pass improves project coordination and automated static checks. 
 - [ ] Obtain explicit approval before any production database migration or production release.
 
 These checkboxes distinguish repository implementation from unperformed environment/hardware steps. The live database was inspected read-only; no production SQL was applied.
+
+
+## Financial integrity spot-check — 19 October 2026
+- [x] Run read-only aggregate checks for posted journal balance/currency/audit fields, stored account balances versus posted liability ledger, multiple IND accounts and joint-holder counts.
+- [x] Check in repeatable diagnostic SQL at \`supabase/tests/financial_integrity_diagnostics.sql\`.
+- [ ] Add this diagnostic to a controlled staging/release checklist and establish a recurring owner/schedule for monitoring.
