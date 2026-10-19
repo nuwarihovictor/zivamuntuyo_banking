@@ -9,6 +9,7 @@ DECLARE
 BEGIN
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
   PERFORM set_config('test.role','accountant',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
   INSERT INTO public.employee_profiles(user_id,is_active)
   VALUES ('40000000-0000-0000-0000-000000000001',true);
 
@@ -155,3 +156,142 @@ BEGIN
   END IF;
 END
 $search_path_test$;
+
+-- Exercise the transaction RPC flow using isolated fixture copies of the live function bodies.
+DO $transaction_test$
+DECLARE
+  v_account uuid := '50000000-0000-0000-0000-000000000001';
+  v_cash uuid := '60000000-0000-0000-0000-000000000001';
+  v_customer_ledger uuid := '60000000-0000-0000-0000-000000000002';
+  v_deposit uuid;
+  v_withdrawal uuid;
+  v_limit_request uuid;
+  v_self_request uuid;
+  v_branch_request uuid;
+  v_failed boolean;
+  v_entries integer;
+  v_balance numeric;
+  v_status text;
+BEGIN
+  INSERT INTO public.employee_profiles(user_id,is_active) VALUES
+    ('40000000-0000-0000-0000-000000000002',true),
+    ('40000000-0000-0000-0000-000000000003',true)
+  ON CONFLICT (user_id) DO UPDATE SET is_active=true;
+
+  INSERT INTO public.bank_accounts(
+    id,account_number,account_type_id,currency_code,branch_id,status,created_by,balance
+  ) VALUES (
+    v_account,'TXNTEST001','20000000-0000-0000-0000-000000000001','UGX',
+    '10000000-0000-0000-0000-000000000001','active',
+    '40000000-0000-0000-0000-000000000001',0
+  );
+  INSERT INTO public.ledger_accounts(id,ledger_type,currency_code,branch_id,is_active)
+  VALUES(v_cash,'asset','UGX','10000000-0000-0000-0000-000000000001',true);
+  INSERT INTO public.ledger_accounts(id,linked_bank_account_id,ledger_type,currency_code,branch_id,is_active)
+  VALUES(v_customer_ledger,v_account,'liability','UGX','10000000-0000-0000-0000-000000000001',true);
+
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_deposit
+  FROM public.create_cash_transaction_request(v_account,'deposit',100,'CI deposit') r;
+
+  -- The requester cannot approve their own request.
+  PERFORM set_config('test.role','bank_admin',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.approve_cash_transaction_request(v_deposit);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%requester cannot approve their own transaction%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: self-approval was accepted'; END IF;
+
+  -- A separate approver can approve when within the configured limit.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_deposit);
+
+  -- A third employee posts; requester and approver cannot post.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  SELECT r.journal_status INTO v_status
+  FROM public.post_approved_cash_transaction(v_deposit,v_cash) r;
+  IF v_status <> 'posted' THEN RAISE EXCEPTION 'FAIL: approved deposit did not post'; END IF;
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_deposit;
+  IF v_entries <> 2 THEN RAISE EXCEPTION 'FAIL: deposit posted % ledger entries, expected 2',v_entries; END IF;
+  IF (SELECT balance FROM public.bank_accounts WHERE id=v_account) <> 100 THEN
+    RAISE EXCEPTION 'FAIL: stored account balance did not update after deposit';
+  END IF;
+  IF (SELECT sum(amount) FILTER (WHERE entry_side='debit') FROM public.ledger_entries WHERE journal_id=v_deposit)
+     <> (SELECT sum(amount) FILTER (WHERE entry_side='credit') FROM public.ledger_entries WHERE journal_id=v_deposit) THEN
+    RAISE EXCEPTION 'FAIL: posted deposit journal is not balanced';
+  END IF;
+
+  -- Duplicate posting must fail and leave the two original entries unchanged.
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_deposit,v_cash);
+  EXCEPTION WHEN OTHERS THEN v_failed := true;
+  END;
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_deposit;
+  IF NOT v_failed OR v_entries <> 2 THEN RAISE EXCEPTION 'FAIL: duplicate posting created additional entries'; END IF;
+
+  -- A withdrawal larger than the posted customer balance must not post.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_withdrawal
+  FROM public.create_cash_transaction_request(v_account,'withdrawal',101,'CI overdraw attempt') r;
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_withdrawal);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  PERFORM set_config('test.role','accountant',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_withdrawal,v_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Insufficient available balance%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: withdrawal exceeding available balance was posted'; END IF;
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_withdrawal;
+  SELECT status INTO v_status FROM public.ledger_journals WHERE id=v_withdrawal;
+  IF v_entries <> 0 OR v_status <> 'pending_approval' THEN
+    RAISE EXCEPTION 'FAIL: failed withdrawal left partial posting state';
+  END IF;
+
+  -- Approval limits are enforced by the server-side helper.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_limit_request
+  FROM public.create_cash_transaction_request(v_account,'deposit',50,'CI limit attempt') r;
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.approval_limit_allowed','false',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.approve_cash_transaction_request(v_limit_request);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%exceeds your configured approval limit%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: over-limit transaction was approved'; END IF;
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+
+  -- Branch-scoped request must be rejected if the staff member lacks branch access.
+  INSERT INTO public.branches(id,branch_code,branch_name,is_head_office,is_active)
+  VALUES('10000000-0000-0000-0000-000000000003','BR2','Second Branch',false,true);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000003',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.create_cash_transaction_request(v_account,'deposit',10,'CI branch denial');
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%transaction access to this account branch%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: cross-branch transaction request was accepted'; END IF;
+END
+$transaction_test$;
+
