@@ -11,6 +11,9 @@ This checklist is a test plan, not a claim that the tests have already passed. U
 - [ ] Bank-wide roles and branch-scoped roles are tested separately.
 - [ ] Auth expiry, refresh, sign-out and back-button behavior do not expose protected pages.
 - [ ] Public browser assets contain no Supabase service-role/secret keys.
+- [ ] Review all Supabase SECURITY DEFINER function grants and body-level authorization; test intended RPCs and reject unauthorized callers.
+- [ ] Review RLS-enabled/no-policy tables and confirm RPC-only access is intentional.
+- [ ] Review the public branch-directory view's anonymous output and RLS-bypass behavior.
 
 ## 2. Account eligibility and joint holders
 
