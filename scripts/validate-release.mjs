@@ -36,5 +36,26 @@ assert.doesNotMatch(app, /sb_secret_[A-Za-z0-9_-]{20,}/, "A Supabase secret key 
 assert.doesNotMatch(app, /service_role\s*[:=]\s*["'][^"']{20,}["']/i, "A service-role credential must never be embedded in browser code");
 assert.doesNotMatch(app, /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, "Private keys must never be embedded in browser code");
 
+assert.match(app, /window\.toggleJointHolderFields/, "Joint account ownership selector must expose the holder workflow");
+assert.match(app, /add_joint_account_holder_to_pending_request/, "Joint account holder registration must call a trusted RPC");
+assert.match(app, /send_vic_line_direct_message/, "VIC LINE direct messages must use the trusted private-message RPC");
+assert.match(app, /list_vic_line_direct_messages/, "VIC LINE must load private conversation history through the trusted RPC");
+const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
+const receiptEnd = app.indexOf("window.printDormantReactivationReceipt", receiptStart);
+assert.ok(receiptStart >= 0 && receiptEnd > receiptStart, "Account-opening receipt printer must exist");
+const receiptCode = app.slice(receiptStart, receiptEnd);
+assert.match(receiptCode, /r\.receipt_number/, "Account-opening receipt must use the server-returned receipt number");
+assert.match(receiptCode, /r\.collection_status===\"received\"/, "Account-opening receipt must require server-confirmed collection status");
+assert.doesNotMatch(receiptCode, /TOTAL RECEIVED: UGX 30,000/, "Receipt must not hard-code the paid amount");
+assert.ok(existsSync("supabase/sql/joint_account_holders_and_approval_guard.sql"), "Joint account database safeguards must be checked into the repository");
+const jointSql = readFileSync("supabase/sql/joint_account_holders_and_approval_guard.sql", "utf8");
+assert.match(jointSql, /distinct_holder_count|v_joint_holder_count/, "Joint account approval must verify distinct holders");
+assert.match(jointSql, /REVOKE ALL ON FUNCTION public\.add_joint_account_holder_to_pending_request/, "Joint-holder RPC must revoke default public execution");
+assert.match(jointSql, /GRANT EXECUTE ON FUNCTION public\.add_joint_account_holder_to_pending_request.*authenticated/, "Joint-holder RPC must be explicitly granted to authenticated staff");
+const directSql = readFileSync("supabase/sql/vic_line_private_messages.sql", "utf8");
+assert.match(directSql, /CREATE OR REPLACE FUNCTION public\.send_vic_line_direct_message/, "Private messaging SQL must include a trusted send RPC");
+assert.match(directSql, /CREATE OR REPLACE FUNCTION public\.mark_vic_line_direct_message_read/, "Private messaging SQL must include read receipts");
+
+
 console.log(`Release static guard passed: ${requiredFiles.length} core files, ${navButtons.length} navigation modules, local asset references and basic secret-exposure checks.`);
 console.log("Reminder: static checks do not verify Supabase RLS/RPC behavior, ledger integrity, hardware, or deployment.");
