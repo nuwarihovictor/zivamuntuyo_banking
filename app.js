@@ -105,11 +105,21 @@ window.createBranch = async function(event) {
   const form=event.currentTarget, feedback=document.getElementById("branch-management-feedback");
   if(!db||!form.reportValidity())return;
   const data=new FormData(form);
-  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on",is_active:true};
+  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
   if(feedback)feedback.textContent="Creating branch…";
-  const {error}=await db.rpc("admin_create_branch",{p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
-  if(error){if(feedback)feedback.textContent="Branch was not created: "+error.message;return;}
-  form.reset();await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_create_branch",{p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
+    if(error)throw error;
+    form.reset();
+    if(feedback)feedback.textContent="Branch created. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch creation could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(submit)submit.disabled=false;
+  }
 };
 
 window.updateBranch = async function(event,id) {
@@ -118,10 +128,19 @@ window.updateBranch = async function(event,id) {
   if(!db||!form.reportValidity())return;
   const data=new FormData(form);
   const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
   if(feedback)feedback.textContent="Saving branch changes…";
-  const {error}=await db.rpc("admin_update_branch",{p_branch_id:id,p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
-  if(error){if(feedback)feedback.textContent="Branch changes were not saved: "+error.message;return;}
-  await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_update_branch",{p_branch_id:id,p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Branch updated. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch update could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(submit)submit.disabled=false;
+  }
 };
 
 window.setBranchActive = async function(id,active) {
@@ -129,12 +148,20 @@ window.setBranchActive = async function(id,active) {
   if(!confirm("Are you sure you want to "+action+" this branch? Existing financial history will be preserved."))return;
   const feedback=document.getElementById("branch-management-feedback");
   if(!db)return;
+  const button=document.querySelector('[onclick="window.setBranchActive(\\''+id+'\\','+active+')"]');
+  if(button)button.disabled=true;
   if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
-  const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
-  if(error){if(feedback)feedback.textContent="Branch status was not changed: "+error.message;return;}
-  await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Branch status updated. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch status change could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(button)button.disabled=false;
+  }
 };
-
 
 window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
