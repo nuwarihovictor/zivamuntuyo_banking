@@ -19,7 +19,7 @@ class FinancialReportRegressionTests(unittest.TestCase):
         self.assertIn("window.validateTrialBalanceRows(rows)", reports)
         # summary.innerHTML is cleared before the request; assert validation precedes
         # construction and rendering of actual report totals, not that initial reset.
-        self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("const currencies = Object.create(null)"))
+        self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("window.calculateFinancialReportGroups(rows)"))
         self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("summary.innerHTML = integrityNotice"))
         self.assertIn("No report figures are being shown", reports)
 
@@ -27,10 +27,14 @@ class FinancialReportRegressionTests(unittest.TestCase):
         start = self.app.index("window.loadFinancialReports = async function()")
         end = self.app.index("window.loadTrialBalance = async function()", start)
         reports = self.app[start:end]
-        self.assertIn("const currencies = Object.create(null)", reports)
-        self.assertIn("rows.forEach(row =>", reports)
-        self.assertIn("const currency = String(row.currency_code).trim()", reports)
-        self.assertIn("const currencyEntries = Object.entries(currencies)", reports)
+        helper_start = self.app.index("window.calculateFinancialReportGroups = function(rows)")
+        helper_end = self.app.index("window.calculateFinancialStatementAmounts = function(accounts)", helper_start)
+        grouping = self.app[helper_start:helper_end]
+        self.assertIn("const currencies = Object.create(null)", grouping)
+        self.assertIn("rows.forEach(row =>", grouping)
+        self.assertIn("const currency = String(row.currency_code).trim()", grouping)
+        self.assertIn("const currencyEntries = Object.entries(currencies)", grouping)
+        self.assertIn("window.calculateFinancialReportGroups(rows)", reports)
         self.assertIn("Currency totals are not combined", reports)
 
     def test_unbalanced_debits_credits_and_balance_sheet_differences_are_explicitly_flagged(self):
