@@ -132,7 +132,7 @@ BEGIN
     UPDATE public.attendance_device_events SET processing_status='inactive_employee',employee_user_id=v_map.employee_user_id,processing_note='Mapped employee is not active' WHERE id=v_event_id;
     RETURN QUERY SELECT v_event_id,NULL::uuid,'inactive_employee'::text,'Mapped employee is not active'::text; RETURN;
   END IF;
-  IF v_employee.home_branch_id IS NOT NULL AND v_employee.home_branch_id<>v_device.branch_id
+  IF coalesce(v_employee.home_branch_id<>v_device.branch_id,true)
      AND NOT EXISTS(SELECT 1 FROM public.employee_branch_access eba WHERE eba.employee_user_id=v_employee.user_id AND eba.branch_id=v_device.branch_id) THEN
     UPDATE public.attendance_device_events SET processing_status='error',employee_user_id=v_employee.user_id,processing_note='Employee is not authorized for the device branch' WHERE id=v_event_id;
     RETURN QUERY SELECT v_event_id,NULL::uuid,'branch_access_denied'::text,'Employee is not authorized for the device branch'::text; RETURN;
