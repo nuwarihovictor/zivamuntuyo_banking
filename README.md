@@ -14,6 +14,8 @@ See:
 - [Full-system integration audit](docs/FULL_SYSTEM_INTEGRATION_AUDIT_2026-10-18.md)
 - [Remaining work plan](docs/REMAINING_WORK_PLAN_2026.md)
 - [Deployment readiness register](docs/DEPLOYMENT_READINESS_2026.md)
+- [Release acceptance tests](docs/RELEASE_ACCEPTANCE_TESTS.md)
+- [Read-only financial integrity diagnostics](supabase/tests/financial_integrity_diagnostics.sql)
 - [Loan servicing design](docs/LOAN_SERVICING_AND_ARREARS_DESIGN.md)
 - [Loan servicing schema draft](docs/LOAN_SERVICING_SCHEMA_DRAFT.md)
 - [Fingerprint attendance compatibility](docs/attendance-device-compatibility.md)
