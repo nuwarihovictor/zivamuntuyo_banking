@@ -129,14 +129,14 @@ BEGIN
 END
 $acl_test$;
 
--- Search-path hardening: pinned catalog/public resolution and pg_temp last.
+-- Search-path hardening: financial activity uses an empty path; other routines pin catalog/public and pg_temp last.
 DO $search_path_test$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND p.proname='record_financial_activity'
-      AND p.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']
+      AND p.proconfig @> ARRAY['search_path=""']
   ) THEN
     RAISE EXCEPTION 'FAIL: SECURITY DEFINER financial routine search_path was not pinned';
   END IF;

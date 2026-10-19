@@ -25,7 +25,6 @@ BEGIN
         'record_account_opening_package_collection',
         'record_account_security_top_up',
         'record_additional_share_purchase',
-        'record_financial_activity',
         'record_loan_processing_fee_collection',
         'record_stationery_collection',
         'refresh_dormant_accounts',
@@ -40,6 +39,11 @@ BEGIN
   END LOOP;
 END
 $migration$;
+
+-- This routine uses schema-qualified application objects and built-ins only.
+-- An empty search_path prevents shadowing without changing its accounting logic.
+ALTER FUNCTION public.record_financial_activity(uuid,text,numeric,text,text,uuid,uuid,date)
+  SET search_path = '';
 
 -- This is an internal policy helper; callers should use the authorized transaction RPCs.
 -- SECURITY DEFINER routines owned by postgres can still call it internally.
