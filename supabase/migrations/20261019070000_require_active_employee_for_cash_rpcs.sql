@@ -27,7 +27,7 @@ BEGIN
     RAISE EXCEPTION 'You do not have transaction access to this account branch';
   END IF;
   v_journal_number := 'REQ-' || to_char(clock_timestamp(),'YYYYMMDDHH24MISSMS') || '-' ||
-    upper(substr(encode(gen_random_bytes(3),'hex'),1,6));
+    upper(substr(replace(pg_catalog.gen_random_uuid()::text,'-',''),1,6));
   INSERT INTO public.ledger_journals
     (journal_number,journal_type,currency_code,status,description,created_by,requested_account_id,requested_amount,request_transaction_type)
   VALUES (v_journal_number,v_type,v_currency,'pending_approval',
