@@ -50,9 +50,10 @@ class AccountEligibilityMigrationStaticTests(unittest.TestCase):
         self.assertIn("Customer must be active before an account can be opened", self.sql)
         self.assertIn("Customer must be active and accessible before an account can be opened", self.sql)
 
-    def test_currency_must_be_configured_and_active(self):
-        self.assertIn("FROM public.currencies c", self.sql)
-        self.assertIn("c.is_active=true", self.sql)
+    def test_currency_must_be_configured_and_active_in_both_entry_points(self):
+        self.assertGreaterEqual(self.sql.count("FROM public.currencies c"), 2)
+        self.assertGreaterEqual(self.sql.count("c.is_active=true"), 2)
+        self.assertGreaterEqual(self.sql.count("Unsupported or inactive currency"), 2)
         self.assertNotIn("'UGX','USD','KES','TZS','RWF','BIF','CDF'", self.sql)
 
     def test_account_creation_checks_auth_employee_role_and_branch_scope(self):
