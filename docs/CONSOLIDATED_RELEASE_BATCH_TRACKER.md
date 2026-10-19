@@ -79,7 +79,7 @@
 
 - Added a Vercel build step that generates `app-config.js` from public Supabase environment variables. Preview/local builds refuse the live production Supabase URL and reject secret/service-role keys; when no staging config is supplied, the preview stays disconnected instead of writing to production.
 - The canonical production hostname retains the existing public-key fallback so this draft change does not require a production env-var mutation. The build script and environment isolation have dedicated regression tests.
-- The Vercel project currently has no environment variables configured, and its separate candidate Supabase project is inactive. A functional staging preview therefore remains blocked until a separate active staging project and Preview environment variables are approved/configured.
+- The Vercel project currently has no environment variables configured, and its separate candidate Supabase project `suopsvncczxlnyjhtfdy` is `INACTIVE`. The production Supabase project is `ACTIVE_HEALTHY`; do not point the preview at production. A functional staging preview remains blocked until a separate active staging project and Preview environment variables are approved/configured.
 
 
 ## Coordinated implementation batch — receipts, staff chat and attendance
@@ -95,4 +95,11 @@
 
 - The exact-head disposable PostgreSQL workflow for commit `33a3431d55d413e1afb685cc4c0ffe41c6728ac4` failed in the Python regression stage, before the database migration assertions ran. The failure was two test-boundary lookups that incorrectly expected the receipt-print function to appear after the attendance function; the application defines the receipt handler earlier in the file. This is a regression-test slicing defect, not evidence of a failed SQL migration.
 - Corrective batch: use the attendance function's own closing boundary and explicitly scope attendance-history reads to the authenticated employee, not only to RLS. A new regression assertion checks this UI-level employee filter.
-- Exact-head CI must be rerun after this correction. No production deployment or production database change is authorised by this batch.
+- Correction verification is complete: commit `0105b41e3793b6d8f613050869e86dc52db5629a` passed run [#39234320707](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39234320707) with 86 Python tests, JS syntax checks, seven draft migrations, and six SQL assertion scripts. No production deployment or production database change is authorised by this batch.
+
+
+## Vercel preview status — 2026-10-19
+
+- Preview build for code/test commit `0105b41e3793b6d8f613050869e86dc52db5629a` is `READY`: [open preview](https://zivamuntuyobanking-744r2l5je-infonuwarihovictor-1047s-projects.vercel.app).
+- The Vercel project has SSO protection enabled for non-custom-domain deployments. A prompt before the app loads may be Vercel/team authentication, not the banking application's own sign-in. Do not disable this protection as a workaround.
+- This is a branch preview (`target: null)), not a production deployment. The preview has not been proven to connect to staging because no Vercel environment variables are configured and the separate staging Supabase project is inactive.
