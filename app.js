@@ -365,7 +365,7 @@ window.switchPage = function(pageName) {
         `).join("");
       }).catch(() => {
         const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No customer records found yet.</p>`;
+        if (listEl) listEl.innerHTML = `<p class="muted">Customer records could not be loaded because the request failed. Check your connection and permissions, then retry.</p>`;
       });
     }
   }
