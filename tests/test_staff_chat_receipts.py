@@ -36,3 +36,13 @@ class StaffChatAndReceiptRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_attendance_ui_and_database_transition_guards(self):
+        migration = (ROOT / "supabase/migrations/20261019090000_staff_attendance_event_rls.sql").read_text(encoding="utf-8")
+        self.assertIn("window.recordStaffAttendancePunch", self.app)
+        self.assertIn('db.from("staff_attendance_events")', self.app)
+        self.assertIn("employee_user_id = (SELECT auth.uid())", migration)
+        self.assertIn("event_source = 'manual'", migration)
+        self.assertIn("enforce_staff_attendance_transition", migration)
+        self.assertIn("Employee is already clocked in", migration)
