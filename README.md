@@ -43,11 +43,16 @@ For any live-money operation, the database must be authoritative for authenticat
 
 ## Features that still require real integration/testing
 
-- Loan repayment schedules, actual repayment posting/allocation, arrears ageing, due-date reminders and loan accounting.
-- Full joint-account holder workflow and server-side approval rule requiring the configured minimum holders.
+- Loan due-date dashboard and draft schedule/repayment/alert schema are present in this integration branch; trusted repayment posting/allocation, ledger integration, schema validation, and scheduled alert generation remain pending.
+- Joint-account holder UI and draft server-side approval guard are present in this integration branch; database migration, concurrency and authorization tests are still required before live use.
 - Real fingerprint reader/terminal connector, vendor SDK, Windows driver validation and audited attendance ingestion.
-- Private one-to-one staff messaging, live voice calls, and push notifications when the browser is closed.
+- Private one-to-one staff messaging UI and draft send/read RPCs are present in this integration branch; RPC installation/authorization tests remain pending. Live voice calls and push notifications when the browser is closed are not implemented.
 - Actual 80 mm thermal printer validation and full Chrome/Edge/Android acceptance.
 - Vercel preview deployment, environment review, custom-domain configuration, production approval and rollback drill.
 
 Do not represent a design, preview calculator, UI control or draft SQL file as a working production feature until its database operation and acceptance tests pass.
+
+
+## Integration branch update — 19 October 2026
+
+The current review branch includes the joint-account holder interface, VIC LINE private-message interface, database-backed loan due-date dashboard, and draft SQL contracts. The release guard checks these expected interfaces. The latest earlier CI run failed because its checked-out commit still used an outdated receipt assertion; the assertion has since been corrected in the branch. A fresh workflow run must pass before this branch is considered release-ready. No live Supabase migration or production deployment has been performed.
