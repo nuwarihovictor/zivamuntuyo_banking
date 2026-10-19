@@ -39,6 +39,9 @@ def validate_disposable_target(env: dict[str, str]) -> tuple[bool, str]:
     host = (env.get("PGHOST") or "").strip().lower()
     if host not in {"localhost", "127.0.0.1", "::1"}:
         return False, "Refusing database tests: PGHOST must be loopback (localhost/127.0.0.1/::1)."
+    hostaddr = (env.get("PGHOSTADDR") or "").strip()
+    if hostaddr and hostaddr not in {"127.0.0.1", "::1"}:
+        return False, "Refusing database tests: PGHOSTADDR must be loopback when supplied."
     if env.get("PGDATABASE") != "banking_test":
         return False, "Refusing database tests: PGDATABASE must be exactly 'banking_test'."
     return True, "Disposable PostgreSQL target accepted."

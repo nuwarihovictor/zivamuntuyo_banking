@@ -30,6 +30,16 @@ class DisposableTargetGuardTests(unittest.TestCase):
         self.assertFalse(safe)
         self.assertIn("loopback", reason)
 
+    def test_refuses_non_loopback_host_address_override(self):
+        safe, reason = validate_disposable_target({
+            "ZIVAMUNTUYO_DISPOSABLE_DB": "1",
+            "PGHOST": "localhost",
+            "PGHOSTADDR": "203.0.113.10",
+            "PGDATABASE": "banking_test",
+        })
+        self.assertFalse(safe)
+        self.assertIn("PGHOSTADDR", reason)
+
     def test_refuses_non_test_database_name(self):
         safe, reason = validate_disposable_target({
             "ZIVAMUNTUYO_DISPOSABLE_DB": "1",

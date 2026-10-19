@@ -8,13 +8,14 @@
 - Working branch: fix/account-eligibility-guards-2026-10-19
 - Pull request: [Draft PR #15](https://github.com/nuwarihovictor/zivamuntuyo_banking/pull/15)
 - Production changes: **none authorised or performed by this batch**
+- Latest consolidated preflight commit: `bb01463745e7645e4969d4a2c8e60fe64c3c4324` (automated disposable PostgreSQL workflow passed)
 - Release state: **NO-GO until all applicable gates below are evidenced and an authorised release owner approves**
 
 ## Consolidated work matrix
 
 | Workstream | Code / automated work | Required evidence before release | State |
 |---|---|---|---|
-| Code and CI | Run JavaScript syntax checks and all Python regression tests; apply draft migrations only to disposable PostgreSQL; investigate failures against the exact tested SHA | Green workflow for exact final SHA, test logs retained | In progress |
+| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, six draft migrations, and five PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Consolidated run passed on `bb01463745e7645e4969d4a2c8e60fe64c3c4324`; rerun required after later changes |
 | Banking workflows | Verify account eligibility, individual/joint holder rules, deposits, withdrawals, approval separation, posting idempotency, ledger legs, audit atomicity, branch/currency boundaries | Production-shaped staging tests with synthetic data; debit/credit reconciliation and rollback evidence | Staging not confirmed |
 | Reports and accounting | Verify dashboards derive from posted ledger entries, preserve currency separation, and agree with trial balance / account movements | Reconciled report outputs for each test currency and branch | Needs verification |
 | Database security | Compare each replaced function with current schema; inspect owner, SECURITY DEFINER search path, execute grants, table grants, RLS policies, and every caller | Approved staging migration run and role/branch negative tests | Not confirmed |

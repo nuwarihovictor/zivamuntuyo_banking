@@ -24,12 +24,14 @@ Features depending on a draft migration are not active in a database until that 
 
 ## Development checks
 
-Run the source-level regression suite from the repository root:
+Install the PostgreSQL client and the SQL parser dependency, then run the consolidated preflight from the repository root:
 
 ```bash
-node --check app.js
-python -m unittest discover -s tests -p 'test_*.py' -v
+python -m pip install pglast
+python scripts/release_preflight.py --static-only
 ```
+
+The static-only command checks JavaScript syntax, all Python regression tests, and migration SQL syntax without connecting to a database. The full disposable-database run is executed by GitHub Actions. To run the database phase locally, use a throwaway PostgreSQL instance with database name `banking_test`, loopback-only host settings, and set `ZIVAMUNTUYO_DISPOSABLE_DB=1` explicitly. The script refuses remote hosts and non-test database names; **never point it at staging or production**.
 
 For Windows field testing, use the [Windows 10/11 acceptance checklist](docs/WINDOWS_10_11_FIELD_ACCEPTANCE.md). The checklist records required evidence; it does not mean hardware tests have already passed.
 
