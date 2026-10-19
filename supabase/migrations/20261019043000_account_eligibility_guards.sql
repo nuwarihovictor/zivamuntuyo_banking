@@ -73,8 +73,13 @@ BEGIN
   IF p_product_type IS NULL OR p_product_type NOT IN ('savings','current','fixed_deposit','business','group','other') THEN
     RAISE EXCEPTION 'Unsupported account product';
   END IF;
-  IF p_currency_code IS NULL OR upper(p_currency_code) NOT IN ('UGX','USD','KES','TZS','RWF','BIF','CDF') THEN
-    RAISE EXCEPTION 'Unsupported currency';
+  -- Validate against the live currency catalogue, not a hard-coded list.
+  -- The current catalogue does not include USD; only active configured currencies pass.
+  IF p_currency_code IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.currencies c
+    WHERE upper(c.code)=upper(trim(p_currency_code)) AND c.is_active=true
+  ) THEN
+    RAISE EXCEPTION 'Unsupported or inactive currency';
   END IF;
 
   v_account_number := 'ZFS-' || upper(substr(replace(v_account_id::text,'-',''),1,12));
@@ -208,7 +213,7 @@ BEGIN
   END IF;
   IF v_role NOT IN ('system_admin','bank_admin')
      AND v_customer_branch IS NOT NULL
-     AND NOT public.current_employee_has_branch_access(v_customer_branch) THEN
+     AND NOT public.current_employee_can_transact_in_branch(v_customer_branch) THEN
     RAISE EXCEPTION 'Customer is outside your authorized branch scope' USING ERRCODE='42501';
   END IF;
   SELECT upper(at.type_code) INTO v_type_code
@@ -288,7 +293,7 @@ BEGIN
   IF NOT FOUND OR v_customer_status IS DISTINCT FROM 'active' THEN
     RAISE EXCEPTION 'Additional holder must be an active customer';
   END IF;
-  IF v_customer_branch IS NOT NULL AND NOT public.current_employee_has_branch_access(v_customer_branch)
+  IF v_customer_branch IS NOT NULL AND NOT public.current_employee_can_transact_in_branch(v_customer_branch)
      AND v_role NOT IN ('system_admin','bank_admin') THEN
     RAISE EXCEPTION 'Additional holder is outside your authorized branch scope' USING ERRCODE='42501';
   END IF;
