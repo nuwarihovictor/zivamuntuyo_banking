@@ -80,3 +80,12 @@
 - Added a Vercel build step that generates `app-config.js` from public Supabase environment variables. Preview/local builds refuse the live production Supabase URL and reject secret/service-role keys; when no staging config is supplied, the preview stays disconnected instead of writing to production.
 - The canonical production hostname retains the existing public-key fallback so this draft change does not require a production env-var mutation. The build script and environment isolation have dedicated regression tests.
 - The Vercel project currently has no environment variables configured, and its separate candidate Supabase project is inactive. A functional staging preview therefore remains blocked until a separate active staging project and Preview environment variables are approved/configured.
+
+
+## Coordinated implementation batch — receipts, staff chat and attendance
+
+- Added receipt-printing regression tests covering posted cash transaction eligibility, invalid/non-positive amounts, escaped receipt fields, blocked pop-ups, and reprint labeling. The disposable PostgreSQL workflow completed successfully on commit `4b088eda4118b22ee396c50a694f86657d195cc3` (run [#39233515546](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39233515546)).
+- Reviewed manual attendance transition logic and corrected the latest-event query to explicitly filter by the authenticated employee ID and order by the event occurrence time. This prevents the browser UI from choosing a clock-in/clock-out transition based on another employee's event if the signed-in role has broader read access.
+- Added regression tests for staff chat authentication, message length limits, safe message rendering, and attendance employee scoping / manual-source labeling.
+- Latest code/test commit: `fda7c9d8afa6b9c829290ef0c881b3065dcbd1fa`. A workflow result for this exact commit has not yet been returned by the current check; therefore the latest attendance patch and added staff tests are **pending exact-head CI verification**.
+- These are code and regression-test improvements only. Staff attendance remains manual, chat permissions still depend on database RLS, physical receipt printing remains untested, and staging/Windows/hardware acceptance remains outstanding.
