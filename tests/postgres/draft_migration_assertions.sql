@@ -175,7 +175,8 @@ DECLARE
 BEGIN
   INSERT INTO public.employee_profiles(user_id,is_active) VALUES
     ('40000000-0000-0000-0000-000000000002',true),
-    ('40000000-0000-0000-0000-000000000003',true)
+    ('40000000-0000-0000-0000-000000000003',true),
+    ('40000000-0000-0000-0000-000000000005',true)
   ON CONFLICT (user_id) DO UPDATE SET is_active=true;
 
   INSERT INTO public.bank_accounts(
@@ -197,6 +198,19 @@ BEGIN
   SELECT r.journal_id INTO v_deposit
   FROM public.create_cash_transaction_request(v_account,'deposit',100,'CI deposit') r;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_requested'
+      AND entity_type='ledger_journal' AND entity_id=v_deposit::text
+      AND actor_user_id='40000000-0000-0000-0000-000000000001'
+      AND branch_id='10000000-0000-0000-0000-000000000001'
+      AND details->>'transaction_type'='deposit'
+      AND details->>'amount'='100'
+      AND details->>'currency_code'='UGX'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: cash request audit event is missing or incomplete';
+  END IF;
+
   -- The requester cannot approve their own request.
   PERFORM set_config('test.role','bank_admin',false);
   v_failed := false;
@@ -211,6 +225,25 @@ BEGIN
   -- A separate approver can approve when within the configured limit.
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
   PERFORM * FROM public.approve_cash_transaction_request(v_deposit);
+
+  -- A second reviewer must not overwrite the first approval.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000005',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.approve_cash_transaction_request(v_deposit);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%unapproved pending cash transaction requests%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: a second approval overwrote the first approver'; END IF;
+  IF (SELECT approved_by FROM public.ledger_journals WHERE id=v_deposit)
+     <> '40000000-0000-0000-0000-000000000002' THEN
+    RAISE EXCEPTION 'FAIL: duplicate approval changed approved_by';
+  END IF;
+  IF (SELECT count(*) FROM public.audit_events
+      WHERE action='cash_transaction_approved' AND entity_id=v_deposit::text) <> 1 THEN
+    RAISE EXCEPTION 'FAIL: duplicate approval created extra approval audit event';
+  END IF;
 
   -- A third employee posts; requester and approver cannot post.
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
