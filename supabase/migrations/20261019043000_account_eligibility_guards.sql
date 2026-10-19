@@ -56,14 +56,14 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Choose a valid active account ownership type'; END IF;
 
   -- Do not silently treat unknown account-type labels as individual or joint.
-  IF v_type_label ~ '(individual|\mind\M|\bind\M)' THEN
+  IF v_type_code = 'IND' THEN
     IF EXISTS (
       SELECT 1
       FROM public.bank_accounts ba
       JOIN public.account_types existing_type ON existing_type.id=ba.account_type_id
       JOIN public.account_holders ah ON ah.account_id=ba.id
       WHERE ah.customer_id=p_customer_id
-        AND lower(coalesce(existing_type.type_code,'') || ' ' || coalesce(existing_type.type_name,'')) ~ '(individual|\mind\M|\bind\M)'
+        AND upper(existing_type.type_code) = 'IND'
         AND ba.status IN ('pending_approval','active','dormant','frozen')
     ) THEN
       RAISE EXCEPTION 'This customer already has an individual account; choose a joint account type if another holder is intended';
@@ -133,7 +133,7 @@ BEGIN
   END IF;
   IF v_status<>'pending_approval' THEN RAISE EXCEPTION 'Only pending account requests can be approved'; END IF;
 
-  IF v_type_label ~ '(joint|\mjnt\M)' THEN
+  IF v_type_code = 'JNT' THEN
     SELECT count(DISTINCT ah.customer_id)::integer INTO v_holder_count
     FROM public.account_holders ah
     WHERE ah.account_id=p_account_id
@@ -148,7 +148,7 @@ BEGIN
   WHERE id=p_account_id;
   INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
   VALUES(auth.uid(),v_branch,'account_request_approved','bank_account',p_account_id::text,'success',
-    jsonb_build_object('account_type_label',v_type_label,'holder_count',CASE WHEN v_type_label ~ '(joint|\mjnt\M)' THEN v_holder_count ELSE NULL END));
+    jsonb_build_object('account_type_label',v_type_label,'holder_count',CASE WHEN v_type_code = 'JNT' THEN v_holder_count ELSE NULL END));
   RETURN QUERY SELECT ba.id,ba.account_number,ba.status FROM public.bank_accounts ba WHERE ba.id=p_account_id;
 END;
 $function$;
