@@ -37,6 +37,21 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("AMOUNT PAID OUT", self.app)
         self.assertIn("window.printTransactionReceipt", self.app)
 
+    def test_branch_management_uses_authorized_admin_rpcs(self):
+        self.assertIn("window.loadBranchManagement", self.app)
+        self.assertIn('db.rpc("current_employee_role_code")', self.app)
+        self.assertIn('roleResult.data==="system_admin"', self.app)
+        self.assertIn('db.rpc("admin_create_branch"', self.app)
+        self.assertIn('db.rpc("admin_update_branch"', self.app)
+        self.assertIn('db.rpc("admin_set_branch_active"', self.app)
+        self.assertIn("Branch was not created:", self.app)
+        self.assertIn("Branch changes were not saved:", self.app)
+
+    def test_manual_attendance_is_not_misrepresented_as_biometric(self):
+        self.assertIn("no fingerprint device is connected yet", self.app)
+        self.assertIn("not fingerprint-verified", self.app)
+        self.assertIn("window.recordStaffAttendancePunch", self.app)
+
     def test_deployment_has_baseline_browser_security_headers(self):
         self.assertIn("X-Content-Type-Options", self.vercel_config)
         self.assertIn("nosniff", self.vercel_config)
