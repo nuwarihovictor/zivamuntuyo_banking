@@ -11,6 +11,8 @@ VALUES ('50000000-0000-0000-0000-000000000001','TEST-CASH-REQ-SECURITY-001','200
         'UGX','10000000-0000-0000-0000-000000000001','active',0)
 ON CONFLICT (account_number) DO UPDATE SET status='active';
 
+SELECT id AS test_bank_account_id FROM public.bank_accounts WHERE account_number='TEST-CASH-REQ-SECURITY-001' \gset
+
 SET ROLE authenticated;
 SELECT set_config('test.role','teller',false);
 SELECT set_config('test.user_id','40000000-0000-0000-0000-000000000015',false);
