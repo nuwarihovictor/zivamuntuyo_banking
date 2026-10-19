@@ -134,3 +134,13 @@
 - Expanded the disposable PostgreSQL assertion suite with negative tests for cross-branch cash request creation and approval. A teller or approver scoped to branch B must be denied access to a branch A account/request; denied operations must not leave an approval or success-audit event.
 - These CI tests use synthetic fixture data and a disposable PostgreSQL 17 database. They do not substitute for a production-shaped staging deployment.
 - The Vercel preview variables remain inert because the prior candidate was an unrelated school database. Do not route the preview to production or another application's database.
+
+
+## Follow-up requested 2026-10-19 — security, accounting, and local printing
+
+- Added [security/accounting blocker review](SECURITY_ACCOUNTING_REVIEW_BLOCKERS.md) to consolidate known access-control findings, financial reconciliation requirements, and release no-go conditions. This is a review record, not evidence that production has been changed or that findings are fixed.
+- Added [offline local receipt-printer test page](../tools/local-receipt-printer-test.html). It uses synthetic values only, has an unmistakable TEST ONLY mark, offers 58 mm, 80 mm, and A4 layout options, and does not connect to any database or cloud service. Use it to test the Windows browser-to-printer path without payment.
+- Added [local printer test instructions](LOCAL_RECEIPT_PRINTER_TEST.md) including the limit that this does not verify the live transaction workflow.
+- Receipt print count remains in page memory only; durable reprint audit is not yet implemented/verified. Real posted deposit/withdrawal receipts, payroll, account-opening, and dormant-reactivation receipts still need accounting-owner and physical printer acceptance.
+- Security review remains read-only for production. No production schema, permissions, data, migration, or deployment changes were made.
+- Zero-cost constraint remains binding: do not upgrade Vercel, create chargeable Supabase staging, buy a domain/device/SDK, or enable a paid service. Preview and live release remain blocked until safe staging and exact-head evidence exist.
