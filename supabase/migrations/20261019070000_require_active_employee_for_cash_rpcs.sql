@@ -33,8 +33,6 @@ BEGIN
   VALUES (v_journal_number,v_type,v_currency,'pending_approval',
     left(coalesce(p_description,initcap(v_type)||' request'),500),auth.uid(),p_account_id,p_amount,v_type)
   RETURNING id INTO v_journal_id;
-  RETURN QUERY SELECT v_journal_id,v_journal_number,'pending_approval'::text;
-END;
   INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
   VALUES (
     auth.uid(),v_branch,'cash_transaction_requested','ledger_journal',v_journal_id::text,'success',
