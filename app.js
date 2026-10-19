@@ -1040,7 +1040,7 @@ window.loadTransactionMonitor = async function() {
     const isPosted=status==="posted";
     const isCashType=type==="deposit"||type==="withdrawal";
     const receiptButton=(isPosted&&isCashType)
-      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(type)+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print '+(type==="deposit"?"deposit":"withdrawal")+' receipt</button>'
+      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-status="posted" data-receipt-print-count="0" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(type)+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print '+(type==="deposit"?"deposit":"withdrawal")+' receipt</button>'
       : "";
     return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><div class="transaction-status-actions"><span class="badge-role">'+esc(r.status||"unknown")+'</span>'+receiptButton+'</div></div>';
   }).join("");
@@ -1898,6 +1898,7 @@ window.sendStaffMessage = async function(event) {
 window.printTransactionReceipt = function(button, skipConfirmation) {
   if(!button || !button.dataset) return;
   const status=document.getElementById("transaction-receipt-status");
+  const receiptStatus=String(button.dataset.receiptStatus||"").toLowerCase();
   const reference=button.dataset.receiptReference||"";
   const transactionDate=button.dataset.receiptDate||"";
   const branch=button.dataset.receiptBranch||"";
@@ -1905,8 +1906,10 @@ window.printTransactionReceipt = function(button, skipConfirmation) {
   const type=String(button.dataset.receiptType||"").toLowerCase();
   const amount=Number(button.dataset.receiptAmount);
   const currency=button.dataset.receiptCurrency||"";
-  if((type!=="deposit"&&type!=="withdrawal")||!reference||!Number.isFinite(amount)||amount<=0){
-    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit or withdrawal.";
+  const previousPrintCount=Number(button.dataset.receiptPrintCount||"0");
+  const copyLabel=previousPrintCount>0?"REPRINT COPY — NOT A NEW TRANSACTION":"ORIGINAL RECEIPT";
+  if(receiptStatus!=="posted"||(type!=="deposit"&&type!=="withdrawal")||!reference||!Number.isFinite(amount)||amount<=0){
+    if(status)status.textContent="Receipt unavailable: the record is not confirmed as a valid posted deposit or withdrawal.";
     return;
   }
   if(!skipConfirmation && !confirm("Print the receipt for posted "+type+" "+reference+"? Verify the transaction reference and amount."))return;
@@ -1914,9 +1917,10 @@ window.printTransactionReceipt = function(button, skipConfirmation) {
   if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
   const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   const money=amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+" "+currency;
-  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(type.toUpperCase())} Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER ${safe(type.toUpperCase())} RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>${safe(type.toUpperCase())}</span></div><hr class="line"><p class="label">${type==="deposit"?"AMOUNT RECEIVED":"AMOUNT PAID OUT"}</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(type.toUpperCase())} Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER ${safe(type.toUpperCase())} RECEIPT</p><p class="muted">${safe(copyLabel)}</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>${safe(type.toUpperCase())}</span></div><hr class="line"><p class="label">${type==="deposit"?"AMOUNT RECEIVED":"AMOUNT PAID OUT"}</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
   printWindow.document.close();
-  if(status)status.textContent="Receipt opened for printing for posted "+type+" "+reference+".";
+  button.dataset.receiptPrintCount=String(previousPrintCount+1);
+  if(status)status.textContent=(previousPrintCount>0?"Reprint copy opened":"Receipt opened")+" for posted "+type+" "+reference+".";
 };
 document.addEventListener("click",function(event){
   const receiptButton=event.target.closest(".transaction-print-receipt");

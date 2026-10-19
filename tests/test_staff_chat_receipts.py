@@ -44,6 +44,7 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
     def test_receipts_are_only_offered_for_posted_cash_transactions(self):
         self.assertIn('const isPosted=status==="posted"', self.app)
         self.assertIn('const isCashType=type==="deposit"||type==="withdrawal"', self.app)
+        self.assertIn('data-receipt-status="posted"', self.app)
         self.assertIn('type!=="withdrawal"', self.app)
         self.assertIn("AMOUNT PAID OUT", self.app)
         self.assertIn("window.printTransactionReceipt", self.app)
@@ -112,9 +113,19 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         start = self.app.index('window.printTransactionReceipt = function')
         end = self.app.index('document.addEventListener("click",function(event){', start)
         receipt = self.app[start:end]
+        self.assertIn('receiptStatus!=="posted"', receipt)
         self.assertIn('(type!=="deposit"&&type!=="withdrawal")', receipt)
         self.assertIn('!Number.isFinite(amount)||amount<=0', receipt)
         self.assertIn('if(!printWindow)', receipt)
+
+    def test_receipt_reprints_are_labelled_and_counted_in_current_transaction_list(self):
+        start = self.app.index('window.printTransactionReceipt = function')
+        end = self.app.index('document.addEventListener("click",function(event){', start)
+        receipt = self.app[start:end]
+        self.assertIn('const previousPrintCount=Number(button.dataset.receiptPrintCount||"0")', receipt)
+        self.assertIn('REPRINT COPY — NOT A NEW TRANSACTION', receipt)
+        self.assertIn('button.dataset.receiptPrintCount=String(previousPrintCount+1)', receipt)
+        self.assertIn('${safe(copyLabel)}', receipt)
 
     def test_chat_rechecks_session_and_handles_send_failures_without_sticking_button(self):
         start = self.app.index('window.sendStaffMessage = async function')
