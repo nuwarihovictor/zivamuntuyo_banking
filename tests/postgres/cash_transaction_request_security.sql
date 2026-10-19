@@ -41,7 +41,8 @@ BEGIN
       'deposit',500,'denied branch-scope attempt'
     );
     RAISE EXCEPTION 'FAIL: cash request outside employee branch was accepted';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'FAIL:%' THEN RAISE; END IF;
   END;
 END
 $branch_scope_denied$;
@@ -56,7 +57,8 @@ BEGIN
       'deposit',500,'denied inactive-employee attempt'
     );
     RAISE EXCEPTION 'FAIL: inactive employee created a cash request';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'FAIL:%' THEN RAISE; END IF;
   END;
 END
 $inactive_employee_denied$;
