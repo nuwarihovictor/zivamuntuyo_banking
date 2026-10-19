@@ -323,4 +323,3 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.add_pending_joint_account_holder(uuid,uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.add_pending_joint_account_holder(uuid,uuid) TO authenticated;
- THEN
