@@ -6,8 +6,8 @@ VALUES ('40000000-0000-0000-0000-000000000015',true),
 ON CONFLICT (user_id) DO UPDATE SET is_active=EXCLUDED.is_active;
 
 INSERT INTO public.bank_accounts
-  (account_number,account_type_id,currency_code,branch_id,status,balance)
-VALUES ('TEST-CASH-REQ-SECURITY-001','20000000-0000-0000-0000-000000000001',
+  (id,account_number,account_type_id,currency_code,branch_id,status,balance)
+VALUES ('50000000-0000-0000-0000-000000000001','TEST-CASH-REQ-SECURITY-001','20000000-0000-0000-0000-000000000001',
         'UGX','10000000-0000-0000-0000-000000000001','active',0)
 ON CONFLICT (account_number) DO UPDATE SET status='active';
 
@@ -21,7 +21,7 @@ DECLARE v_id uuid; v_status text;
 BEGIN
   SELECT r.journal_id,r.journal_status INTO v_id,v_status
   FROM public.create_cash_transaction_request(
-    (SELECT id FROM public.bank_accounts WHERE account_number='TEST-CASH-REQ-SECURITY-001'),
+    '50000000-0000-0000-0000-000000000001',
     'deposit',12500,'fixture security test'
   ) r;
   IF v_id IS NULL OR v_status <> 'pending_approval' THEN
@@ -35,7 +35,7 @@ DO $branch_scope_denied$
 BEGIN
   BEGIN
     PERFORM * FROM public.create_cash_transaction_request(
-      (SELECT id FROM public.bank_accounts WHERE account_number='TEST-CASH-REQ-SECURITY-001'),
+      '50000000-0000-0000-0000-000000000001',
       'deposit',500,'denied branch-scope attempt'
     );
     RAISE EXCEPTION 'FAIL: cash request outside employee branch was accepted';
@@ -50,7 +50,7 @@ DO $inactive_employee_denied$
 BEGIN
   BEGIN
     PERFORM * FROM public.create_cash_transaction_request(
-      (SELECT id FROM public.bank_accounts WHERE account_number='TEST-CASH-REQ-SECURITY-001'),
+      '50000000-0000-0000-0000-000000000001',
       'deposit',500,'denied inactive-employee attempt'
     );
     RAISE EXCEPTION 'FAIL: inactive employee created a cash request';
