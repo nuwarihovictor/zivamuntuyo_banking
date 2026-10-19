@@ -1,8 +1,8 @@
 -- Draft safety migration: serialize account opening and enforce joint-holder minimum.
 -- Apply to a staging Supabase project first. Do NOT run directly on production before review.
--- Assumes account_types.type_code/type_name identify Individual and Joint account ownership.
--- The checks are deliberately fail-closed for joint products only when the account type
--- is identifiable by its code/name; verify seeded type codes in staging before deployment.
+-- Account type codes were read-only verified against the connected database on 2026-10-19:
+-- IND = Individual Account; JNT = Joint Account. Other codes include BUS, FIX, GRP, INS.
+-- Staging execution and schema/function ACL review are still required before deployment.
 
 CREATE OR REPLACE FUNCTION public.create_bank_account_request(
   p_customer_id uuid,
@@ -22,6 +22,7 @@ DECLARE
   v_account_number text;
   v_customer_branch uuid;
   v_type_label text;
+  v_type_code text;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.employee_profiles ep WHERE ep.user_id=auth.uid() AND ep.is_active) THEN
@@ -49,7 +50,8 @@ BEGIN
   IF v_customer_branch IS NOT NULL AND NOT public.current_employee_can_transact_in_branch(v_customer_branch) THEN
     RAISE EXCEPTION 'Customer is outside your authorized branch scope' USING ERRCODE='42501';
   END IF;
-  SELECT lower(coalesce(at.type_code,'') || ' ' || coalesce(at.type_name,'')) INTO v_type_label
+  SELECT upper(at.type_code), lower(coalesce(at.type_code,'') || ' ' || coalesce(at.type_name,''))
+    INTO v_type_code, v_type_label
   FROM public.account_types at WHERE at.id=p_account_type_id AND at.is_active;
   IF NOT FOUND THEN RAISE EXCEPTION 'Choose a valid active account ownership type'; END IF;
 
@@ -107,6 +109,7 @@ DECLARE
   v_branch uuid;
   v_status text;
   v_type_label text;
+  v_type_code text;
   v_holder_count integer;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
@@ -118,8 +121,8 @@ BEGIN
     RAISE EXCEPTION 'Only an authorized administrator or branch manager may approve accounts' USING ERRCODE='42501';
   END IF;
 
-  SELECT ba.branch_id,ba.status,lower(coalesce(at.type_code,'') || ' ' || coalesce(at.type_name,''))
-    INTO v_branch,v_status,v_type_label
+  SELECT ba.branch_id,ba.status,lower(coalesce(at.type_code,'') || ' ' || coalesce(at.type_name,'')),upper(at.type_code)
+    INTO v_branch,v_status,v_type_label,v_type_code
   FROM public.bank_accounts ba
   JOIN public.account_types at ON at.id=ba.account_type_id
   WHERE ba.id=p_account_id
