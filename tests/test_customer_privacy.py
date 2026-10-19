@@ -1,7 +1,7 @@
 """Static regressions for customer directory privacy and honest error states."""
 from pathlib import Path
-import unittest
 import re
+import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app.js"
@@ -26,7 +26,7 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
             "staff_chat_messages", "staff_attendance_events", "loan_applications",
         )
         for table in sensitive_tables:
-            pattern = r"""\\.from\\(["']""" + re.escape(table) + r"""["']\\)\\.select\\(["']\\*["']\\)"""
+            pattern = r""".from(["']""" + re.escape(table) + r"""["']).select(["']*["'])"""
             with self.subTest(table=table):
                 self.assertIsNone(re.search(pattern, self.app), f"Wildcard select found for {table}")
 
