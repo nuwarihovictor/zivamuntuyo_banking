@@ -1,7 +1,7 @@
 /* Isolated demonstration only. Intentionally no Supabase/client/network calls. */
 (function(){
   "use strict";
-  const titles={dashboard:"Overview / Dashboard",customers:"Workspace / Customers",accounts:"Workspace / Accounts",transactions:"Workspace / Transaction simulator",receipts:"Workspace / Receipt printing",reports:"Workspace / Reports",staff:"Administration / Staff & branches"};
+  const titles={dashboard:"Overview / Dashboard",customers:"Workspace / Customers",accounts:"Workspace / Accounts",transactions:"Workspace / Transaction simulator",receipts:"Workspace / Receipt printing",reports:"Workspace / Reports",staff:"Administration / Staff & branches",attendance:"Staff / Attendance demo",chat:"Staff / Chat demo"};
   const views=[...document.querySelectorAll(".view")];
   function go(page){views.forEach(v=>v.classList.toggle("hidden",v.id!==page+"-view"));document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.getElementById("top-title").textContent=titles[page]||"Demo";window.scrollTo({top:0,behavior:"smooth"});}
   document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
@@ -21,7 +21,25 @@
     go("receipts");
   });
   document.getElementById("print-btn").addEventListener("click",()=>{if(receipt)window.print();});
-  document.getElementById("export-demo").addEventListener("click",()=>{
+
+  const punch=document.getElementById("punch-demo");
+  if(punch)punch.addEventListener("click",()=>{
+    const now=new Date();
+    const time=now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    const row=document.createElement("tr");
+    ["DEMO-S003","Taylor Test","Main (sample)",time,"Manual simulation"].forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
+    document.getElementById("attendance-rows").prepend(row);
+    document.getElementById("punch-feedback").textContent="Clock-in simulated at "+time+". This was not biometric verification and is not persisted.";
+    punch.disabled=true;punch.textContent="Clock-in simulated";
+  });
+  const chatForm=document.getElementById("chat-form");
+  if(chatForm)chatForm.addEventListener("submit",e=>{
+    e.preventDefault();const input=document.getElementById("chat-input");const value=input.value.trim();if(!value)return;
+    const p=document.createElement("p"), strong=document.createElement("strong"), stamp=document.createElement("span"), br=document.createElement("br");
+    strong.textContent="You (demo) ";stamp.className="muted";stamp.textContent="· "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});p.append(strong,stamp,br,document.createTextNode(value));
+    const box=document.getElementById("chat-messages");box.appendChild(p);input.value="";
+  });
+\n  document.getElementById("export-demo").addEventListener("click",()=>{
     const rows=[["Reference","Customer","Type","Amount UGX","Status"],["DEMO-00041","Alex Sample","Deposit",250000,"SIMULATED"],["DEMO-00040","Jordan Example","Withdrawal",80000,"SIMULATED"],["DEMO-00039","Sam Test","Deposit",125000,"SIMULATED"]];
     const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="zivamuntuyo-demo-report.csv";a.click();URL.revokeObjectURL(a.href);
