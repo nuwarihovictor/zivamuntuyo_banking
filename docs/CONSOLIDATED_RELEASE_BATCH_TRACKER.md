@@ -144,3 +144,5 @@
 - Receipt print count remains in page memory only; durable reprint audit is not yet implemented/verified. Real posted deposit/withdrawal receipts, payroll, account-opening, and dormant-reactivation receipts still need accounting-owner and physical printer acceptance.
 - Security review remains read-only for production. No production schema, permissions, data, migration, or deployment changes were made.
 - Zero-cost constraint remains binding: do not upgrade Vercel, create chargeable Supabase staging, buy a domain/device/SDK, or enable a paid service. Preview and live release remain blocked until safe staging and exact-head evidence exist.
+
+- Added `tests/test_local_printer_page.py` to the standard Python unittest discovery suite. It asserts that the local printer page is visibly test-only, offers common paper widths and both cash transaction labels, contains no remote/database dependency, and uses the browser print dialog. This automated test is committed; exact-head CI result is still pending and must be checked before claiming it passed.
