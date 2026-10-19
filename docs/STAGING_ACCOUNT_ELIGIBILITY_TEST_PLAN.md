@@ -184,3 +184,10 @@ CI also includes fixture assertions that:
 - the denied posting leaves no ledger entries.
 
 **Validation limit:** the fixture uses representative function bodies and synthetic data in disposable PostgreSQL. It does not prove the full production schema, deployed UI compatibility, real employee-role helper behavior, or all execute grants in the live Supabase project. Do not apply the migration to production until the complete CI run is green, production function definitions/grants have been compared, and staging UI and transaction tests have passed.
+
+
+## Staff chat draft migration (2026-10-19)
+
+The draft migration `20261019080000_staff_chat_active_employee_rls.sql` creates an append-only internal staff message table. Authenticated active employees can read messages and insert only as their own `auth.uid()`; inactive employees cannot read or send. Browser roles have no update/delete policy. The app loads the latest 100 messages and refreshes after sending; it does not claim realtime delivery.
+
+The disposable PostgreSQL workflow now parses/applies this migration and tests active/inactive employee RLS. These are isolated fixture tests, not a production-schema integration test. Before release, confirm the actual production `employee_profiles` foreign-key semantics and grants, apply to an approved staging environment, test with real staff sessions, and verify that the Data API exposes the table only with RLS enabled. Never put passwords, PINs, or customer financial details in chat.
