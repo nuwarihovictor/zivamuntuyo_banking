@@ -32,3 +32,10 @@ These are candidate integration paths, not a statement that every model has been
 
 ## Current state
 The web app contains a device-family selector and integration guidance only. No fingerprint scan, device connection, biometric storage, or official attendance write is enabled yet.
+
+
+## Attendance event storage and manual punches (draft)
+
+Migration `20261019090000_staff_attendance_event_rls.sql` adds append-only clock events, active-employee/self-only RLS, idempotency keys, and a database trigger enforcing alternating clock-in/clock-out events. The browser UI supports manual punches and displays the employee's latest events. Manual punches are not biometric proof and must not be described as fingerprint verified.
+
+Trusted biometric ingestion is intentionally not enabled. It requires the exact USB reader/terminal models, vendor-supported Windows 10/11 drivers or SDKs, a signed local connector or supported terminal API, server-side device authentication, staff/device mapping, retry-safe ingestion, and field testing. Do not place a Supabase service-role key in the Windows connector UI or browser code; device authentication should terminate in a secured server endpoint.
