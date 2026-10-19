@@ -79,6 +79,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
       - name: Test account-opening wrapper rollback in isolated fixture
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/opening_package_wrapper_atomicity.sql
+      - name: Test cash request branch and active-employee guards
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/cash_transaction_request_security.sql
       - name: Test staff chat active-employee row security
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/staff_chat_rls_assertions.sql
       - name: Test staff attendance event security and transition rules
