@@ -12,6 +12,10 @@
 
 ## A. Prepare staging
 
+**Cost constraint:** Do not create or start a paid Supabase development branch. Until a separate banking staging database is available at no additional cost, run only the disposable PostgreSQL 17 CI fixture and source checks. Mark staging as blocked; do not represent CI as a live staging environment, and do not point preview at production or another application’s database.
+
+
+
 - [ ] Create a dedicated Supabase staging project and a preview deployment target.
 - [ ] Record project ref, current schema version, app commit SHA, migration list, database version, extensions, auth settings, and RLS state.
 - [ ] Obtain a schema-only baseline from the authorized database owner; do not copy unredacted production data.
