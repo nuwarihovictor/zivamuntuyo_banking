@@ -2928,6 +2928,7 @@ window.loadStaffAttendance = async function() {
     if(userError||!userData?.user)throw new Error("Sign in with your staff account first.");
     const {data,error}=await db.from("staff_attendance_events")
       .select("id,event_type,event_source,occurred_at,created_at,device_identifier")
+      .eq("employee_user_id",userData.user.id)
       .order("created_at",{ascending:false}).limit(30);
     if(error)throw error;
     const rows=data||[];
