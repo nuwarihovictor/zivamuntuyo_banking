@@ -531,3 +531,17 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .register-privacy-note{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
 #customer-register-count,#account-register-count{margin:8px 0;color:var(--muted);font-size:12px}
 @media(max-width:640px){.register-toolbar{align-items:stretch;flex-direction:column}.register-toolbar label{min-width:0;width:100%}.register-toolbar button{white-space:normal;width:100%}.register-data-table{font-size:11px}.register-data-table th,.register-data-table td{padding:8px}}
+
+
+/* Joint account holder workflow and private VIC LINE conversations */
+.joint-holder-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end;padding:14px;margin:12px 0;border:1px solid var(--line,#dce5dd);border-radius:12px;background:var(--surface,#fff)}
+.joint-holder-row label{min-width:0}
+.joint-holder-row .joint-holder-search{width:100%}
+.joint-holder-row .joint-holder-results{position:relative;z-index:3;max-height:240px;overflow:auto}
+.joint-holder-row .joint-holder-selected{display:block;margin-top:6px}
+.joint-holder-row .joint-holder-remove{margin-bottom:2px}
+#joint-holder-fieldset[hidden],#vicline-channel-picker-wrap[hidden],#vicline-dm-picker-wrap[hidden],.vicline-voice-tools[hidden]{display:none!important}
+.vicline-direct-sent{margin-left:auto;max-width:88%}
+.vicline-direct-sent .vicline-bubble{border-color:rgba(7,59,43,.18);background:rgba(7,59,43,.06)}
+.vicline-direct-received{margin-right:auto;max-width:88%}
+@media(max-width:640px){.joint-holder-row{grid-template-columns:minmax(0,1fr)}.joint-holder-row .joint-holder-remove{justify-self:start}.vicline-direct-sent,.vicline-direct-received{max-width:100%}}
