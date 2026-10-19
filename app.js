@@ -2839,6 +2839,19 @@ async function handleStaffLogin(event) {
     }
     if (feedback) feedback.textContent = "";
   } catch (error) {
+    // A branch login is not complete until the database confirms branch access.
+    // If that check fails, clear any newly-created session so a page reload cannot
+    // resume in a bank-wide workspace without repeating the branch authorization.
+    if (pendingBranchOpen) {
+      activeBranchContext = null;
+      try {
+        const { data: sessionData } = await db.auth.getSession();
+        if (sessionData?.session) await db.auth.signOut();
+      } catch (_) {
+        // Keep the original sign-in/access error visible; server-side authorization
+        // remains authoritative even if client-side session cleanup itself fails.
+      }
+    }
     if (feedback) feedback.textContent = "Sign-in failed. Check your email and password, or contact your bank administrator. " + (error?.message || "");
   } finally {
     if (button) { button.disabled = false; button.textContent = "Sign in securely"; }
