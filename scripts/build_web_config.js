@@ -64,7 +64,14 @@ if (supabaseUrl) {
 }
 
 const config = { supabaseUrl, supabaseAnonKey };
-const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\n";
-fs.writeFileSync(path.join(process.cwd(), "app-config.js"), output, { encoding: "utf8", mode: 0o644 });
+const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\\n";
+const outputDirectory = path.join(process.cwd(), "public");
+const sourceRoot = path.resolve(__dirname, "..");
+const publicAssets = ["index.html", "app.js", "styles.css", "logo.svg"];
+fs.mkdirSync(outputDirectory, { recursive: true });
+for (const asset of publicAssets) {
+  fs.copyFileSync(path.join(sourceRoot, asset), path.join(outputDirectory, asset));
+}
+fs.writeFileSync(path.join(outputDirectory, "app-config.js"), output, { encoding: "utf8", mode: 0o644 });
 process.stdout.write("Generated browser configuration for " + (target || "development") +
   " target. " + (supabaseUrl ? "Public key configured; no secret key emitted." : "No backend configured; app will fail closed.") + "\n");

@@ -25,20 +25,35 @@ def run_build(overrides: dict[str, str]):
             ["node", str(SCRIPT)], cwd=temp, env=env,
             capture_output=True, text=True, check=False
         )
-        output_path = Path(temp) / "app-config.js"
+        output_dir = Path(temp) / "public"
+        output_path = output_dir / "app-config.js"
         content = output_path.read_text(encoding="utf-8") if output_path.exists() else None
-        return result, content
+        public_files = sorted(item.name for item in output_dir.iterdir()) if output_dir.is_dir() else []
+        return result, content, public_files
 
 
 class WebConfigBuildTests(unittest.TestCase):
     def test_missing_environment_is_fail_closed_with_empty_config(self):
-        result, content = run_build({"VERCEL_ENV": "preview"})
+        result, content, public_files = run_build({"VERCEL_ENV": "preview"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIsNotNone(content)
         config_match = re.search(r"Object\.freeze\((\{.*\})\)", content)
         self.assertIsNotNone(config_match, content)
         config = json.loads(config_match.group(1))
         self.assertEqual(config, {"supabaseUrl": "", "supabaseAnonKey": ""})
+
+    def test_build_outputs_a_complete_static_site_directory_without_repository_sources(self):
+        result, content, public_files = run_build({
+            "VERCEL_ENV": "preview",
+            "SUPABASE_URL": "https://staging-example.supabase.co",
+            "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_example"
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIsNotNone(content)
+        self.assertEqual(set(public_files), {"index.html", "app.js", "styles.css", "logo.svg", "app-config.js"})
+        self.assertNotIn("README.md", public_files)
+        self.assertNotIn("scripts", public_files)
+        self.assertNotIn("tests", public_files)
 
     def test_preview_refuses_production_database_url(self):
         result, content = run_build({
