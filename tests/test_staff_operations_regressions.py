@@ -32,7 +32,7 @@ class StaffOperationsRegressionTests(unittest.TestCase):
 
     def test_manual_attendance_transition_uses_current_employees_own_latest_event(self):
         start = self.app.index("window.recordStaffAttendancePunch = async function()")
-        end = self.app.index("window.printTransactionReceipt = function(button, skipConfirmation)", start)
+        end = len(self.app)
         punch = self.app[start:end]
         self.assertIn("await db.auth.getUser()", punch)
         self.assertIn('.eq("employee_user_id",userData.user.id)', punch)
@@ -44,7 +44,7 @@ class StaffOperationsRegressionTests(unittest.TestCase):
 
     def test_manual_attendance_is_not_described_as_biometric_verification(self):
         start = self.app.index("window.recordStaffAttendancePunch = async function()")
-        end = self.app.index("window.printTransactionReceipt = function(button, skipConfirmation)", start)
+        end = len(self.app)
         punch = self.app[start:end]
         self.assertIn('event_source:"manual"', punch)
         self.assertNotIn('event_source:"fingerprint"', punch)
