@@ -90,6 +90,11 @@ class CashTransactionIntegritySourceTests(unittest.TestCase):
         self.assertIn("'cash_transaction_posted'", post)
         self.assertIn("INSERT INTO public.audit_events", post)
 
+    def test_cash_posting_rejects_cross_currency_ledger_accounts(self):
+        self.assertIn("v_cash_ledger.currency_code<>v_ba.currency_code", self.migration)
+        self.assertIn("FAIL: wrong-currency cash ledger caused partial posting", self.assertions)
+        self.assertIn("'USD','10000000-0000-0000-0000-000000000001',true", self.assertions)
+
 
 if __name__ == "__main__":
     unittest.main()
