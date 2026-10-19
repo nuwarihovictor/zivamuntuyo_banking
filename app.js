@@ -353,9 +353,18 @@ window.switchPage = function(pageName) {
             </select>
           </label>
           <label>Account ownership type *
-            <select name="account_type_id" id="account-type-id" required>
+            <select name="account_type_id" id="account-type-id" required onchange="window.toggleJointHolderFields()">
               <option value="">Loading account types…</option>
             </select>
+            <p class="muted">Individual ownership allows one individual account per customer. Joint accounts can be held in addition to that individual account.</p>
+          </label>
+          <fieldset id="joint-holder-fieldset" class="document-upload-fieldset" hidden>
+            <legend>Joint account holders</legend>
+            <p class="muted">A joint account requires at least two different active customers. The selected customer above is the primary holder. Add at least one additional holder; every holder is verified again by the database.</p>
+            <div id="joint-holder-fields"></div>
+            <button type="button" class="secondary" onclick="window.addJointAccountHolderField()">+ Add another holder</button>
+            <p id="joint-holder-feedback" class="muted" role="status" aria-live="polite"></p>
+          </fieldset>
           </label>
           <label>Account product *
             <select name="product_type" required>
@@ -417,7 +426,7 @@ window.switchPage = function(pageName) {
         }
         if(typeSelect){
           if(typeResult.error) typeSelect.innerHTML='<option value="">Account types unavailable</option>';
-          else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
+          else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'" data-type-code="'+esc(t.type_code)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")
@@ -1426,48 +1435,142 @@ window.searchAccountOpeningCustomers = async function(input) {
   }catch(err){results.textContent="Customer search failed. Check the connection and try again.";}
 };
 
+window.toggleJointHolderFields = function() {
+  const select=document.getElementById("account-type-id");
+  const fieldset=document.getElementById("joint-holder-fieldset");
+  if(!select||!fieldset)return;
+  const code=String(select.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
+  fieldset.hidden=code!=="JNT";
+  if(code==="JNT"&&!document.querySelector("#joint-holder-fields .joint-holder-row"))window.addJointAccountHolderField();
+  const feedback=document.getElementById("joint-holder-feedback");
+  if(feedback)feedback.textContent=code==="JNT"?"Add at least one additional active customer. The account cannot be approved until two or more distinct holders are recorded.":"";
+};
+
+window.jointHolderFieldSequence=window.jointHolderFieldSequence||0;
+window.addJointAccountHolderField = function() {
+  const host=document.getElementById("joint-holder-fields");if(!host)return;
+  const index=++window.jointHolderFieldSequence;
+  const row=document.createElement("div");
+  row.className="joint-holder-row";
+  row.id="joint-holder-row-"+index;
+  row.dataset.index=String(index);
+  row.innerHTML='<label>Additional joint holder '+index+' *<input type="search" autocomplete="off" class="joint-holder-search" placeholder="Search active customer by name" oninput="window.searchJointAccountHolder(this)" required><input type="hidden" name="joint_holder_customer_id" required><div class="account-search-results joint-holder-results" role="listbox"></div><small class="joint-holder-selected muted">Choose a customer from the results.</small></label><button type="button" class="secondary joint-holder-remove" aria-label="Remove holder '+index+'">Remove</button>';
+  row.querySelector(".joint-holder-remove").addEventListener("click",()=>{row.remove();});
+  host.appendChild(row);
+};
+
+window.searchJointAccountHolder = async function(input) {
+  const row=input?.closest(".joint-holder-row"),results=row?.querySelector(".joint-holder-results"),hidden=row?.querySelector('input[name="joint_holder_customer_id"]'),selected=row?.querySelector(".joint-holder-selected");
+  if(!row||!results||!hidden)return;
+  hidden.value="";
+  if(selected)selected.textContent="Choose a customer from the results.";
+  const term=String(input.value||"").trim();
+  if(term.length<2){results.textContent=term?"Type at least 2 characters.":"";return;}
+  if(!db){results.textContent="Database connection unavailable.";return;}
+  results.textContent="Searching active customers…";
+  try{
+    const safe=term.replace(/[\\%_]/g,"\\$&");
+    const [names,numbers]=await Promise.all([
+      db.from("customers").select("id,full_name,customer_number,phone_number,status").eq("status","active").ilike("full_name","%"+safe+"%").limit(8),
+      db.from("customers").select("id,full_name,customer_number,phone_number,status").eq("status","active").ilike("customer_number","%"+safe+"%").limit(8)
+    ]);
+    if(names.error||numbers.error){results.textContent="Customer search unavailable. Check staff access.";return;}
+    const rows=[...(names.data||[]),...(numbers.data||[])].filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).slice(0,10);
+    if(!rows.length){results.textContent="No active customer found in records you can access.";return;}
+    results.innerHTML=rows.map((item,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(item.full_name||"Customer")+'</strong><span>'+esc(item.customer_number||"No customer number")+'</span><small>'+esc(item.phone_number||"")+'</small></button>').join("");
+    results.querySelectorAll(".account-search-option").forEach((button,i)=>button.addEventListener("click",()=>{
+      const item=rows[i];hidden.value=item.id;input.value=item.full_name||item.customer_number||"";
+      results.innerHTML="";
+      if(selected)selected.textContent="Selected "+(item.full_name||"customer")+" · "+(item.customer_number||"customer number");
+    }));
+  }catch(_){results.textContent="Customer search failed. Check the connection and try again.";}
+};
+
 window.handleAccountSubmit = async function(e) {
   e.preventDefault();
-  const form=e.target;
-  const feedback=document.getElementById("acc-feedback");
+  const form=e.target,feedback=document.getElementById("acc-feedback");
   if(!db){if(feedback)feedback.textContent="Database connection unavailable. No account request was submitted.";return;}
   const formData=new FormData(form);
   const customerId=String(formData.get("customer_id")||"").trim();
   const branchId=String(formData.get("branch_id")||"").trim();
   const accountTypeId=String(formData.get("account_type_id")||"").trim();
+  const typeCode=String(document.getElementById("account-type-id")?.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
+  const jointHolderIds=formData.getAll("joint_holder_customer_id").map(value=>String(value||"").trim()).filter(Boolean);
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)){
-    if(feedback)feedback.textContent="Enter a valid customer UUID.";return;
+    if(feedback)feedback.textContent="Select the primary customer from the search results.";return;
   }
   if(!branchId||!accountTypeId){if(feedback)feedback.textContent="Choose a branch and account ownership type.";return;}
+  if(typeCode==="JNT"){
+    if(!jointHolderIds.length){if(feedback)feedback.textContent="A joint account needs at least one additional holder.";return;}
+    const all=[customerId,...jointHolderIds];
+    if(all.some(id=>!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))||new Set(all).size!==all.length){
+      if(feedback)feedback.textContent="Choose at least two different customers. The same customer cannot be added twice.";return;
+    }
+  }
+  if(typeCode==="IND"&&jointHolderIds.length){
+    if(feedback)feedback.textContent="Additional holders are only allowed for joint accounts. Select the joint ownership type or remove the extra holders.";return;
+  }
   const button=form.querySelector('button[type="submit"]');
   if(button)button.disabled=true;
-  if(feedback)feedback.textContent="Submitting account request for approval…";
+  let result=null;
   try{
-    const {data,error}=await db.rpc("create_bank_account_request_with_opening_package",{
-      p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
-      p_product_type:formData.get("product_type")||"savings",
-      p_currency_code:formData.get("currency_code")||"UGX"
-    });
-    if(error)throw error;
-    const result=Array.isArray(data)?data[0]:data;
-    const packageResult=result;
+    const existingAccountId=String(form.dataset.createdAccountId||"");
+    if(existingAccountId){
+      result={account_id:existingAccountId,account_number:String(form.dataset.createdAccountNumber||""),account_status:"pending_approval"};
+      if(feedback)feedback.textContent="Finishing the existing pending account request and retrying holder registration…";
+    }else{
+      if(feedback)feedback.textContent="Submitting account request and recording the opening package…";
+      const {data,error}=await db.rpc("create_bank_account_request_with_opening_package",{
+        p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
+        p_product_type:formData.get("product_type")||"savings",
+        p_currency_code:formData.get("currency_code")||"UGX"
+      });
+      if(error)throw error;
+      result=Array.isArray(data)?data[0]:data;
+      if(!result?.account_id)throw new Error("The server did not return the account request ID.");
+      form.dataset.createdAccountId=String(result.account_id);
+      form.dataset.createdAccountNumber=String(result.account_number||"");
+      window.lastAccountOpeningReceipt={
+        receipt_number:String(result.receipt_number||""),
+        account_number:String(result.account_number||""),
+        date:new Date().toLocaleString("en-UG"),
+        amount:Number(result.amount||0),
+        share_amount:Number(result.share_amount||0),
+        shares_issued:Number(result.shares_issued||0),
+        security_reserve:Number(result.security_reserve||0),
+        bundled_opening_costs:Number(result.bundled_opening_costs||0),
+        collection_status:String(result.collection_status||"")
+      };
+    }
+    if(typeCode==="JNT"){
+      const holderFeedback=document.getElementById("joint-holder-feedback");
+      if(holderFeedback)holderFeedback.textContent="Recording joint holders securely…";
+      for(const holderId of jointHolderIds){
+        const {error}=await db.rpc("add_joint_account_holder_to_pending_request",{
+          p_account_id:String(result.account_id),p_customer_id:holderId,p_holder_role:"joint_owner"
+        });
+        if(error)throw new Error("Account request "+String(result.account_number||result.account_id)+" exists but holder registration is incomplete. It must remain pending. "+error.message+" Correct the holder selections and submit again to retry this same request.");
+      }
+      if(holderFeedback)holderFeedback.textContent="All selected holders were accepted by the database. Approval still requires at least two distinct holders.";
+    }
     const files=Array.from(form.querySelector('input[name="account_documents"]')?.files||[]);
     let documentStatus="";
     if(files.length){
       const uploaded=await window.uploadApplicationDocuments("account-opening",customerId,files,String(formData.get("account_document_category")||"other"));
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
-    window.lastAccountOpeningReceipt = {
-      receipt_number:String(packageResult?.receipt_number||"recorded"),
-      account_number:String(result?.account_number||"created"),
-      date:new Date().toLocaleString("en-UG"),
-      amount:30000,share_amount:10000,security_reserve:8500,bundled_opening_costs:11500
-    };
-    if(feedback)feedback.innerHTML="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+" · UGX 30,000 received and allocated automatically"+documentStatus+' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print UGX 30,000 receipt</button>';
+    const receipt=window.lastAccountOpeningReceipt;
+    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received";
+    const holderSummary=typeCode==="JNT"?" · Joint holders recorded: "+(new Set([customerId,...jointHolderIds]).size):"";
+    if(feedback)feedback.textContent="Account request submitted. Reference: "+String(result.account_number||"created")+" · Status: "+String(result.account_status||"pending_approval")+holderSummary+documentStatus+(hasReceipt?" · Opening package collection confirmed by the server.":" · No paid receipt was returned by the server; do not print a payment receipt.");
+    if(hasReceipt)feedback.insertAdjacentHTML("beforeend",' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print receipt '+esc(receipt.receipt_number)+'</button>');
+    delete form.dataset.createdAccountId;delete form.dataset.createdAccountNumber;
     form.reset();
+    const holderHost=document.getElementById("joint-holder-fields");if(holderHost)holderHost.innerHTML="";
+    window.toggleJointHolderFields();
     setTimeout(()=>window.switchPage("Accounts"),1200);
   }catch(err){
-    if(feedback)feedback.textContent="Account request failed: "+(err?.message||"Unexpected error");
+    if(feedback)feedback.textContent="Account request could not be fully completed: "+(err?.message||"Unexpected error");
   }finally{if(button)button.disabled=false;}
 };
 
@@ -2509,14 +2612,19 @@ window.printInstitutionPayrollReceipt = function(){
 
 window.printAccountOpeningReceipt = function(){
   const r=window.lastAccountOpeningReceipt;
-  if(!r){alert("No account-opening receipt is available in this session.");return;}
-  const text="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nACCOUNT OPENING PACKAGE RECEIPT\nReceipt No: "+r.receipt_number+"\nAccount No: "+r.account_number+"\nDate: "+r.date+"\n\nTOTAL RECEIVED: UGX 30,000\n\nAUTOMATIC ALLOCATION\nNon-withdrawable share capital: UGX 10,000 (1 share)\nRestricted security reserve: UGX 8,500 (not withdrawable)\nBundled opening fees: UGX 11,500 (opening form + initial cheque book + initial transaction log book)\n\nTOTAL ALLOCATED: UGX 30,000\n\nNo manual allocation by the teller. Each component is recorded to its designated account.\nThank you.";
+  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)){
+    alert("No server-confirmed account-opening payment receipt is available. Do not print a paid receipt without a recorded collection.");
+    return;
+  }
+  const money=value=>"UGX "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
+  const total=Number(r.amount),shares=Number(r.share_amount||0),reserve=Number(r.security_reserve||0),costs=Number(r.bundled_opening_costs||0);
+  const allocated=shares+reserve+costs;
+  const body="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nACCOUNT OPENING PACKAGE RECEIPT\nReceipt No: "+r.receipt_number+"\nAccount No: "+r.account_number+"\nDate: "+r.date+"\n\nTOTAL RECEIVED: "+money(total)+"\n\nSERVER-RECORDED ALLOCATION\nShare capital: "+money(shares)+" ("+Number(r.shares_issued||0)+" share(s))\nRestricted security reserve: "+money(reserve)+"\nBundled opening costs: "+money(costs)+"\n\nTOTAL ALLOCATED: "+money(allocated)+"\nAllocation difference: "+money(total-allocated)+"\n\nReceipt generated from the server-confirmed collection record. Keep it with the teller's daily reconciliation.";
   const win=window.open("","_blank","width=700,height=650");
-  if(!win){alert("Allow pop-ups to print the account-opening receipt.");return;}
-  win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · UGX 30,000</div><pre>"+text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
+  if(!win){alert("Allow pop-ups to print the receipt.");return;}
+  win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · "+money(total)+"</div><pre>"+body.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
   win.document.close();
 };
-
 
 
 window.printDormantReactivationReceipt = function(){
