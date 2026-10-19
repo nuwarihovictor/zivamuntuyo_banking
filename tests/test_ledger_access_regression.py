@@ -16,8 +16,9 @@ class LedgerAccessRegressionTests(unittest.TestCase):
 
     def test_privilege_migration_revokes_direct_browser_access(self):
         sql = MIGRATION.read_text(encoding="utf-8")
-        self.assertIn("REVOKE ALL ON TABLE public.general_ledger_accounts FROM anon, authenticated", sql)
-        self.assertIn("REVOKE ALL ON TABLE public.ledger_journal_entries FROM anon, authenticated", sql)
+        self.assertIn("REVOKE ALL PRIVILEGES ON TABLE public.general_ledger_accounts", sql)
+        self.assertIn("FROM PUBLIC, anon, authenticated", sql)
+        self.assertIn("REVOKE ALL PRIVILEGES ON TABLE public.ledger_journal_entries", sql)
 
 
 if __name__ == "__main__":
