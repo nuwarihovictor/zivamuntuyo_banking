@@ -4,6 +4,7 @@
 GRANT SELECT ON public.employee_profiles TO authenticated;
 INSERT INTO public.employee_profiles(user_id,is_active)
 VALUES ('40000000-0000-0000-0000-000000000015',true),
+       ('40000000-0000-0000-0000-000000000017',true),
        ('40000000-0000-0000-0000-000000000016',false)
 ON CONFLICT (user_id) DO UPDATE SET is_active=EXCLUDED.is_active;
 
@@ -19,6 +20,17 @@ BEGIN
   END IF;
 END
 $active_can_read_own$;
+
+DO $cannot_spoof_employee$
+BEGIN
+  BEGIN
+    INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,idempotency_key)
+    VALUES ('40000000-0000-0000-0000-000000000017','clock_out','manual','fixture-spoof-employee');
+    RAISE EXCEPTION 'FAIL: employee inserted attendance for another employee';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$cannot_spoof_employee$;
 
 DO $cannot_double_clock_in$
 BEGIN
