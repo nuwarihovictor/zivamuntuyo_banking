@@ -1191,12 +1191,12 @@ window.exportFinancialReportsCsv = function() {
   ];
   const csvCell = value => {
     let text = value == null ? "" : String(value);
-    if (/^[=+@\\-\\t\\r]/.test(text)) text = "'" + text;
+    if (/^[=+\\-@\t\r]/.test(text)) text = "'" + text;
     return '"' + text.replace(/"/g, '""') + '"';
   };
   const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
   rows.forEach(row => lines.push(columns.map(([key]) => csvCell(row[key])).join(",")));
-  const blob = new Blob(["\\uFEFF" + lines.join("\\r\\n") + "\\r\\n"], {type:"text/csv;charset=utf-8;"});
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n") + "\r\n"], {type:"text/csv;charset=utf-8;"});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   const date = new Date().toISOString().slice(0,10);
