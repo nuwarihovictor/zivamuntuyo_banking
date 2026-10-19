@@ -90,5 +90,42 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertNotIn("service_role", (ROOT / "app.js").read_text(encoding="utf-8").lower())
 
 
+    def test_receipt_html_escapes_every_database_derived_display_value(self):
+        start = self.app.index('window.printTransactionReceipt = function')
+        end = self.app.index('document.addEventListener("click",function(event){', start)
+        receipt = self.app[start:end]
+        self.assertIn('const safe=value=>String(value).replace(/[&<>"\']', receipt)
+        self.assertIn('${safe(reference)}', receipt)
+        self.assertIn('${safe(transactionDate||"Not provided")}', receipt)
+        self.assertIn('${safe(branch||"Not provided")}', receipt)
+        self.assertIn('${safe(account||"Not provided")}', receipt)
+        self.assertIn('${safe(money)}', receipt)
+
+    def test_receipt_rejects_invalid_type_and_nonpositive_or_nonfinite_amount(self):
+        start = self.app.index('window.printTransactionReceipt = function')
+        end = self.app.index('document.addEventListener("click",function(event){', start)
+        receipt = self.app[start:end]
+        self.assertIn('(type!=="deposit"&&type!=="withdrawal")', receipt)
+        self.assertIn('!Number.isFinite(amount)||amount<=0', receipt)
+        self.assertIn('if(!printWindow)', receipt)
+
+    def test_chat_rechecks_session_and_handles_send_failures_without_sticking_button(self):
+        start = self.app.index('window.sendStaffMessage = async function')
+        end = self.app.index('window.printTransactionReceipt = function', start)
+        sender = self.app[start:end]
+        self.assertIn('await db.auth.getUser()', sender)
+        self.assertIn('if(submit)submit.disabled=true', sender)
+        self.assertIn('finally{if(submit)submit.disabled=false;}', sender)
+        self.assertIn('if(error) throw error;', sender)
+        self.assertIn('Message was not sent:', sender)
+
+    def test_chat_message_body_is_escaped_before_inserting_into_page(self):
+        start = self.app.index('window.loadStaffChat = async function')
+        end = self.app.index('window.sendStaffMessage = async function', start)
+        loader = self.app[start:end]
+        self.assertIn("'<p>'+esc(m.message_body)+'</p>'", loader)
+        self.assertIn('.order("created_at",{ascending:false}).limit(100)', loader)
+
+
 if __name__ == "__main__":
     unittest.main()
