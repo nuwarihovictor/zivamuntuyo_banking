@@ -59,6 +59,7 @@ jobs:
               Path("supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql"),
               Path("supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql"),
               Path("supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql"),
+              Path("supabase/migrations/20261019090000_staff_attendance_event_rls.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
@@ -71,9 +72,12 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019090000_staff_attendance_event_rls.sql
       - name: Run account, joint-holder, branch-view, grants, and search-path assertions
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
       - name: Test account-opening wrapper rollback in isolated fixture
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/opening_package_wrapper_atomicity.sql
       - name: Test staff chat active-employee row security
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/staff_chat_rls_assertions.sql
+      - name: Test staff attendance event security and transition rules
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/staff_attendance_rls_assertions.sql
