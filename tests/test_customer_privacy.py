@@ -1,6 +1,7 @@
 """Static regressions for customer directory privacy and honest error states."""
 from pathlib import Path
 import unittest
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app.js"
@@ -18,6 +19,16 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
         self.assertIn('onclick="window.loadCustomerDirectory()"', self.app)
         self.assertIn('Customer records could not be loaded. Check your connection and permissions, then retry.', self.app)
         self.assertIn('Loading customer records…', self.app)
+
+    def test_sensitive_table_queries_do_not_use_wildcard_selects(self):
+        sensitive_tables = (
+            "customers", "bank_accounts", "audit_events", "staff_messages",
+            "staff_chat_messages", "staff_attendance_events", "loan_applications",
+        )
+        for table in sensitive_tables:
+            pattern = r"""\\.from\\(["']""" + re.escape(table) + r"""["']\\)\\.select\\(["']\\*["']\\)"""
+            with self.subTest(table=table):
+                self.assertIsNone(re.search(pattern, self.app), f"Wildcard select found for {table}")
 
     def test_customer_directory_uses_an_explicit_minimal_field_list(self):
         self.assertIn('db.from("customers").select("id,full_name,customer_number,phone_number,created_at")', self.app)
