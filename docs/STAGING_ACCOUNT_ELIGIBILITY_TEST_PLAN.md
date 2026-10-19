@@ -115,3 +115,41 @@ Do not change production function definitions or grants as part of this source-o
 - Updated `tests/test_account_eligibility_migration.py` to assert that both account-opening paths validate the currency catalogue.
 - Rechecked source-level invariants after the change: all SECURITY DEFINER functions in this draft pin an empty search path; both account-opening paths have active-currency checks; the new joint-holder RPC is revoked from `PUBLIC` and `anon` and granted to `authenticated`.
 - These are source checks only. No PostgreSQL runtime test has been run; no GitHub Actions run is available for the latest commit. Do not treat these checks as SQL execution validation or a release approval.
+
+
+## Security hardening draft — 19 October 2026
+
+A second draft migration, `supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql`, has been added on this same draft branch. It is **not applied**.
+
+- It changes `branch_directory_public` to `security_invoker=true` while preserving the unauthenticated branch selector with an explicit anonymous RLS policy and column-only grants for the five fields needed by the directory.
+- It revokes direct `PUBLIC`, `anon`, and `authenticated` table privileges on `general_ledger_accounts` and `ledger_journal_entries`, which have RLS enabled but no policies despite currently carrying broad direct table privileges. This assumes the app uses authorized RPCs for ledger access; verify all screens and RPC paths in staging before accepting the change.
+- Read-only checks confirmed PostgreSQL 17.11, RLS enabled on `branches`, no anonymous column privileges on `branches` before this draft, and the branch view currently exposes only active branch IDs and labels. The app uses the view for the unauthenticated branch-selection landing page, so the proposed fix deliberately retains that use case.
+- These changes address a specific view configuration finding and narrow unnecessary direct ledger grants. They do **not** resolve the full 68-function review or the 22-table advisor message.
+
+## Transaction integration-test matrix (required before release)
+
+Use a dedicated disposable PostgreSQL/Supabase environment with synthetic customers, staff, accounts, branches, journals, and ledgers. Never run these write tests against production data.
+
+| Area | Positive test | Negative / concurrency test |
+|---|---|---|
+| Transaction request | Authorized active employee creates valid deposit/withdrawal request for an active in-scope account | Unauthenticated, inactive employee, unauthorized role, inactive account, wrong branch, zero/negative/over-limit amount all rejected |
+| Transaction approval | Authorized approver approves pending request within their approval limit | Requester cannot approve own request; wrong branch, unauthorized role, over-limit amount, wrong status, and repeated approval rejected |
+| Ledger posting | Approved request posts once with balanced debit/credit entries and matching currency | Repeated/replayed posting creates no second ledger entry; mismatched currency/ledger, insufficient withdrawal balance, unapproved journal, or wrong branch rejected |
+| Concurrency | Independent valid requests can proceed without corrupting ledger balances | Two simultaneous attempts to approve/post the same journal yield exactly one successful posting and one set of ledger entries |
+| Branch scope | Staff can transact only within authorized branch scope; authorized central roles follow documented policy | Cross-branch account request, approval, holder addition, or posting denied |
+| Joint holders | Two distinct active customers are present before joint-account approval | One holder, duplicate holder, inactive holder, non-joint account, or adding after approval rejected |
+| View and direct grants | Anonymous landing page can list only active branch display fields; signed-in staff flow still works | Anonymous attempts to select branch address/timezone or read ledger tables directly fail |
+| Audit and rollback | Successful requests/approvals/postings produce expected audit records | Failed operation leaves no partial account, holder, journal, or ledger rows; duplicate retries do not duplicate audit/posting effects |
+
+For each case, save the exact test setup, expected SQLSTATE/result, actual result, and a query proving ledger balance invariants. Verify transaction functions preserve atomicity and use unique/idempotency constraints where applicable. Test the deployed UI separately from direct RPC calls.
+
+## Remaining security work and release gate
+
+1. Function-by-function review of all 68 authenticated-executable SECURITY DEFINER functions: record intended callers, authorization checks, search_path, object qualification, and exact execute ACLs. Do not blanket-revoke.
+2. Review all 22 RLS-enabled/no-policy tables. Read-only inspection found most deny direct anon/authenticated table privileges, but `general_ledger_accounts` and `ledger_journal_entries` currently have direct privileges for anon/authenticated; the draft migration revokes these and must be staging-tested.
+3. Confirm the new branch-view migration works with pre-login branch selection and does not expose any branch columns beyond the directory fields.
+4. Review `record_financial_activity` search_path and fully qualify dependencies before preparing a separate tested hardening change.
+5. Enable leaked-password protection through the authorized Supabase Auth settings after confirming the sign-in policy. This is not changed by SQL migration.
+6. Run the migration against a disposable PostgreSQL 17 database, run the Python static tests, run integration tests, re-run security advisors, and capture evidence before requesting production approval.
+
+**Current state:** no PostgreSQL integration run is available in this session because there is no local PostgreSQL/Supabase CLI runtime, and the user declined paid staging compute. No live database objects, permissions, settings, or customer data have been modified. Production deployment remains blocked.
