@@ -401,14 +401,8 @@ window.switchPage = function(pageName) {
             </select>
           </label>
           <label>Currency *
-            <select name="currency_code" required>
-              <option value="UGX">UGX — Ugandan shilling</option>
-              <option value="USD">USD — US dollar</option>
-              <option value="KES">KES — Kenyan shilling</option>
-              <option value="TZS">TZS — Tanzanian shilling</option>
-              <option value="RWF">RWF — Rwandan franc</option>
-              <option value="BIF">BIF — Burundian franc</option>
-              <option value="CDF">CDF — Congolese franc</option>
+            <select name="currency_code" id="account-currency-code" required>
+              <option value="">Loading active currencies…</option>
             </select>
           </label>
           <fieldset class="document-upload-fieldset">
@@ -441,10 +435,12 @@ window.switchPage = function(pageName) {
     if (db) {
       Promise.all([
         db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name"),
-        db.from("account_types").select("id,type_name,type_code").eq("is_active",true).order("type_name")
-      ]).then(([branchResult,typeResult])=>{
+        db.from("account_types").select("id,type_name,type_code").eq("is_active",true).order("type_name"),
+        db.from("currencies").select("code").eq("is_active",true).order("code")
+      ]).then(([branchResult,typeResult,currencyResult])=>{
         const branchSelect=document.getElementById("account-branch-id");
         const typeSelect=document.getElementById("account-type-id");
+        const currencySelect=document.getElementById("account-currency-code");
         if(branchSelect){
           if(branchResult.error) branchSelect.innerHTML='<option value="">Branches unavailable</option>';
           else branchSelect.innerHTML='<option value="">Choose branch</option>'+(branchResult.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
@@ -452,6 +448,10 @@ window.switchPage = function(pageName) {
         if(typeSelect){
           if(typeResult.error) typeSelect.innerHTML='<option value="">Account types unavailable</option>';
           else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
+        }
+        if(currencySelect){
+          if(currencyResult.error) currencySelect.innerHTML='<option value="">Currencies unavailable</option>';
+          else currencySelect.innerHTML='<option value="">Choose currency</option>'+(currencyResult.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")

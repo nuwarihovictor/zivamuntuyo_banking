@@ -12,6 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "supabase" / "migrations" / "20261019043000_account_eligibility_guards.sql"
+APP = ROOT / "app.js"
 
 
 class AccountEligibilityMigrationStaticTests(unittest.TestCase):
@@ -55,6 +56,14 @@ class AccountEligibilityMigrationStaticTests(unittest.TestCase):
         self.assertGreaterEqual(self.sql.count("c.is_active=true"), 2)
         self.assertGreaterEqual(self.sql.count("Unsupported or inactive currency"), 2)
         self.assertNotIn("'UGX','USD','KES','TZS','RWF','BIF','CDF'", self.sql)
+
+    def test_account_currency_selector_uses_active_database_catalogue(self):
+        app = APP.read_text(encoding="utf-8")
+        self.assertIn('id="account-currency-code"', app)
+        self.assertIn('db.from("currencies").select("code").eq("is_active",true).order("code")', app)
+        self.assertIn('currencySelect.innerHTML=\'<option value="">Choose currency</option>'', app)
+        self.assertNotIn('<option value="USD">USD — US dollar</option>', app)
+        self.assertNotIn('<option value="KES">KES — Kenyan shilling</option>', app)
 
     def test_account_creation_checks_auth_employee_role_and_branch_scope(self):
         self.assertGreaterEqual(self.sql.count("Authentication required"), 4)
