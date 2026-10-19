@@ -2952,8 +2952,13 @@ window.recordStaffAttendancePunch = async function() {
   try{
     const {data:userData,error:userError}=await db.auth.getUser();
     if(userError||!userData?.user)throw new Error("Your staff session has expired. Sign in again.");
+    // Derive this employee's next punch only from their own latest event.
+    // RLS remains authoritative; the explicit filter also avoids toggling based on
+    // another employee's event if the viewer has broader read permissions.
     const {data:latestRows,error:latestError}=await db.from("staff_attendance_events")
-      .select("event_type,created_at").order("created_at",{ascending:false}).limit(1);
+      .select("event_type,occurred_at,created_at")
+      .eq("employee_user_id",userData.user.id)
+      .order("occurred_at",{ascending:false}).order("created_at",{ascending:false}).limit(1);
     if(latestError)throw latestError;
     const latest=latestRows?.[0];
     const eventType=latest?.event_type==="clock_in"?"clock_out":"clock_in";
