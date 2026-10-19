@@ -650,7 +650,7 @@ window.loadAttendancePolicy();
             <div class="vicline-channel-title"><span class="vicline-channel-icon" aria-hidden="true">◎</span><div><strong>Messages</strong><small>Keep 10+ branch and team conversations within reach</small></div></div>
             <div class="vicline-toolbar-actions">
               <button type="button" class="vicline-settings-button" onclick="window.toggleVicLineSettings()" aria-expanded="false" id="vicline-settings-toggle"><span aria-hidden="true">⚙</span> Settings</button>
-              <label class="vicline-channel-picker">OPEN CONVERSATION<select id="staff-chat-branch" onchange="window.loadStaffChat()"><option value="">Bank-wide messages</option></select></label>
+              <label class="vicline-channel-picker">CONVERSATION TYPE<select id="vicline-mode" onchange="window.toggleVicLineMode()"><option value="channel">Team / branch channel</option><option value="direct">Private direct message</option></select></label><label class="vicline-channel-picker" id="vicline-channel-picker-wrap">OPEN CHANNEL<select id="staff-chat-branch" onchange="window.loadStaffChat()"><option value="">Bank-wide messages</option></select></label><label class="vicline-channel-picker" id="vicline-dm-picker-wrap" hidden>MESSAGE TO STAFF<select id="vicline-dm-recipient" onchange="window.loadStaffChat()"><option value="">Choose staff member</option></select></label>
             </div>
           </div>
           <section class="vicline-settings-panel" id="vicline-settings-panel" hidden aria-labelledby="vicline-settings-title">
@@ -2211,6 +2211,15 @@ window.notifyVicLineNewMessage=function(message,channelName){
   const settings=window.getVicLineSettings();if(settings.soundEnabled)window.playVicLineTone();
   if(settings.desktopNotifications&&"Notification" in window&&Notification.permission==="granted"&&document.hidden){try{const n=new Notification("VIC LINE · "+channelName,{body:String(message||"New staff message").slice(0,140),tag:"vic-line-"+channelName});n.onclick=()=>{window.focus();n.close();};}catch(_){}}
 };
+window.toggleVicLineMode=function(){
+  const mode=document.getElementById("vicline-mode")?.value||"channel";
+  const channelWrap=document.getElementById("vicline-channel-picker-wrap"),dmWrap=document.getElementById("vicline-dm-picker-wrap"),voice=document.querySelector(".vicline-voice-tools"),sidebarNote=document.querySelector(".vicline-sidebar-note");
+  if(channelWrap)channelWrap.hidden=mode==="direct";
+  if(dmWrap)dmWrap.hidden=mode!=="direct";
+  if(voice)voice.hidden=mode==="direct";
+  if(sidebarNote)sidebarNote.textContent=mode==="direct"?"Private conversations are visible only to their participants.":"Each conversation follows bank-wide or branch access permissions.";
+  window.loadStaffChat();
+};
 window.renderVicLineConversationList=function(branches){
   const list=document.getElementById("vicline-conversation-list"),count=document.getElementById("vicline-conversation-count"),selector=document.getElementById("staff-chat-branch");if(!list||!selector)return;
   const current=selector.value||"",conversations=[{id:"",name:"Bank-wide messages",short:"All staff",icon:"✦"}].concat((branches||[]).map(b=>({id:b.id,name:b.branch_name,short:"Branch conversation",icon:"◎"})));
@@ -2223,6 +2232,39 @@ window.openVicLineConversation=function(id){const selector=document.getElementBy
 window.loadStaffChat=async function(options={}){
   const feedback=document.getElementById("staff-chat-feedback"),list=document.getElementById("staff-chat-messages"),selector=document.getElementById("staff-chat-branch");if(!feedback||!list||!selector)return;
   if(!db){feedback.textContent="Database connection unavailable. Messages were not loaded.";return;}
+  const mode=document.getElementById("vicline-mode")?.value||"channel";
+  if(mode==="direct"){
+    feedback.textContent="Loading private staff conversations…";
+    try{
+      const staffSelect=document.getElementById("vicline-dm-recipient");
+      if(!staffSelect){feedback.textContent="Direct-message selector is unavailable.";return;}
+      const previousRecipient=staffSelect.value||"";
+      const directory=await db.rpc("list_vic_line_staff_directory");
+      if(directory.error){feedback.textContent="Private messaging is not installed or staff directory access was denied: "+directory.error.message;list.innerHTML="";return;}
+      const staff=(directory.data||[]).filter(item=>item.user_id&&item.user_id!==window.currentUserId);
+      staffSelect.innerHTML='<option value="">Choose staff member</option>'+staff.map(item=>'<option value="'+esc(item.user_id)+'">'+esc(item.full_name||item.employee_number||"Staff member")+(item.branch_name?' · '+esc(item.branch_name):"")+'</option>').join("");
+      if(staff.some(item=>String(item.user_id)===String(previousRecipient)))staffSelect.value=previousRecipient;
+      else if(staff.length)staffSelect.value=String(staff[0].user_id);
+      const recipientId=staffSelect.value;
+      const recipient=staff.find(item=>String(item.user_id)===String(recipientId));
+      const title=document.getElementById("vicline-current-channel");
+      if(title)title.textContent=recipient?"Private · "+recipient.full_name:"Private direct messages";
+      if(!recipientId){list.innerHTML='<p class="muted">No other active staff members are available for private messaging.</p>';feedback.textContent="Staff directory loaded.";return;}
+      const result=await db.rpc("list_vic_line_direct_messages",{p_recipient_user_id:recipientId,p_limit:100});
+      if(result.error){feedback.textContent="Private messages could not be loaded. Apply the reviewed VIC LINE private-message SQL in the test database first. "+result.error.message;list.innerHTML="";return;}
+      const messages=(result.data||[]).slice().reverse();
+      list.innerHTML=messages.map(m=>{
+        const sent=String(m.direction)==="sent",sender=sent?"You":(m.sender_name||"Staff member");
+        const when=m.sent_at?new Date(m.sent_at).toLocaleString():"";
+        return '<article class="staff-chat-message '+(sent?'vicline-direct-sent':'vicline-direct-received')+'"><div class="vicline-message-avatar" aria-hidden="true">'+(sent?'Y':esc(String(sender).trim().charAt(0).toUpperCase()||'S'))+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(when)+(sent?'':(m.read_at?' · Read':' · Delivered'))+'</span></div><div class="vicline-bubble"><p class="staff-chat-text">'+esc(m.message_text)+'</p></div></div></article>';
+      }).join("")||'<p class="muted">No private messages with this colleague yet. Send the first message below.</p>';
+      const unread=messages.filter(m=>m.direction==="received"&&!m.read_at);
+      await Promise.all(unread.map(m=>db.rpc("mark_vic_line_direct_message_read",{p_message_id:m.message_id})));
+      feedback.textContent=messages.length+" private message"+(messages.length===1?"":"s")+" loaded. Messages are visible only to the sender and recipient.";
+      list.scrollTop=list.scrollHeight;
+    }catch(error){feedback.textContent="A connection error prevented private messages from loading. Check the database functions and try again.";}
+    return;
+  }
   feedback.textContent="Loading messages and voice notes…";
   try{
     const currentValue=selector.value||"";
@@ -2287,32 +2329,28 @@ window.pollVicLineAllConversations=async function(){
 window.vicLineStartPolling=function(){if(window.vicLinePollHandle)clearInterval(window.vicLinePollHandle);window.vicLinePollHandle=setInterval(()=>{window.pollVicLineAllConversations();},30000);};
 window.sendStaffChatMessage = async function(event) {
   event.preventDefault();
-  const form = event.currentTarget;
-  const input = document.getElementById("staff-chat-input");
-  const feedback = document.getElementById("staff-chat-feedback");
-  const selector = document.getElementById("staff-chat-branch");
-  const submitButton = form?.querySelector('button[type="submit"]');
-  const message = input ? input.value.trim() : "";
-  if (!db || !form || !input || !form.reportValidity() || !message) return;
-  if (submitButton) submitButton.disabled = true;
-  if (feedback) feedback.textContent = "Sending message…";
-  try {
-    const { error } = await db.rpc("send_staff_channel_message", {
-      p_message: message,
-      p_branch_id: selector && selector.value ? selector.value : null
-    });
-    if (error) {
-      if (feedback) feedback.textContent = "Message was not sent: " + error.message;
-      return;
+  const form=event.currentTarget,input=document.getElementById("staff-chat-input"),feedback=document.getElementById("staff-chat-feedback"),selector=document.getElementById("staff-chat-branch"),mode=document.getElementById("vicline-mode")?.value||"channel";
+  const submitButton=form?.querySelector('button[type="submit"]'),message=input?input.value.trim():"";
+  if(!db||!form||!input||!form.reportValidity()||!message)return;
+  if(submitButton)submitButton.disabled=true;
+  if(feedback)feedback.textContent="Sending "+(mode==="direct"?"private message…":"channel message…");
+  try{
+    let error=null;
+    if(mode==="direct"){
+      const recipientId=document.getElementById("vicline-dm-recipient")?.value||"";
+      if(!recipientId){if(feedback)feedback.textContent="Choose a staff member before sending a private message.";return;}
+      const result=await db.rpc("send_vic_line_direct_message",{p_recipient_user_id:recipientId,p_message_text:message});
+      error=result.error;
+    }else{
+      const result=await db.rpc("send_staff_channel_message",{p_message:message,p_branch_id:selector&&selector.value?selector.value:null});
+      error=result.error;
     }
-    input.value = "";
-    if (feedback) feedback.textContent = "Message sent. Refreshing conversation…";
+    if(error){if(feedback)feedback.textContent="Message was not sent: "+error.message;return;}
+    input.value="";
+    if(feedback)feedback.textContent="Message sent. Refreshing conversation…";
     await window.loadStaffChat();
-  } catch (error) {
-    if (feedback) feedback.textContent = "A connection error prevented the message from being sent. Check the conversation before retrying.";
-  } finally {
-    if (submitButton) submitButton.disabled = false;
-  }
+  }catch(error){if(feedback)feedback.textContent="A connection error prevented the message from being sent. Check the conversation before retrying.";}
+  finally{if(submitButton)submitButton.disabled=false;}
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
