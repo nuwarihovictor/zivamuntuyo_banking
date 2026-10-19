@@ -84,6 +84,7 @@ DECLARE
   v_attendance_id uuid;
   v_work_date date;
   v_local_time time;
+  v_timezone text := 'Africa/Kampala';
   v_status text := 'present';
   v_policy public.attendance_policies%ROWTYPE;
   v_existing public.staff_attendance%ROWTYPE;
@@ -91,7 +92,7 @@ BEGIN
   IF p_device_code IS NULL OR length(btrim(p_device_code)) NOT BETWEEN 2 AND 80
      OR p_external_event_id IS NULL OR length(btrim(p_external_event_id)) NOT BETWEEN 1 AND 180
      OR p_device_user_id IS NULL OR length(btrim(p_device_user_id)) NOT BETWEEN 1 AND 120
-     OR p_event_type NOT IN ('clock_in','clock_out') OR p_event_at IS NULL
+     OR p_event_type IS NULL OR p_event_type NOT IN ('clock_in','clock_out') OR p_event_at IS NULL
      OR p_event_at > now() + interval '10 minutes'
      OR p_event_at < now() - interval '45 days' THEN
     RAISE EXCEPTION 'Invalid attendance device event' USING ERRCODE='22023';
@@ -137,8 +138,11 @@ BEGIN
     RETURN QUERY SELECT v_event_id,NULL::uuid,'branch_access_denied'::text,'Employee is not authorized for the device branch'::text; RETURN;
   END IF;
 
-  v_work_date := (p_event_at AT TIME ZONE 'Africa/Kampala')::date;
-  v_local_time := (p_event_at AT TIME ZONE 'Africa/Kampala')::time;
+  SELECT coalesce(nullif(b.timezone,''),'Africa/Kampala') INTO v_timezone
+  FROM public.branches b WHERE b.id=v_device.branch_id;
+  IF v_timezone NOT IN ('Africa/Kampala','UTC') THEN v_timezone := 'Africa/Kampala'; END IF;
+  v_work_date := (p_event_at AT TIME ZONE v_timezone)::date;
+  v_local_time := (p_event_at AT TIME ZONE v_timezone)::time;
   SELECT * INTO v_policy FROM public.attendance_policies
   WHERE is_active=true AND effective_from<=v_work_date
     AND (branch_id=v_device.branch_id OR branch_id IS NULL)
