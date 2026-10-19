@@ -734,6 +734,17 @@ window.loadAttendancePolicy();
         </form>
         <div id="loan-schedule-preview" aria-live="polite"></div>
       `)}
+      ${panel("LOAN DUE-DATE CONTROL","Repayment due and arrears dashboard","Status is calculated from approved saved schedules and posted repayment allocations. If the database servicing schema is not installed, this panel will report that rather than inventing balances.",`
+        <div class="form-grid">
+          <label>Branch filter<select id="loan-due-branch"><option value="">All authorized branches</option></select></label>
+          <button type="button" class="secondary" onclick="window.loadLoanDueDashboard()">Refresh due dates</button>
+        </div>
+        <div class="loan-due-legend" aria-label="Loan servicing status legend"><span>🟢 Upcoming</span><span>🔵 Due today</span><span>🟠 Grace period</span><span>🔴 Overdue</span><span>⚫ Settled</span></div>
+        <div id="loan-due-feedback" class="muted" role="status" aria-live="polite">Loading saved loan schedules…</div>
+        <div id="loan-due-summary" class="grid-2"></div>
+        <div id="loan-due-list" class="table-wrap"></div>
+        <p class="muted">Days past due are measured from the contractual due date. Grace-period status is shown separately. Alert delivery and collection notes require the reviewed servicing database setup.</p>
+      `)}
       ${panel("NEW LOAN APPLICATION","Capture request and supporting evidence","Use an active customer and the branch responsible for the application. Attach ID, land title, chairperson letter and other supporting documents.",`
         <form id="loan-application-form" onsubmit="handleLoanApplicationSubmit(event)">
           <label>Customer *
@@ -781,6 +792,7 @@ window.loadAttendancePolicy();
     `;
     window.loadLoanApplicationFormOptions();
     window.loadLoanApplications();
+    window.loadLoanDueDashboard();
   }
   else if (pageName === "Approvals") {
     c.innerHTML = `
@@ -1724,6 +1736,49 @@ window.handleLoanApplicationSubmit = async function(e) {
     await window.loadLoanApplications();
   }catch(err){if(feedback)feedback.textContent="Loan application failed: "+(err?.message||"Unexpected error");}
   finally{if(button)button.disabled=false;}
+};
+
+window.loadLoanDueDashboard = async function(){
+  const feedback=document.getElementById("loan-due-feedback"),host=document.getElementById("loan-due-list"),summary=document.getElementById("loan-due-summary"),branchSelect=document.getElementById("loan-due-branch");
+  if(!feedback||!host)return;
+  if(!db){feedback.textContent="Database connection unavailable. No due-date figures are being shown.";return;}
+  feedback.textContent="Loading approved schedules and posted repayment allocations…";
+  try{
+    if(branchSelect&&branchSelect.options.length<=1){
+      const branches=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+      if(!branches.error)branchSelect.innerHTML='<option value="">All authorized branches</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+    }
+    const branchId=branchSelect?.value||null;
+    const {data,error}=await db.rpc("list_loan_due_alert_dashboard",{p_branch_id:branchId,p_limit:250});
+    if(error){
+      feedback.textContent="Live loan servicing is not yet available: "+error.message+". Review and apply the loan servicing schema and dashboard RPC in a non-production database before enabling this feature.";
+      host.innerHTML="";if(summary)summary.innerHTML="";return;
+    }
+    const rows=data||[];
+    const fmt=(value,currency="UGX")=>currency+" "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2});
+    const meta={
+      upcoming:{label:"🟢 Upcoming",className:"loan-due-upcoming"},
+      due_today:{label:"🔵 Due today",className:"loan-due-today"},
+      grace_period:{label:"🟠 Grace period",className:"loan-due-grace"},
+      overdue:{label:"🔴 Overdue",className:"loan-due-overdue"},
+      settled:{label:"⚫ Settled",className:"loan-due-settled"}
+    };
+    const counts={upcoming:0,due_today:0,grace_period:0,overdue:0,settled:0};
+    rows.forEach(row=>{if(Object.hasOwn(counts,row.servicing_status))counts[row.servicing_status]++;});
+    if(summary)summary.innerHTML=[
+      ["Overdue instalments",counts.overdue,"loan-due-overdue"],
+      ["Due today",counts.due_today,"loan-due-today"],
+      ["Within grace period",counts.grace_period,"loan-due-grace"],
+      ["Upcoming instalments",counts.upcoming,"loan-due-upcoming"]
+    ].map(([label,count,cls])=>'<div class="metric-card '+cls+'"><div class="metric-sub">'+label+'</div><div class="metric-val">'+count+'</div></div>').join("");
+    if(!rows.length){host.innerHTML='<p class="muted">No unpaid instalments were returned for your authorized scope. This is not proof that loan servicing is configured unless the RPC succeeded.</p>';feedback.textContent="Servicing query completed successfully. No unpaid instalments returned.";return;}
+    host.innerHTML='<table class="data-table"><thead><tr><th>Loan / customer</th><th>Instalment</th><th>Due / grace end</th><th>Outstanding</th><th>DPD</th><th>Status</th><th>Branch</th></tr></thead><tbody>'+rows.map(row=>{
+      const state=meta[row.servicing_status]||{label:esc(row.servicing_status||"Unknown"),className:""};
+      const currency="UGX";
+      return '<tr><td><strong>'+esc(row.loan_account_number||"Loan")+'</strong><br><span class="muted">'+esc(row.customer_name||"Customer")+'</span></td><td>#'+esc(row.installment_no)+'<br><span class="muted">Due '+fmt(row.total_due,currency)+' · Paid '+fmt(row.total_paid,currency)+'</span></td><td>'+esc(row.due_date||"—")+'<br><span class="muted">Grace ends '+esc(row.grace_end_date||"—")+'</span></td><td><strong>'+fmt(row.outstanding_amount,currency)+'</strong></td><td>'+Number(row.days_past_due||0)+'</td><td><span class="loan-servicing-status '+state.className+'">'+state.label+'</span></td><td>'+esc(row.branch_name||"Unassigned")+'</td></tr>';
+    }).join("")+'</tbody></table>';
+    feedback.textContent=rows.length+" unpaid instalment(s) loaded from approved schedules and posted allocations. Figures are database-derived.";
+  }catch(_){feedback.textContent="A connection error prevented the loan servicing dashboard from loading.";}
 };
 
 window.loadLoanApplications = async function() {
