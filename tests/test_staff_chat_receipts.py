@@ -17,6 +17,9 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         cls.attendance_migration = (
             ROOT / "supabase/migrations/20261019090000_staff_attendance_event_rls.sql"
         ).read_text(encoding="utf-8")
+        cls.cash_migration = (
+            ROOT / "supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql"
+        ).read_text(encoding="utf-8")
 
     def test_html_escape_covers_quotes_for_attribute_values(self):
         self.assertIn('.replace(/"/g, "&quot;")', self.app)
@@ -57,6 +60,17 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("no fingerprint device is connected yet", self.app)
         self.assertIn("not fingerprint-verified", self.app)
         self.assertIn("window.recordStaffAttendancePunch", self.app)
+
+    def test_cash_rpcs_keep_active_employee_and_separation_of_duties_guards(self):
+        self.assertIn("Active employee profile required", self.cash_migration)
+        self.assertIn("current_employee_can_transact_in_branch", self.cash_migration)
+        self.assertIn("Transaction must be approved and pending posting", self.cash_migration)
+        self.assertIn("v_j.created_by=auth.uid() OR v_j.approved_by=auth.uid()", self.cash_migration)
+        self.assertIn("Ledger entries already exist for this request; duplicate posting is blocked", self.cash_migration)
+        self.assertIn("Insufficient available balance", self.cash_migration)
+        self.assertIn("same currency and branch", self.cash_migration)
+        self.assertIn("REVOKE ALL ON FUNCTION public.post_approved_cash_transaction", self.cash_migration)
+        self.assertIn("TO authenticated, service_role", self.cash_migration)
 
     def test_deployment_has_baseline_browser_security_headers(self):
         self.assertIn("X-Content-Type-Options", self.vercel_config)
