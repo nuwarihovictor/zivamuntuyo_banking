@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
 -- Run after the disposable migration fixture, draft migrations, and core assertions.
 -- Existing fixture users are reused; these checks exercise RLS as authenticated.
+-- The minimal fixture does not otherwise expose the profile table to authenticated.
+GRANT SELECT ON public.employee_profiles TO authenticated;
 INSERT INTO public.employee_profiles(user_id,is_active)
 VALUES ('40000000-0000-0000-0000-000000000005',true),
        ('40000000-0000-0000-0000-000000000006',false)
