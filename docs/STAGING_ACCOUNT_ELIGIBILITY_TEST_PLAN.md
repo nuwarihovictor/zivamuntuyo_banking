@@ -193,6 +193,13 @@ The draft migration `20261019080000_staff_chat_active_employee_rls.sql` creates 
 The disposable PostgreSQL workflow now parses/applies this migration and tests active/inactive employee RLS. These are isolated fixture tests, not a production-schema integration test. Before release, confirm the actual production `employee_profiles` foreign-key semantics and grants, apply to an approved staging environment, test with real staff sessions, and verify that the Data API exposes the table only with RLS enabled. Never put passwords, PINs, or customer financial details in chat.
 
 
+## Browser output-encoding regression checklist (added 2026-10-19)
+
+- Confirm dynamic text and attribute values escape ampersands, angle brackets, double quotes, and apostrophes before being inserted into HTML.
+- Test branch names, addresses, country names, staff messages, and form values containing quote characters and markup-like strings; they must display as text and must not create new attributes or elements.
+- Keep dynamic values out of inline JavaScript contexts unless they are separately encoded for that context. Current branch action IDs should remain UUIDs returned by the database; do not use arbitrary user-controlled text in event-handler code.
+- This source-level check does not replace browser-based XSS testing or a content-security-policy review.
+
 ## Branch management regression checklist (added 2026-10-19)
 
 - Sign in as an active system administrator and verify branch create, edit, archive, and reactivation actions use the administrator RPCs.
