@@ -9,6 +9,7 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = (ROOT / "app.js").read_text(encoding="utf-8")
+        cls.styles = (ROOT / "styles.css").read_text(encoding="utf-8")
         cls.chat_migration = (
             ROOT / "supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql"
         ).read_text(encoding="utf-8")
@@ -41,6 +42,7 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("window.loadBranchManagement", self.app)
         self.assertIn('db.rpc("current_employee_role_code")', self.app)
         self.assertIn('roleResult.data==="system_admin"', self.app)
+        self.assertIn(".branch-admin-controls[hidden] { display: none !important; }", self.styles)
         self.assertIn('db.rpc("admin_create_branch"', self.app)
         self.assertIn('db.rpc("admin_update_branch"', self.app)
         self.assertIn('db.rpc("admin_set_branch_active"', self.app)
