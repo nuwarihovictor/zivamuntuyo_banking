@@ -57,7 +57,7 @@ LANGUAGE sql STABLE AS $$ SELECT true $$;
 -- Representative routines used to exercise the search_path/ACL hardening migration.
 CREATE OR REPLACE FUNCTION public.approval_limit_allows(text,text,uuid,text,numeric)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER
-SET search_path = public, pg_temp AS $ SELECT true $;
+SET search_path = public, pg_temp AS $$ SELECT true $$;
 GRANT EXECUTE ON FUNCTION public.approval_limit_allows(text,text,uuid,text,numeric)
 TO authenticated;
 CREATE OR REPLACE FUNCTION public.record_financial_activity(
