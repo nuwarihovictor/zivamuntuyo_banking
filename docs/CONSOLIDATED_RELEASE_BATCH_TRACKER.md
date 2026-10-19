@@ -152,3 +152,12 @@
 - **Receipt flow issue found during source review:** the cash-posting button does not initially carry `data-receipt-status="posted"`, while `printTransactionReceipt` refuses to print unless that status is set. The post-success handler currently calls the receipt function using that button, so the guard can reject the receipt. Also, the transaction-monitor receipt print count resets to zero when the list is re-rendered, so it cannot establish a durable original/reprint history. Fix and test this in the draft branch; do not infer that a printed receipt is evidence of posting.
 
 - **Latest checked branch head:** `6cce49d572667aa379205dddd9e5fc89eeb66599`. Its reported Vercel check is still the Hobby build-rate-limit failure. The GitHub Actions run that passed is the earlier `e8ca38c3ae11028e85875fec1a5b612b3477f213` commit; exact-head test evidence is still not confirmed. Keep the no-payment rule and do not upgrade to clear the Vercel check.
+
+
+## Deployment-preparation checkpoint — 2026-10-19
+
+- Latest draft branch head: `19527c4f931d1f749de33b7212bbe20a7eb27089` — fixes receipt eligibility so a cash receipt is marked posted only after the cash-posting RPC succeeds, and adds a regression test for the order of operations.
+- Exact-head disposable PostgreSQL preflight passed in [GitHub Actions run #39238893502](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39238893502). The job completed successfully, including the consolidated release preflight against disposable PostgreSQL 17. This is fixture/CI evidence only, not staging or production acceptance.
+- Vercel check on this head remains a Hobby build-rate-limit failure. No upgrade or payment was made. Wait for the quota window to clear before retrying; do not repeatedly trigger builds.
+- Build configuration currently emits a clean `public/` output directory and refuses mismatched or privileged browser configuration. Before the next preview attempt, confirm the Preview environment has only inert/non-production configuration; do not restore production Supabase credentials to Preview.
+- Deployment is **prepared for a safe preview retry, not approved for live release**. Remaining no-go items include production-shaped staging, per-function security/grant review, accounting reconciliation, backup/restore and recovery evidence, Windows 10/11 acceptance, physical printer testing, and fingerprint-device validation. Keep the PR draft and production untouched until the release owner explicitly approves.
