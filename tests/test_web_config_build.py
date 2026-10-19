@@ -42,6 +42,27 @@ class WebConfigBuildTests(unittest.TestCase):
         config = json.loads(config_match.group(1))
         self.assertEqual(config, {"supabaseUrl": "", "supabaseAnonKey": ""})
 
+    def test_explicitly_disabled_preview_backend_builds_empty_fail_closed_config(self):
+        result, content, public_files = run_build({
+            "VERCEL_ENV": "preview",
+            "SUPABASE_URL": "DISABLED",
+            "SUPABASE_PUBLISHABLE_KEY": "DISABLED"
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config_match = re.search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        self.assertIsNotNone(config_match, content)
+        self.assertEqual(json.loads(config_match.group(1)), {"supabaseUrl": "", "supabaseAnonKey": ""})
+        self.assertIn("Preview backend explicitly disabled", result.stdout)
+
+    def test_production_refuses_disabled_backend_sentinel(self):
+        result, content, public_files = run_build({
+            "VERCEL_ENV": "production",
+            "SUPABASE_URL": "DISABLED",
+            "SUPABASE_PUBLISHABLE_KEY": "DISABLED"
+        })
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIsNone(content)
+
     def test_build_outputs_a_complete_static_site_directory_without_repository_sources(self):
         result, content, public_files = run_build({
             "VERCEL_ENV": "preview",
