@@ -129,5 +129,26 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn('.order("created_at",{ascending:false}).limit(100)', loader)
 
 
+    def test_branch_admin_rpc_failures_are_reported_and_submit_controls_recover(self):
+        create_start = self.app.index("window.createBranch = async function")
+        update_start = self.app.index("window.updateBranch = async function", create_start)
+        active_start = self.app.index("window.setBranchActive = async function", update_start)
+        switch_start = self.app.index("window.switchPage = function", active_start)
+        create_fn = self.app[create_start:update_start]
+        update_fn = self.app[update_start:active_start]
+        active_fn = self.app[active_start:switch_start]
+        self.assertIn("try {", create_fn)
+        self.assertIn("catch(error)", create_fn)
+        self.assertIn("finally", create_fn)
+        self.assertIn("if(submit)submit.disabled=false", create_fn)
+        self.assertIn("try {", update_fn)
+        self.assertIn("catch(error)", update_fn)
+        self.assertIn("if(submit)submit.disabled=false", update_fn)
+        self.assertIn("catch(error)", active_fn)
+        self.assertIn("could not be confirmed", create_fn)
+        self.assertIn("could not be confirmed", update_fn)
+        self.assertIn("could not be confirmed", active_fn)
+
+
 if __name__ == "__main__":
     unittest.main()
