@@ -35,6 +35,90 @@ BEGIN
   RETURNING id INTO v_journal_id;
   RETURN QUERY SELECT v_journal_id,v_journal_number,'pending_approval'::text;
 END;
+  INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
+  VALUES (
+    auth.uid(),v_branch,'cash_transaction_requested','ledger_journal',v_journal_id::text,'success',
+    jsonb_build_object(
+      'journal_number',v_journal_number,
+      'transaction_type',v_type,
+      'amount',p_amount,
+      'currency_code',v_currency,
+      'account_id',p_account_id
+    )
+  );
+  RETURN QUERY SELECT v_journal_id,v_journal_number,'pending_approval'::text;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.approve_cash_transaction_request(p_journal_id uuid)
+RETURNS TABLE(journal_id uuid,journal_number text,journal_status text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $function$
+DECLARE
+  v_role text; v_status text; v_requester uuid; v_approver uuid;
+  v_type text; v_amount numeric; v_currency text; v_branch uuid;
+  v_account_status text;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep
+    WHERE ep.user_id=auth.uid() AND ep.is_active=true
+  ) THEN
+    RAISE EXCEPTION 'Active employee profile required' USING ERRCODE='42501';
+  END IF;
+  v_role:=public.current_employee_role_code();
+  IF v_role IS NULL OR v_role NOT IN ('system_admin','general_manager','bank_admin','branch_manager','teller') THEN
+    RAISE EXCEPTION 'Your role cannot approve cash transaction requests' USING ERRCODE='42501';
+  END IF;
+
+  SELECT j.status,j.created_by,j.approved_by,j.request_transaction_type,
+         j.requested_amount,b.currency_code,b.branch_id,b.status
+    INTO v_status,v_requester,v_approver,v_type,v_amount,v_currency,v_branch,v_account_status
+  FROM public.ledger_journals j
+  JOIN public.bank_accounts b ON b.id=j.requested_account_id
+  WHERE j.id=p_journal_id
+  FOR UPDATE OF j;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Cash transaction request not found' USING ERRCODE='P0002'; END IF;
+  IF v_status<>'pending_approval' OR v_approver IS NOT NULL THEN
+    RAISE EXCEPTION 'Only unapproved pending cash transaction requests can be approved' USING ERRCODE='23514';
+  END IF;
+  IF v_type NOT IN ('deposit','withdrawal') OR v_amount IS NULL OR v_amount<=0 THEN
+    RAISE EXCEPTION 'Cash transaction request has invalid transaction details' USING ERRCODE='22023';
+  END IF;
+  IF v_account_status<>'active' THEN
+    RAISE EXCEPTION 'Only active customer accounts can be approved' USING ERRCODE='23514';
+  END IF;
+  IF v_requester=auth.uid() THEN RAISE EXCEPTION 'The requester cannot approve their own transaction' USING ERRCODE='42501'; END IF;
+  IF NOT public.current_employee_can_transact_in_branch(v_branch) THEN
+    RAISE EXCEPTION 'Branch access denied' USING ERRCODE='42501';
+  END IF;
+  IF NOT public.approval_limit_allows(v_role,'cash_transaction',v_branch,v_currency,v_amount) THEN
+    RAISE EXCEPTION 'This transaction exceeds your configured approval limit. Escalate it to an authorized higher approver.';
+  END IF;
+
+  UPDATE public.ledger_journals
+     SET approved_by=auth.uid(),approved_at=pg_catalog.now()
+   WHERE id=p_journal_id AND status='pending_approval'
+     AND approved_by IS NULL AND approved_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Transaction was approved by another reviewer; reload the request' USING ERRCODE='23514';
+  END IF;
+
+  INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
+  VALUES (
+    auth.uid(),v_branch,'cash_transaction_approved','ledger_journal',p_journal_id::text,'success',
+    pg_catalog.jsonb_build_object(
+      'requester_user_id',v_requester,
+      'transaction_type',v_type,
+      'amount',v_amount,
+      'currency_code',v_currency,
+      'approval_role',v_role
+    )
+  );
+  RETURN QUERY SELECT j.id,j.journal_number,j.status
+  FROM public.ledger_journals j WHERE j.id=p_journal_id;
+END;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.post_approved_cash_transaction(p_journal_id uuid,p_cash_ledger_account_id uuid)
@@ -119,5 +203,7 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.create_cash_transaction_request(uuid,text,numeric,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_cash_transaction_request(uuid,text,numeric,text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.approve_cash_transaction_request(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.approve_cash_transaction_request(uuid) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.post_approved_cash_transaction(uuid,uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.post_approved_cash_transaction(uuid,uuid) TO authenticated, service_role;
