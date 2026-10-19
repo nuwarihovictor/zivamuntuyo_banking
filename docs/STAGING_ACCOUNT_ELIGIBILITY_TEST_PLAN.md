@@ -12,7 +12,7 @@ The current database seed values are:
 - `INS` — Institutional Account
 - `JNT` — Joint Account
 
-The migration now uses the exact `IND`/`JNT` codes in the legacy `open_account_request` path. The primary `create_bank_account_request` path still uses code/name matching and should be normalized to exact code checks before production.
+The migration uses exact `IND`/`JNT` type codes in both account-opening paths. The `create_bank_account_request` currency guard now validates against the active `public.currencies` catalogue rather than a hard-coded list.
 
 ## Preconditions
 
@@ -49,8 +49,9 @@ The migration now uses the exact `IND`/`JNT` codes in the legacy `open_account_r
 
 - The migration is not deployed to Supabase and has not been run against a staging database yet.
 - Advisory locks serialize requests only when all relevant creation paths use compatible locks; test both paths under concurrency.
-- `create_bank_account_request` currently detects IND/JNT by code/name regex; change to exact type-code checks before production.
+- Currency availability is validated against the active currency catalogue. This avoids accepting a code such as USD when it is not configured in the current database.
 - The new joint-holder RPC and the legacy opening-function replacement need SQL review and staging execution before release.
+- Branch-scope checks in both legacy account opening and joint-holder addition use `current_employee_can_transact_in_branch` to align customer scope with transaction access policy.
 - The migration preserves existing execute grants for `approve_account_request`; compare ACLs and review SECURITY DEFINER authorization before deployment.
 - Keep live financial transactions disabled until account-opening, approvals, ledger posting, permissions, rollback and error handling are verified.
 
@@ -64,3 +65,10 @@ The migration now uses the exact `IND`/`JNT` codes in the legacy `open_account_r
 - GitHub Actions has not reported a run for the latest draft commit. No staging branch was created because the user declined additional paid Supabase compute.
 
 These checks were read-only. No customer, account, transaction, or production schema data was changed.
+
+
+## Additional no-cost review on 2026-10-19
+
+- Compared the draft currency allowlist with the live currency catalogue and found USD was not configured although the earlier hard-coded list accepted it. Updated the draft to require a matching active row in `public.currencies`.
+- Tightened customer-branch checks in the legacy account-opening and joint-holder paths to use the transaction-scope helper instead of the broader branch-access helper.
+- These are source-level corrections only. The migration remains unapplied and must still be parsed/executed against a non-production PostgreSQL database before it can be considered validated.
