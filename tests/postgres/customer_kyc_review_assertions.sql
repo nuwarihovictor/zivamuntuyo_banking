@@ -139,3 +139,38 @@ BEGIN
   END IF;
 END
 $test$;
+
+-- Additional negative checks: invalid input and RPC execute grants.
+DO $test$
+DECLARE
+  v_failed boolean := false;
+BEGIN
+  IF has_function_privilege('anon', 'public.review_customer_kyc(uuid,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anonymous role can execute KYC review RPC';
+  END IF;
+
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.review_customer_kyc(
+      '50000000-0000-0000-0000-000000000003','delete','Invalid decision test'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%KYC decision must be approve or reject%' THEN v_failed := true; ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: invalid KYC decision was accepted'; END IF;
+
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.review_customer_kyc(
+      '50000000-0000-0000-0000-000000000003','approve','short'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%KYC review reason must be 8 to 500 characters%' THEN v_failed := true; ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: too-short KYC review reason was accepted'; END IF;
+
+  IF NOT has_function_privilege('authenticated', 'public.review_customer_kyc(uuid,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated staff cannot execute KYC review RPC';
+  END IF;
+END
+$test$;
