@@ -233,8 +233,12 @@ BEGIN
       AND entity_type='ledger_journal'
       AND entity_id=v_deposit::text
       AND outcome='success'
+      AND details->>'amount' = '100'
+      AND details->>'currency_code' = 'UGX'
+      AND details->>'requester_user_id' = '40000000-0000-0000-0000-000000000001'
+      AND details->>'approver_user_id' = '40000000-0000-0000-0000-000000000002'
   ) THEN
-    RAISE EXCEPTION 'FAIL: successful cash posting has no audit event';
+    RAISE EXCEPTION 'FAIL: successful cash posting audit event is missing or has incorrect transaction details';
   END IF;
 
   -- Duplicate posting must fail and leave the two original entries unchanged.
