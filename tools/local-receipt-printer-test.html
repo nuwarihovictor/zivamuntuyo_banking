@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Local Receipt Printer Test — TEST ONLY</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,Arial,sans-serif;color:#18251e;background:#f3f6f3}
+body{max-width:900px;margin:0 auto;padding:20px}
+h1{font-size:1.5rem} .warning{border:2px solid #a33;background:#fff4f2;padding:12px;border-radius:8px;font-weight:700}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+label{display:grid;gap:6px}select,button{font:inherit;padding:10px;border:1px solid #9aa89e;border-radius:6px;background:white}
+button{cursor:pointer;font-weight:650}.sample{background:#fff;border:1px solid #ccd6ce;padding:14px;border-radius:8px}
+.mono{font-family:ui-monospace,Consolas,monospace}
+@media print{
+ body{padding:0;margin:0;background:#fff}
+ .no-print{display:none!important}
+ #receipt{display:block!important;border:0;padding:0;border-radius:0;width:var(--paper-width,72mm);margin:0 auto;color:#000;font:12px/1.45 monospace}
+ @page{margin:4mm}
+}
+#receipt{width:72mm;max-width:100%;box-sizing:border-box}
+#receipt h2,#receipt .center{text-align:center}
+#receipt h2{font-size:14px;margin:0 0 5px}
+#receipt .muted{font-size:10px}
+#receipt .rule{border:0;border-top:1px dashed #000;margin:10px 0}
+#receipt .row{display:flex;justify-content:space-between;gap:8px;margin:6px 0;overflow-wrap:anywhere}
+#receipt .amount{text-align:center;font-size:16px;font-weight:800;overflow-wrap:anywhere}
+#receipt .testmark{border:2px solid #b00020;text-align:center;font-weight:900;padding:5px;margin:8px 0;letter-spacing:.08em}
+</style>
+</head>
+<body>
+<div class="no-print">
+<h1>Local receipt-printer test</h1>
+<p class="warning">TEST ONLY — this page is offline, uses synthetic values, and does not connect to the banking database. Its printout is NOT a customer receipt or proof of payment.</p>
+<p>Use this page to check the browser print dialog, printer selection, paper width, text clipping, spacing, and cut/feed. It does not certify the app's real transaction workflow.</p>
+<div class="controls">
+<label>Paper layout
+<select id="paper"><option value="58">58 mm thermal</option><option value="80" selected>80 mm thermal</option><option value="a4">A4 / office printer</option></select>
+</label>
+<label>Sample transaction
+<select id="kind"><option value="DEPOSIT">Deposit sample</option><option value="WITHDRAWAL">Withdrawal sample</option></select>
+</label>
+<button type="button" id="print">Print test page</button>
+<button type="button" id="reload">Reset sample</button>
+</div>
+<p id="result" role="status" aria-live="polite">Ready. Choose the installed local printer in the print dialog.</p>
+</div>
+<section id="receipt" class="sample mono" aria-label="Synthetic receipt test">
+<h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2>
+<p class="center muted">RECEIPT LAYOUT TEST</p>
+<div class="testmark">TEST ONLY · NOT VALID</div>
+<hr class="rule">
+<div class="row"><span>Reference</span><span>TEST-2026-0001</span></div>
+<div class="row"><span>Date</span><span>2026-10-19 10:30</span></div>
+<div class="row"><span>Branch</span><span>DEMO BRANCH</span></div>
+<div class="row"><span>Account</span><span>0000000000</span></div>
+<div class="row"><span>Transaction</span><span id="type">DEPOSIT</span></div>
+<hr class="rule">
+<p class="center" id="amount-label">SAMPLE AMOUNT RECEIVED</p>
+<p class="amount">UGX 123,456.00</p>
+<hr class="rule">
+<p class="center">This is a synthetic printer test.</p>
+<p class="center muted">NOT POSTED · NOT A FINANCIAL DOCUMENT</p>
+</section>
+<script>
+(function(){
+const paper=document.getElementById("paper"),kind=document.getElementById("kind"),type=document.getElementById("type"),label=document.getElementById("amount-label"),receipt=document.getElementById("receipt"),result=document.getElementById("result");
+function update(){
+const k=kind.value;type.textContent=k;label.textContent=k==="DEPOSIT"?"SAMPLE AMOUNT RECEIVED":"SAMPLE AMOUNT PAID OUT";
+receipt.style.setProperty("--paper-width",paper.value==="a4"?"180mm":paper.value+"mm");
+receipt.style.width=paper.value==="a4"?"180mm":paper.value+"mm";
+}
+paper.addEventListener("change",update);kind.addEventListener("change",update);
+document.getElementById("reload").addEventListener("click",()=>{paper.value="80";kind.value="DEPOSIT";update();result.textContent="Sample reset. Ready to print.";});
+document.getElementById("print").addEventListener("click",()=>{update();result.textContent="Print dialog opened if supported. Check the selected printer and preview before printing.";window.print();});
+update();
+})();
+</script>
+</body>
+</html>

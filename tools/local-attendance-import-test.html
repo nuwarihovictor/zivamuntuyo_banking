@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zivamuntuyo — Attendance Import Test</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#1b2c22;background:#f4f7f4;--g:#073b2b;--gold:#cba85a;--line:#d9e3dc}
+*{box-sizing:border-box}body{margin:0;padding:18px;max-width:1100px;margin-inline:auto}header{background:var(--g);color:#fff;padding:20px;border-radius:12px}h1{margin:0 0 8px;font-size:1.35rem}header p{margin:0;line-height:1.5}.warning{margin:16px 0;padding:12px;border:2px solid #9d5a00;background:#fff5df;border-radius:8px;font-weight:700}.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}label{display:block;font-weight:700;margin:8px 0}input,textarea,button{font:inherit;max-width:100%}input[type=file],textarea{width:100%;padding:10px;border:1px solid #aab9ae;border-radius:6px}textarea{min-height:100px}button{background:var(--g);color:white;border:0;border-radius:6px;padding:10px 14px;cursor:pointer;margin:6px 6px 6px 0}button.secondary{background:#52665a}button:focus,input:focus,textarea:focus{outline:3px solid var(--gold);outline-offset:2px}.muted{color:#536359;font-size:.93rem;line-height:1.5}.status{font-weight:700;margin:12px 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:#edf3ee}.table-wrap{overflow-x:auto}.good{color:#17643c}.bad{color:#9a2d21}.pill{display:inline-block;border-radius:99px;background:#edf3ee;padding:3px 8px;font-size:.8rem}@media print{button,input,textarea{display:none}body{background:#fff;padding:0}.panel,header{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+<h1>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h1>
+<p>Staff attendance import — local compatibility test</p>
+</header>
+<div class="warning">TEST TOOL ONLY — NOT CONNECTED TO THE BANKING DATABASE. Imported rows are not official attendance and are not proof that a fingerprint was scanned.</div>
+<div class="panel">
+<h2>1. Prepare the test file</h2>
+<p>Choose a CSV file exported from a fingerprint attendance terminal. This page reads it locally in this browser tab only; it does not upload it anywhere.</p>
+<p class="muted">For this first compatibility test, use these exact column headings: <code>employee_id,timestamp,event_type,device_id,event_id</code>. Timestamp should be ISO-like (for example <code>2026-10-19T08:01:00+03:00</code>) and event_type must be <code>clock_in</code> or <code>clock_out</code>. Vendor exports with different headings need a reviewed mapping adapter first.</p>
+<label for="csvFile">Attendance CSV file</label><input id="csvFile" type="file" accept=".csv,text/csv">
+<div class="grid">
+<div><label for="employees">Known employee IDs for this test (one per line)</label><textarea id="employees" placeholder="EMP001&#10;EMP002"></textarea><p class="muted">Use synthetic IDs only. This list is not sent or saved.</p></div>
+<div><label for="timezone">Timestamp rule</label><p class="muted">Timestamps must include a timezone offset or Z. Ambiguous local times are rejected rather than guessed.</p><button id="sample" type="button" class="secondary">Load synthetic sample</button><button id="clear" type="button" class="secondary">Clear test data</button></div>
+</div>
+<button id="validate" type="button">Validate locally</button>
+<div id="summary" class="status" role="status" aria-live="polite">No file loaded.</div>
+</div>
+<div class="panel">
+<h2>2. Validation results</h2>
+<p class="muted">The validator checks required headers, employee mapping, timestamp format, event types, required device IDs, and duplicate event IDs/rows. It does not verify biometric identity, official employee status, or valid clock-in/out sequence against the bank database.</p>
+<div class="table-wrap"><table><thead><tr><th>Row</th><th>Employee</th><th>Timestamp</th><th>Event</th><th>Device</th><th>Result</th></tr></thead><tbody id="results"><tr><td colspan="6">No validation results yet.</td></tr></tbody></table></div>
+</div>
+<script>
+"use strict";
+const fileInput=document.getElementById("csvFile"), employeesInput=document.getElementById("employees"), summary=document.getElementById("summary"), results=document.getElementById("results");
+let csvText="";
+function parseCSV(text){
+ text=text.replace(/^\uFEFF/,"");
+ const rows=[];let row=[],cell="",quoted=false;
+ for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(c==='"'){quoted=false;}else{cell+=c;}}else if(c==='"'){quoted=true;}else if(c===","){row.push(cell);cell="";}else if(c==="\n"){row.push(cell.replace(/\r$/,""));rows.push(row);row=[];cell="";}else{cell+=c;}}
+ if(quoted)throw new Error("CSV contains an unclosed quoted field.");if(cell.length||row.length){row.push(cell.replace(/\r$/,""));rows.push(row);}return rows.filter(r=>r.some(v=>v.trim()!==""));
+}
+fileInput.addEventListener("change",async()=>{csvText="";const file=fileInput.files&&fileInput.files[0];if(!file){summary.textContent="No file loaded.";return;}if(file.size>2*1024*1024){summary.textContent="Rejected: test file exceeds 2 MB.";return;}try{csvText=await file.text();summary.textContent="Loaded locally: "+file.name+" ("+file.size+" bytes). Select synthetic employee IDs, then validate.";results.replaceChildren();}catch(e){summary.textContent="Could not read file locally."; }});
+function isValidTimestamp(value){
+ const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-](\d{2}):(\d{2}))$/i.exec(value);
+ if(!match||Number.isNaN(Date.parse(value)))return false;
+ const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),hour=Number(match[4]),minute=Number(match[5]),second=Number(match[6]);
+ if(hour>23||minute>59||second>59)return false;
+ const date=new Date(Date.UTC(year,month-1,day,hour,minute,second));
+ if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day||date.getUTCHours()!==hour||date.getUTCMinutes()!==minute||date.getUTCSeconds()!==second)return false;
+ if(match[8]!==undefined&&(Number(match[8])>23||Number(match[9])>59))return false;
+ return true;
+}
+function validate(){
+ results.replaceChildren();if(!csvText){summary.textContent="Choose a CSV file or load the synthetic sample first.";return;}
+ let rows;try{rows=parseCSV(csvText);}catch(e){summary.textContent="CSV parse error: "+e.message;return;}if(rows.length<2){summary.textContent="Rejected: file must contain a header and at least one data row.";return;}
+ const headers=rows[0].map(x=>x.replace(/^\uFEFF/,"").trim().toLowerCase()),required=["employee_id","timestamp","event_type","device_id","event_id"];
+ if(new Set(headers).size!==headers.length){summary.textContent="Rejected: duplicate column headers make mapping ambiguous.";return;}
+ const missing=required.filter(h=>!headers.includes(h));if(missing.length){summary.textContent="Rejected: missing required header(s): "+missing.join(", ");return;}
+ const index=Object.fromEntries(required.map(h=>[h,headers.indexOf(h)]));
+ const known=new Set(employeesInput.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)),seenIds=new Set(),seenRows=new Set();let accepted=0,rejected=0;
+ rows.slice(1).forEach((r,n)=>{
+  const get=h=>(r[index[h]]||"").trim();const employee=get("employee_id"),timestamp=get("timestamp"),event=get("event_type").toLowerCase(),device=get("device_id"),eventId=get("event_id");
+  const errors=[];if(r.length!==headers.length)errors.push("column count mismatch");if(!employee)errors.push("missing employee ID");else if(!known.has(employee))errors.push("unknown employee ID");if(!timestamp||!/(Z|[+-]\d{2}:?\d{2})$/i.test(timestamp)||Number.isNaN(Date.parse(timestamp)))errors.push("invalid timestamp/timezone");if(!["clock_in","clock_out"].includes(event))errors.push("invalid event type");if(!device)errors.push("missing device ID");if(!eventId)errors.push("missing event ID");else if(seenIds.has(eventId))errors.push("duplicate event ID");if(eventId)seenIds.add(eventId);
+  const rowKey=[employee,timestamp,event,device].join("|");if(seenRows.has(rowKey))errors.push("duplicate event row");seenRows.add(rowKey);
+  const tr=document.createElement("tr");const values=[String(n+2),employee,timestamp,event,device,errors.length?"REJECTED: "+errors.join("; "):"VALID FORMAT — TEST ONLY"];values.forEach((value,i)=>{const td=document.createElement("td");td.textContent=value;if(i===5)td.className=errors.length?"bad":"good";tr.appendChild(td);});results.appendChild(tr);if(errors.length)rejected++;else accepted++;
+ });
+ summary.textContent="Rows checked: "+(accepted+rejected)+" | Valid format: "+accepted+" | Rejected: "+rejected+". Nothing was saved or sent to a server.";
+}
+document.getElementById("validate").addEventListener("click",validate);
+document.getElementById("sample").addEventListener("click",()=>{csvText="employee_id,timestamp,event_type,device_id,event_id\nEMP001,2026-10-19T08:01:00+03:00,clock_in,TEST-DEVICE-01,TEST-EVENT-001\nEMP001,2026-10-19T17:04:00+03:00,clock_out,TEST-DEVICE-01,TEST-EVENT-002\nEMP999,2026-10-19T08:03:00+03:00,clock_in,TEST-DEVICE-01,TEST-EVENT-003\nEMP002,2026-10-19T08:05:00,clock_in,TEST-DEVICE-01,TEST-EVENT-004\nEMP001,2026-10-19T08:01:00+03:00,clock_in,TEST-DEVICE-01,TEST-EVENT-001";employeesInput.value="EMP001\nEMP002";fileInput.value="";summary.textContent="Synthetic sample loaded. Press Validate locally to see expected accepted and rejected rows.";});
+document.getElementById("clear").addEventListener("click",()=>{csvText="";fileInput.value="";employeesInput.value="";results.replaceChildren();const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No validation results yet.";tr.appendChild(td);results.appendChild(tr);summary.textContent="Cleared. Nothing was saved to disk or sent to a server.";});
+</script>
+</body>
+</html>

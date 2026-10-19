@@ -20,7 +20,8 @@ body { background: var(--page-bg); color: var(--text-main); font-size: 14px; min
 
 .header { background: var(--header-bg); color: var(--header-text); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
 .logo-container { display: flex; align-items: center; gap: 12px; }
-.logo-icon { width: 44px; height: 44px; background: #e3bc6b; color: #1c2520; font-size: 22px; font-weight: bold; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.brand-logo { width: 58px; height: 58px; object-fit: contain; background: #fff; border-radius: 8px; flex: 0 0 auto; }
+.login-brand-logo { display: block; width: min(100%, 250px); height: auto; max-height: 150px; object-fit: contain; margin: 0 auto 16px; }
 .logo-text h1 { font-size: 15px; letter-spacing: 0.5px; font-weight: 700; color: #fff; }
 .logo-text p { font-size: 9px; opacity: 0.7; letter-spacing: 0.5px; margin-top: 1px; }
 
@@ -413,3 +414,29 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .login-security-note{border-top:1px solid var(--border-color,#dfe7e0);padding-top:14px;margin:12px 0 0;font-size:11px}
 .sign-out-button{padding:7px 11px;font-size:12px}
 @media(max-width:560px){.login-screen{padding:18px 12px}.login-card{border-radius:17px}.header-tools{gap:8px;flex-wrap:wrap;justify-content:flex-end}}
+
+
+/* Staff chat */
+.staff-chat-toolbar,.staff-chat-submit,.staff-chat-message-meta{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.staff-chat-toolbar{margin:12px 0;flex-wrap:wrap}
+.staff-chat-list{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow:auto;margin:14px 0}
+.staff-chat-message{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow-wrap:anywhere}
+.staff-chat-message.own{border-color:#b7d9c8;background:#f0f8f3}
+.staff-chat-message-meta{font-size:12px;color:var(--muted)}
+.staff-chat-message time{font-size:11px}
+.staff-chat-message p{margin:8px 0 0;white-space:pre-wrap}
+.staff-chat-form{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:16px}
+.staff-chat-form textarea{width:100%;resize:vertical}
+.staff-chat-submit{flex-wrap:wrap}
+@media(max-width:640px){.staff-chat-message-meta{align-items:flex-start;flex-direction:column;gap:3px}.staff-chat-submit{align-items:stretch;flex-direction:column}}
+
+
+/* Staff attendance self-service punches */
+.attendance-punch-panel{display:grid;gap:12px;margin:12px 0 18px;padding:16px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}
+.attendance-punch-actions{display:flex;gap:10px;flex-wrap:wrap}
+.staff-attendance-list{display:grid;gap:8px;margin-top:8px}
+.staff-attendance-event{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border-color);border-radius:9px;flex-wrap:wrap}
+@media(max-width:640px){.attendance-punch-actions{display:grid;grid-template-columns:1fr}.staff-attendance-event{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* Ensure role-hidden branch administration controls stay hidden even when grid styles apply. */
+.branch-admin-controls[hidden] { display: none !important; }
