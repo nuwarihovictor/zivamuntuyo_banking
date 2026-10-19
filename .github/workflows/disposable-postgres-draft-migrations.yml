@@ -56,6 +56,7 @@ jobs:
           files = [
               Path("supabase/migrations/20261019043000_account_eligibility_guards.sql"),
               Path("supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql"),
+              Path("supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
@@ -65,5 +66,6 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019043000_account_eligibility_guards.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql
       - name: Run account, joint-holder, branch-view, and grants assertions
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
