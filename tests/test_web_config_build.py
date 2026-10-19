@@ -52,7 +52,19 @@ class WebConfigBuildTests(unittest.TestCase):
         config_match = re.search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
         self.assertIsNotNone(config_match, content)
         self.assertEqual(json.loads(config_match.group(1)), {"supabaseUrl": "", "supabaseAnonKey": ""})
-        self.assertIn("Preview backend explicitly disabled", result.stdout)
+        self.assertIn("Preview backend disabled (explicit sentinel)", result.stdout)
+
+    def test_invalid_preview_url_disables_backend_instead_of_failing_static_build(self):
+        result, content, public_files = run_build({
+            "VERCEL_ENV": "preview",
+            "SUPABASE_URL": "not-a-valid-supabase-url",
+            "SUPABASE_PUBLISHABLE_KEY": "inert-placeholder"
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config_match = re.search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        self.assertIsNotNone(config_match, content)
+        self.assertEqual(json.loads(config_match.group(1)), {"supabaseUrl": "", "supabaseAnonKey": ""})
+        self.assertIn("Preview backend disabled (invalid preview URL)", result.stdout)
 
     def test_production_refuses_disabled_backend_sentinel(self):
         result, content, public_files = run_build({
