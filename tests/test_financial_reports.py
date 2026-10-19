@@ -1,4 +1,4 @@
-"""Regression tests for accounting report integrity and safe failure states."""
+""""Regression tests for accounting report integrity and safe failure states."""
 from pathlib import Path
 import unittest
 
@@ -17,6 +17,9 @@ class FinancialReportRegressionTests(unittest.TestCase):
         reports = self.app[start:end]
         self.assertIn('db.rpc("list_trial_balance", { p_branch_id: branchId || null })', reports)
         self.assertIn("window.validateTrialBalanceRows(rows)", reports)
+        # summary.innerHTML is cleared before the request; assert validation precedes
+        # construction and rendering of actual report totals, not that initial reset.
+        self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("const currencies = Object.create(null)"))
         self.assertLess(reports.index("window.validateTrialBalanceRows(rows)"), reports.index("summary.innerHTML = integrityNotice"))
         self.assertIn("No report figures are being shown", reports)
 
