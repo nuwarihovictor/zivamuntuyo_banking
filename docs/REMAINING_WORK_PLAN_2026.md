@@ -82,3 +82,22 @@ The new member/account register code passes the JavaScript syntax check and the 
 - [ ] Verify current Vercel quota, preview deployment, domain, production environment and rollback readiness before release.
 
 The integration pass improves project coordination and automated static checks. It does not mark the release gates above as passed.
+
+
+## Integration pass 2 — 19 October 2026
+- [x] Add multiple additional-holder controls to joint account opening and call the trusted holder-registration RPC.
+- [x] Make retry behavior reuse the same pending account request if joint-holder registration is incomplete.
+- [x] Add draft database safeguards for joint holder registration and approval minimum-holder checks.
+- [x] Remove hard-coded account-opening paid receipt values; require server-confirmed collection fields before printing.
+- [x] Add VIC LINE private direct-message UI and draft send/read RPCs.
+- [x] Add the loan due-date dashboard UI, draft read RPC and idempotent staff-alert generator.
+- [x] Extend the static release guard for the new source and SQL interfaces.
+- [ ] Apply/review the account SQL on a non-production database; test concurrency, retries, branch access and approval rejection before production.
+- [ ] Apply/review the VIC LINE private-message SQL on a non-production database and test unauthorized recipients, read receipts and RLS.
+- [ ] Validate loan servicing schema and journal/posting workflow, then apply to a non-production database and test partial payment, reversal, grace periods and duplicate requests.
+- [ ] Configure and verify a trusted scheduler for loan alerts after approval; external customer delivery remains a separate provider integration.
+- [ ] Select and test the actual fingerprint device and vendor SDK/API before completing biometric capture.
+- [ ] Complete live 80 mm printer, Windows 10/11, Android, and Vercel preview acceptance.
+- [ ] Obtain explicit approval before any production database migration or production release.
+
+These checkboxes distinguish repository implementation from unperformed environment/hardware steps. The live database was inspected read-only; no production SQL was applied.
