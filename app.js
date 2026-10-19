@@ -1511,6 +1511,9 @@ window.handleAccountSubmit = async function(e) {
     if(feedback)feedback.textContent="Select the primary customer from the search results.";return;
   }
   if(!branchId||!accountTypeId){if(feedback)feedback.textContent="Choose a branch and account ownership type.";return;}
+  if(form.dataset.createdAccountId && (customerId!==form.dataset.createdPrimaryCustomerId || branchId!==form.dataset.createdBranchId || accountTypeId!==form.dataset.createdAccountTypeId || typeCode!==form.dataset.createdTypeCode)){
+    if(feedback)feedback.textContent="A previous account request is awaiting joint-holder completion. Restore its original primary customer, branch and ownership type before retrying; do not create another request.";return;
+  }
   if(typeCode==="JNT"){
     if(!jointHolderIds.length){if(feedback)feedback.textContent="A joint account needs at least one additional holder.";return;}
     const all=[customerId,...jointHolderIds];
@@ -1541,6 +1544,10 @@ window.handleAccountSubmit = async function(e) {
       if(!result?.account_id)throw new Error("The server did not return the account request ID.");
       form.dataset.createdAccountId=String(result.account_id);
       form.dataset.createdAccountNumber=String(result.account_number||"");
+      form.dataset.createdPrimaryCustomerId=customerId;
+      form.dataset.createdBranchId=branchId;
+      form.dataset.createdAccountTypeId=accountTypeId;
+      form.dataset.createdTypeCode=typeCode;
       window.lastAccountOpeningReceipt={
         receipt_number:String(result.receipt_number||""),
         account_number:String(result.account_number||""),
@@ -1575,7 +1582,7 @@ window.handleAccountSubmit = async function(e) {
     const holderSummary=typeCode==="JNT"?" · Joint holders recorded: "+(new Set([customerId,...jointHolderIds]).size):"";
     if(feedback)feedback.textContent="Account request submitted. Reference: "+String(result.account_number||"created")+" · Status: "+String(result.account_status||"pending_approval")+holderSummary+documentStatus+(hasReceipt?" · Opening package collection confirmed by the server.":" · No paid receipt was returned by the server; do not print a payment receipt.");
     if(hasReceipt)feedback.insertAdjacentHTML("beforeend",' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print receipt '+esc(receipt.receipt_number)+'</button>');
-    delete form.dataset.createdAccountId;delete form.dataset.createdAccountNumber;
+    delete form.dataset.createdAccountId;delete form.dataset.createdAccountNumber;delete form.dataset.createdPrimaryCustomerId;delete form.dataset.createdBranchId;delete form.dataset.createdAccountTypeId;delete form.dataset.createdTypeCode;
     form.reset();
     const holderHost=document.getElementById("joint-holder-fields");if(holderHost)holderHost.innerHTML="";
     window.toggleJointHolderFields();
