@@ -569,6 +569,18 @@ window.switchPage = function(pageName) {
            <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
          </ul>
          <hr>
+         <h3 style="margin:18px 0 8px;">Staff clock-in / clock-out</h3>
+         <p class="muted">This records a manual punch for your signed-in staff account. It is not fingerprint verification; device-sourced punches must come through a trusted device connector.</p>
+         <div class="attendance-punch-panel">
+           <div id="staff-attendance-state" class="notice-box" role="status" aria-live="polite">Checking your attendance status…</div>
+           <div class="attendance-punch-actions">
+             <button id="staff-attendance-punch" type="button" class="primary" onclick="window.recordStaffAttendancePunch()">Clock in</button>
+             <button type="button" class="secondary" onclick="window.loadStaffAttendance()">Refresh punches</button>
+           </div>
+           <div id="staff-attendance-feedback" class="muted" aria-live="polite"></div>
+           <div id="staff-attendance-list" class="staff-attendance-list"></div>
+         </div>
+         <hr>
          <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
          <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. The schedule can be saved only after the attendance_policies.sql database setup is installed. Saving requires an authorized manager and creates an audit event.</p>
          <div class="notice-box"><strong>Manager configuration</strong><br>Use the fields below to plan the schedule. Saving official rules will require a manager-authorized database action and an audit trail.</div>
@@ -626,6 +638,7 @@ window.switchPage = function(pageName) {
       )}
     `;
     window.showAttendanceDeviceHelp();
+    window.loadStaffAttendance();
     const timesheetToday = new Date();
     const timesheetToDate = timesheetToday.toISOString().slice(0,10);
     const timesheetFromDate = new Date(timesheetToday.getTime() - 30*24*60*60*1000).toISOString().slice(0,10);
@@ -2472,4 +2485,58 @@ window.attachInstitutionPayrollEvidence = async function(){
   if(error)throw error;
   if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
  }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
+
+
+// Staff self-service manual attendance. Browser submissions cannot impersonate trusted biometric events.
+window.loadStaffAttendance = async function() {
+  const state=document.getElementById("staff-attendance-state");
+  const list=document.getElementById("staff-attendance-list");
+  const feedback=document.getElementById("staff-attendance-feedback");
+  const button=document.getElementById("staff-attendance-punch");
+  if(!state||!list||!button)return;
+  if(!db){state.textContent="Attendance is unavailable: database client is not configured.";button.disabled=true;return;}
+  state.textContent="Loading your attendance…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user)throw new Error("Sign in with your staff account first.");
+    const {data,error}=await db.from("staff_attendance_events")
+      .select("id,event_type,event_source,occurred_at,created_at,device_identifier")
+      .order("occurred_at",{ascending:false}).limit(30);
+    if(error)throw error;
+    const rows=data||[];
+    const latest=rows[0];
+    const shouldClockOut=latest?.event_type==="clock_in";
+    button.textContent=shouldClockOut?"Clock out":"Clock in";
+    button.disabled=false;
+    state.textContent=latest
+      ? "Latest punch: "+(latest.event_type==="clock_in"?"Clocked in":"Clocked out")+" at "+new Date(latest.occurred_at).toLocaleString()+"."
+      : "No punches recorded yet. Clock in to start your attendance record.";
+    list.innerHTML=rows.length?rows.map(row=>'<article class="staff-attendance-event"><strong>'+esc(row.event_type==="clock_in"?"Clock in":"Clock out")+'</strong><span>'+esc(new Date(row.occurred_at).toLocaleString())+'</span><span class="muted">'+esc(row.event_source==="device"?"Verified device event":"Manual punch")+'</span></article>').join(""):'<p class="muted">No attendance events yet.</p>';
+    if(feedback)feedback.textContent="Showing up to 30 of your latest punches.";
+  }catch(err){state.textContent="Could not load attendance: "+(err?.message||"Unexpected error");button.disabled=true;}
+};
+
+window.recordStaffAttendancePunch = async function() {
+  const button=document.getElementById("staff-attendance-punch");
+  const feedback=document.getElementById("staff-attendance-feedback");
+  if(!button||!db)return;
+  button.disabled=true;
+  if(feedback)feedback.textContent="Recording punch…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user)throw new Error("Your staff session has expired. Sign in again.");
+    const {data:latestRows,error:latestError}=await db.from("staff_attendance_events")
+      .select("event_type,occurred_at").order("occurred_at",{ascending:false}).limit(1);
+    if(latestError)throw latestError;
+    const latest=latestRows?.[0];
+    const eventType=latest?.event_type==="clock_in"?"clock_out":"clock_in";
+    const key=(window.crypto?.randomUUID?.()||("punch-"+Date.now()+"-"+Math.random().toString(36).slice(2)));
+    const {error}=await db.from("staff_attendance_events").insert({
+      employee_user_id:userData.user.id,event_type:eventType,event_source:"manual",idempotency_key:key
+    });
+    if(error)throw error;
+    if(feedback)feedback.textContent=(eventType==="clock_in"?"Clock-in":"Clock-out")+" recorded by the database.";
+    await window.loadStaffAttendance();
+  }catch(err){if(feedback)feedback.textContent="Punch not recorded: "+(err?.message||"Unexpected error");button.disabled=false;}
 };
