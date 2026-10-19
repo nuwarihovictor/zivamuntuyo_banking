@@ -11,6 +11,14 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = APP.read_text(encoding="utf-8")
 
+    def test_customer_directory_has_retryable_loading_and_error_states(self):
+        self.assertIn("window.loadCustomerDirectory = async function()", self.app)
+        self.assertIn('if (!db)', self.app)
+        self.assertIn('Database connection unavailable. Customer records were not loaded.', self.app)
+        self.assertIn('onclick="window.loadCustomerDirectory()"', self.app)
+        self.assertIn('Customer records could not be loaded. Check your connection and permissions, then retry.', self.app)
+        self.assertIn('Loading customer records…', self.app)
+
     def test_customer_directory_uses_an_explicit_minimal_field_list(self):
         self.assertIn('db.from("customers").select("id,full_name,customer_number,phone_number,created_at")', self.app)
         self.assertNotIn('db.from("customers").select("*").order("created_at", { ascending: false })', self.app)

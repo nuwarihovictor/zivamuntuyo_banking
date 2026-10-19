@@ -27,6 +27,39 @@ function panel(title, subtitle, desc, contentHtml) {
   `;
 }
 
+window.loadCustomerDirectory = async function() {
+  const listEl = document.getElementById("cust-list");
+  if (!listEl) return;
+  if (!db) {
+    listEl.innerHTML = '<p class="muted">Database connection unavailable. Customer records were not loaded. <button type="button" class="secondary" onclick="window.loadCustomerDirectory()">Retry</button></p>';
+    return;
+  }
+  listEl.innerHTML = '<p class="muted">Loading customer records…</p>';
+  try {
+    const { data, error } = await db.from("customers")
+      .select("id,full_name,customer_number,phone_number,created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      listEl.innerHTML = '<p class="muted">No customer records found yet. Register above to begin.</p>';
+      return;
+    }
+    listEl.innerHTML = data.map(cust => `
+      <div class="list-item">
+        <div>
+          <strong>${esc(cust.full_name)}</strong><br>
+          <span class="muted">${esc(cust.customer_number)} | Identification: held in restricted customer record</span>
+        </div>
+        <span class="badge-role">${esc(cust.phone_number)}</span>
+      </div>
+    `).join("");
+  } catch (error) {
+    listEl.innerHTML = '<p class="muted">Customer records could not be loaded. Check your connection and permissions, then retry. ' +
+      esc(error?.message || "Request failed") +
+      ' <button type="button" class="secondary" onclick="window.loadCustomerDirectory()">Retry</button></p>';
+  }
+};
+
 function transactionModuleTabs(active){
   const tabs=[["Transactions","Overview","📋"],["Deposits","Deposits","⬇️"],["Withdrawals","Withdrawals","⬆️"]];
   return '<div class="transaction-module-tabs" role="navigation" aria-label="Transaction sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="transaction-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
@@ -342,32 +375,7 @@ window.switchPage = function(pageName) {
       )}
     `;
 
-    if (db) {
-      db.from("customers").select("id,full_name,customer_number,phone_number,created_at").order("created_at", { ascending: false }).then(({ data, error }) => {
-        const listEl = document.getElementById("cust-list");
-        if (!listEl) return;
-        if (error) {
-          listEl.innerHTML = `<p class="muted">Customer records could not be loaded. Check your connection or access permissions. Details: ${esc(error.message)}</p>`;
-          return;
-        }
-        if (!data || data.length === 0) {
-          listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
-          return;
-        }
-        listEl.innerHTML = data.map(cust => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | Identification: held in restricted customer record</span>
-            </div>
-            <span class="badge-role">${esc(cust.phone_number)}</span>
-          </div>
-        `).join("");
-      }).catch(() => {
-        const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">Customer records could not be loaded because the request failed. Check your connection and permissions, then retry.</p>`;
-      });
-    }
+    window.loadCustomerDirectory();
   }
   else if (pageName === "Accounts") {
     c.innerHTML = `
