@@ -168,6 +168,8 @@ DECLARE
   v_limit_request uuid;
   v_self_request uuid;
   v_branch_request uuid;
+  v_currency_request uuid;
+  v_wrong_currency_cash uuid := '60000000-0000-0000-0000-000000000003';
   v_failed boolean;
   v_entries integer;
   v_balance numeric;
@@ -187,7 +189,9 @@ BEGIN
     '40000000-0000-0000-0000-000000000001',0
   );
   INSERT INTO public.ledger_accounts(id,ledger_type,currency_code,branch_id,is_active)
-  VALUES(v_cash,'asset','UGX','10000000-0000-0000-0000-000000000001',true);
+  VALUES
+    (v_cash,'asset','UGX','10000000-0000-0000-0000-000000000001',true),
+    (v_wrong_currency_cash,'asset','USD','10000000-0000-0000-0000-000000000001',true);
   INSERT INTO public.ledger_accounts(id,linked_bank_account_id,ledger_type,currency_code,branch_id,is_active)
   VALUES(v_customer_ledger,v_account,'liability','UGX','10000000-0000-0000-0000-000000000001',true);
 
@@ -286,6 +290,32 @@ BEGIN
   END;
   SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_deposit;
   IF NOT v_failed OR v_entries <> 2 THEN RAISE EXCEPTION 'FAIL: duplicate posting created additional entries'; END IF;
+
+  -- A ledger account in a different currency must never be used for this journal.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_currency_request
+  FROM public.create_cash_transaction_request(v_account,'deposit',10,'CI currency mismatch') r;
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_currency_request);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  PERFORM set_config('test.role','accountant',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_currency_request,v_wrong_currency_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%same currency and branch%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_currency_request;
+  SELECT status INTO v_status FROM public.ledger_journals WHERE id=v_currency_request;
+  IF NOT v_failed OR v_entries <> 0 OR v_status <> 'pending_approval' THEN
+    RAISE EXCEPTION 'FAIL: wrong-currency cash ledger caused partial posting';
+  END IF;
+  IF (SELECT balance FROM public.bank_accounts WHERE id=v_account) <> 100 THEN
+    RAISE EXCEPTION 'FAIL: wrong-currency posting changed the customer balance';
+  END IF;
 
   -- A withdrawal larger than the posted customer balance must not post.
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
@@ -517,6 +547,7 @@ DECLARE
 BEGIN
   FOREACH v_signature IN ARRAY ARRAY[
     'public.create_cash_transaction_request(uuid,text,numeric,text)',
+    'public.approve_cash_transaction_request(uuid)',
     'public.post_approved_cash_transaction(uuid,uuid)'
   ]
   LOOP
