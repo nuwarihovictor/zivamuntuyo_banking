@@ -1,4 +1,4 @@
-""""Regression tests for accounting report integrity and safe failure states."""
+"""Regression tests for accounting report integrity and safe failure states."""
 from pathlib import Path
 import unittest
 
