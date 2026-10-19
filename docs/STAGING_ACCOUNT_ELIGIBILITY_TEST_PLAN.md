@@ -84,3 +84,12 @@ The current Supabase security advisor still reports the following findings. Thes
 - **WARN:** Supabase leaked-password protection is disabled. This is an Auth project setting that needs an authorized administrator to enable after checking the desired sign-in policy.
 
 The advisor was read-only. No settings, policies, grants, views, or live database objects were changed. These findings should be tracked and resolved before the system is used for live financial transactions.
+
+
+## Additional validation work — 19 October 2026
+
+- The canonical `create_bank_account_request` path now also rejects customers whose status is not `active`, matching the legacy account-opening path.
+- Added a no-dependency Python unittest file at `tests/test_account_eligibility_migration.py`. From the repository root, run:
+  `python -m unittest discover -s tests -p 'test_*.py' -v`
+- These tests are static source assertions only. They are intended as a cheap regression guard and do not prove the migration parses or executes correctly in PostgreSQL.
+- No GitHub Actions workflow was added, to avoid creating automated runner usage or costs without confirming the repository's billing configuration.
