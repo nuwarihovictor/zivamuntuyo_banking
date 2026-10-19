@@ -40,6 +40,15 @@ assert.match(app, /window\.toggleJointHolderFields/, "Joint account ownership se
 assert.match(app, /add_joint_account_holder_to_pending_request/, "Joint account holder registration must call a trusted RPC");
 assert.match(app, /send_vic_line_direct_message/, "VIC LINE direct messages must use the trusted private-message RPC");
 assert.match(app, /list_vic_line_direct_messages/, "VIC LINE must load private conversation history through the trusted RPC");
+
+assert.match(app, /window\.loadLoanDueDashboard/, "Loans page must include the database-backed due-date dashboard");
+assert.match(app, /list_loan_due_alert_dashboard/, "Loan due-date dashboard must query the trusted servicing RPC");
+assert.ok(existsSync("supabase/sql/loan_servicing_dashboard_and_alerts_draft.sql"), "Loan servicing dashboard and alert generation draft must exist");
+const loanSql = readFileSync("supabase/sql/loan_servicing_dashboard_and_alerts_draft.sql", "utf8");
+assert.match(loanSql, /CREATE OR REPLACE FUNCTION public\.list_loan_due_alert_dashboard/, "Loan dashboard SQL RPC must exist");
+assert.match(loanSql, /ON CONFLICT \(idempotency_key\) DO NOTHING/, "Loan alert generation must be idempotent");
+assert.match(loanSql, /GRANT EXECUTE ON FUNCTION public\.generate_loan_due_alerts\(date\) TO service_role/, "Automated alert generation must be restricted to the trusted service role");
+
 const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
 const receiptEnd = app.indexOf("window.printDormantReactivationReceipt", receiptStart);
 assert.ok(receiptStart >= 0 && receiptEnd > receiptStart, "Account-opening receipt printer must exist");
