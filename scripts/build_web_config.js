@@ -6,9 +6,17 @@ const path = require("node:path");
 
 const productionUrl = "https://hwghiezvghdqxnhcnpwk.supabase.co";
 const target = String(process.env.VERCEL_ENV || "development").toLowerCase();
-const supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
-const publishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
+let supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
+let publishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
 const legacyAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+
+// Explicit branch-scoped sentinel permits a static preview build without any backend.
+// Production never accepts this sentinel, and the generated browser config stays empty.
+if (target !== "production" && supabaseUrl === "DISABLED" && publishableKey === "DISABLED" && !legacyAnonKey) {
+  supabaseUrl = "";
+  publishableKey = "";
+  process.stdout.write("Preview backend explicitly disabled; generating an empty, fail-closed browser config.\\n");
+}
 
 function fail(message) {
   process.stderr.write("Web config build refused: " + message + "\n");
