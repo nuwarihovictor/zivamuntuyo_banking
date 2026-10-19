@@ -436,3 +436,6 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .staff-attendance-list{display:grid;gap:8px;margin-top:8px}
 .staff-attendance-event{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border-color);border-radius:9px;flex-wrap:wrap}
 @media(max-width:640px){.attendance-punch-actions{display:grid;grid-template-columns:1fr}.staff-attendance-event{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* Ensure role-hidden branch administration controls stay hidden even when grid styles apply. */
+.branch-admin-controls[hidden] { display: none !important; }
