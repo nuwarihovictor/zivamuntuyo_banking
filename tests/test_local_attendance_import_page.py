@@ -42,6 +42,13 @@ class LocalAttendanceImportPageTests(unittest.TestCase):
         self.assertIn("duplicate event row", self.html)
         self.assertIn("column count mismatch", self.html)
 
+    def test_validator_rejects_ambiguous_headers_and_invalid_calendar_dates(self):
+        self.assertIn("duplicate column headers make mapping ambiguous", self.html)
+        self.assertIn("text=text.replace(/^\\\\uFEFF/,\"\")", self.html)
+        self.assertIn("function isValidTimestamp(value)", self.html)
+        self.assertIn("date.getUTCDate()!==day", self.html)
+        self.assertIn("match[8]!==undefined", self.html)
+
     def test_results_are_rendered_as_text_not_interpreted_html(self):
         self.assertIn("td.textContent=value", self.html)
         self.assertNotIn("innerHTML=values", self.html)
