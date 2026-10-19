@@ -106,6 +106,6 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.create_cash_transaction_request(uuid,text,numeric,text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.create_cash_transaction_request(uuid,text,numeric,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_cash_transaction_request(uuid,text,numeric,text) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.post_approved_cash_transaction(uuid,uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.post_approved_cash_transaction(uuid,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.post_approved_cash_transaction(uuid,uuid) TO authenticated, service_role;
