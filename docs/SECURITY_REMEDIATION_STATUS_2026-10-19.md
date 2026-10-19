@@ -64,6 +64,20 @@ This is a targeted search-path hardening pass, **not** a completed function-by-f
 4. Enable leaked-password protection through Supabase Auth settings after confirming the organization’s sign-in policy. This is not a SQL migration and has not been changed.
 5. Re-run the Supabase security advisor after the approved non-production migrations and verify branch selection, account opening, transaction approval, and posting through the actual application.
 
+## Transaction scenario coverage added to the disposable harness
+
+The fixture now contains isolated test versions of the three inspected cash-transaction RPCs and minimal ledger tables. The added assertions exercise:
+- Requester self-approval denial.
+- Approval by a separate authorized user.
+- Posting by a third user.
+- Two-entry balanced deposit posting and stored balance update.
+- Duplicate-post retry rejection without extra ledger entries.
+- Insufficient-funds withdrawal rejection with no partial ledger entries.
+- Approval-limit denial.
+- Cross-branch transaction request denial.
+
+**Important:** these are fixture-adapted copies of the inspected live RPC logic, not direct executions of the live database functions or a complete clone of production. Passing tests prove the scenario harness and the represented rules work in the disposable database; production-shaped integration tests against a schema-faithful non-production database remain required before a release.
+
 ## Release decision
 
 Keep PR #15 in draft. Do not apply these migrations to production or enable live transaction processing until the latest CI run passes and the remaining release gates have evidence.
