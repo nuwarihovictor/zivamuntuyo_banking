@@ -56,7 +56,7 @@ class WebConfigBuildTests(unittest.TestCase):
         self.assertNotIn("tests", public_files)
 
     def test_preview_refuses_production_database_url(self):
-        result, content = run_build({
+        result, content, public_files = run_build({
             "VERCEL_ENV": "preview",
             "SUPABASE_URL": PRODUCTION_URL,
             "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_example"
@@ -66,7 +66,7 @@ class WebConfigBuildTests(unittest.TestCase):
         self.assertIsNone(content)
 
     def test_preview_accepts_separate_staging_project_with_public_key(self):
-        result, content = run_build({
+        result, content, public_files = run_build({
             "VERCEL_ENV": "preview",
             "SUPABASE_URL": "https://staging-example.supabase.co",
             "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_example"
@@ -78,7 +78,7 @@ class WebConfigBuildTests(unittest.TestCase):
     def test_privileged_jwt_key_is_rejected(self):
         payload = base64.urlsafe_b64encode(json.dumps({"role": "service_role"}).encode()).decode().rstrip("=")
         token = "eyJhbGciOiJub25lIn0." + payload + ".signature"
-        result, content = run_build({
+        result, content, public_files = run_build({
             "VERCEL_ENV": "production",
             "SUPABASE_URL": PRODUCTION_URL,
             "SUPABASE_ANON_KEY": token
@@ -88,7 +88,7 @@ class WebConfigBuildTests(unittest.TestCase):
         self.assertIsNone(content)
 
     def test_secret_key_prefix_is_rejected(self):
-        result, content = run_build({
+        result, content, public_files = run_build({
             "VERCEL_ENV": "production",
             "SUPABASE_URL": PRODUCTION_URL,
             "SUPABASE_PUBLISHABLE_KEY": "sb_secret_do_not_use"
