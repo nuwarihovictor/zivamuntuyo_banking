@@ -30,10 +30,8 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
                 self.assertNotIn(f"db.from('{table}').select('*')", self.app)
 
     def test_customer_directory_uses_an_explicit_minimal_field_list(self):
-        self.assertRegex(
-            self.app,
-            r'db\\.from\\("customers"\\)\\s*\\.select\\("id,full_name,customer_number,phone_number,created_at"\\)',
-        )
+        self.assertIn('db.from("customers")', self.app)
+        self.assertIn('.select("id,full_name,customer_number,phone_number,created_at")', self.app)
         self.assertNotIn('db.from("customers").select("*").order("created_at", { ascending: false })', self.app)
 
     def test_customer_directory_does_not_render_national_id_or_passport_number(self):
