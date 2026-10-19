@@ -191,3 +191,13 @@ CI also includes fixture assertions that:
 The draft migration `20261019080000_staff_chat_active_employee_rls.sql` creates an append-only internal staff message table. Authenticated active employees can read messages and insert only as their own `auth.uid()`; inactive employees cannot read or send. Browser roles have no update/delete policy. The app loads the latest 100 messages and refreshes after sending; it does not claim realtime delivery.
 
 The disposable PostgreSQL workflow now parses/applies this migration and tests active/inactive employee RLS. These are isolated fixture tests, not a production-schema integration test. Before release, confirm the actual production `employee_profiles` foreign-key semantics and grants, apply to an approved staging environment, test with real staff sessions, and verify that the Data API exposes the table only with RLS enabled. Never put passwords, PINs, or customer financial details in chat.
+
+
+## Branch management regression checklist (added 2026-10-19)
+
+- Sign in as an active system administrator and verify branch create, edit, archive, and reactivation actions use the administrator RPCs.
+- Sign in as a non-administrator and verify branch editing controls remain hidden; confirm the database rejects direct RPC attempts regardless of UI visibility.
+- Verify branch codes are normalized to uppercase, duplicate codes are rejected by the database, and failed RPCs display an error without claiming success.
+- Confirm branch archive preserves historical financial records and that inactive branches cannot be selected for new transactions.
+- Verify branch and country values render as text and never execute injected markup.
+- Run the disposable PostgreSQL workflow after changes. The browser UI checks are static regression tests, not proof of database policy correctness.
