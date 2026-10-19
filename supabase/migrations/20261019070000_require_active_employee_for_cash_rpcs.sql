@@ -101,6 +101,18 @@ BEGIN
   UPDATE public.ledger_journals SET status='posted',posted_by=auth.uid(),posted_at=now()
   WHERE id=v_j.id AND status='pending_approval' AND approved_by IS NOT NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'Transaction state changed before posting; no posting completed' USING ERRCODE='23514'; END IF;
+  INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
+  VALUES (
+    auth.uid(),v_ba.branch_id,'cash_transaction_posted','ledger_journal',v_j.id::text,'success',
+    jsonb_build_object(
+      'journal_number',v_j.journal_number,
+      'transaction_type',v_j.request_transaction_type,
+      'amount',v_j.requested_amount,
+      'currency_code',v_ba.currency_code,
+      'requester_user_id',v_j.created_by,
+      'approver_user_id',v_j.approved_by
+    )
+  );
   RETURN QUERY SELECT lj.id,lj.journal_number,lj.status,v_j.requested_amount FROM public.ledger_journals lj WHERE lj.id=v_j.id;
 END;
 $function$;
