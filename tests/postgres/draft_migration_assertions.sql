@@ -295,3 +295,51 @@ BEGIN
 END
 $transaction_test$;
 
+
+-- Failure recovery: force an error after the first row of the two-leg posting
+-- statement. The function call must leave no ledger entry, balance change, or
+-- posted status behind. This tests the isolated fixture copy, not live production RPCs.
+DO $failure_recovery_test$
+DECLARE
+  v_journal uuid;
+  v_entries integer;
+  v_balance numeric;
+  v_status text;
+  v_failed boolean := false;
+BEGIN
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_journal
+  FROM public.create_cash_transaction_request(
+    '50000000-0000-0000-0000-000000000001','deposit',25,'CI injected posting failure'
+  ) r;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_journal);
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  PERFORM set_config('test.role','accountant',false);
+  PERFORM set_config('test.fail_customer_leg','on',false);
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(
+      v_journal,'60000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Injected failure on customer ledger leg%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  PERFORM set_config('test.fail_customer_leg','off',false);
+
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_journal;
+  SELECT balance INTO v_balance FROM public.bank_accounts
+    WHERE id='50000000-0000-0000-0000-000000000001';
+  SELECT status INTO v_status FROM public.ledger_journals WHERE id=v_journal;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: injected posting error was not observed'; END IF;
+  IF v_entries <> 0 THEN RAISE EXCEPTION 'FAIL: failed posting left % ledger entries',v_entries; END IF;
+  IF v_balance <> 100 THEN RAISE EXCEPTION 'FAIL: failed posting changed account balance to %',v_balance; END IF;
+  IF v_status <> 'pending_approval' THEN RAISE EXCEPTION 'FAIL: failed posting changed journal status to %',v_status; END IF;
+END
+$failure_recovery_test$;
