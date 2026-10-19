@@ -395,6 +395,66 @@ END
 $active_employee_cash_rpc_test$;
 
 
+-- Requester and approver must not post their own cash request.
+DO $cash_separation_of_duties_test$
+DECLARE
+  v_journal uuid;
+  v_failed boolean;
+  v_status text;
+  v_entries integer;
+  v_cash uuid := '60000000-0000-0000-0000-000000000001';
+BEGIN
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_journal
+  FROM public.create_cash_transaction_request(
+    '50000000-0000-0000-0000-000000000001','deposit',5,'CI separation of duties'
+  ) r;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_journal);
+
+  -- The requester cannot post.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','accountant',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_journal,v_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Requester or approver cannot post this transaction%' THEN
+      v_failed := true;
+    ELSE
+      RAISE;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: requester posted their own cash request'; END IF;
+
+  -- The approver cannot post either.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_journal,v_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Requester or approver cannot post this transaction%' THEN
+      v_failed := true;
+    ELSE
+      RAISE;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: approver posted the transaction they approved'; END IF;
+
+  SELECT status INTO v_status FROM public.ledger_journals WHERE id=v_journal;
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_journal;
+  IF v_status <> 'pending_approval' OR v_entries <> 0 THEN
+    RAISE EXCEPTION 'FAIL: separation-of-duties denials changed posting state';
+  END IF;
+END
+$cash_separation_of_duties_test$;
+
+
 -- Verify browser-facing cash RPC grants are narrow and intentional.
 DO $cash_rpc_acl_test$
 DECLARE
