@@ -195,10 +195,27 @@ BEGIN
   INSERT INTO public.ledger_accounts(id,linked_bank_account_id,ledger_type,currency_code,branch_id,is_active)
   VALUES(v_customer_ledger,v_account,'liability','UGX','10000000-0000-0000-0000-000000000001',true);
 
-  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000002',false);
   PERFORM set_config('test.approval_limit_allowed','true',false);
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
   PERFORM set_config('test.role','teller',false);
+
+  -- A branch-A teller must not create a request while scoped only to branch B.
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.create_cash_transaction_request(v_account,'deposit',100,'CI wrong branch request');
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%transaction access to this account branch%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: teller created cash request outside their branch'; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_requested'
+      AND actor_user_id='40000000-0000-0000-0000-000000000001'
+  ) THEN RAISE EXCEPTION 'FAIL: denied cross-branch request left an audit success event'; END IF;
+
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
   SELECT r.journal_id INTO v_deposit
   FROM public.create_cash_transaction_request(v_account,'deposit',100,'CI deposit') r;
 
@@ -215,7 +232,30 @@ BEGIN
     RAISE EXCEPTION 'FAIL: cash request audit event is missing or incomplete';
   END IF;
 
+  -- A bank administrator scoped to branch B cannot approve branch A's request.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000002',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.approve_cash_transaction_request(v_deposit);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Branch access denied%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: approver approved cash request outside their branch'; END IF;
+  IF (SELECT approved_by FROM public.ledger_journals WHERE id=v_deposit) IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: denied cross-branch approval changed approver';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_approved' AND entity_id=v_deposit::text
+  ) THEN RAISE EXCEPTION 'FAIL: denied cross-branch approval left an audit success event'; END IF;
+
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+
   -- The requester cannot approve their own request.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
   PERFORM set_config('test.role','bank_admin',false);
   v_failed := false;
   BEGIN
