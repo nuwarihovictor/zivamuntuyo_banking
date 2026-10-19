@@ -48,6 +48,11 @@ const loanSql = readFileSync("supabase/sql/loan_servicing_dashboard_and_alerts_d
 assert.match(loanSql, /CREATE OR REPLACE FUNCTION public\.list_loan_due_alert_dashboard/, "Loan dashboard SQL RPC must exist");
 assert.match(loanSql, /ON CONFLICT \(idempotency_key\) DO NOTHING/, "Loan alert generation must be idempotent");
 assert.match(loanSql, /GRANT EXECUTE ON FUNCTION public\.generate_loan_due_alerts\(date\) TO service_role/, "Automated alert generation must be restricted to the trusted service role");
+assert.ok(existsSync("supabase/tests/financial_integrity_diagnostics.sql"), "Read-only financial integrity diagnostics must be present");
+const diagnostics = readFileSync("supabase/tests/financial_integrity_diagnostics.sql", "utf8");
+assert.match(diagnostics, /posted_journal_unbalanced/, "Financial diagnostics must check posted journal balance");
+assert.match(diagnostics, /stored_account_balance_differs_from_ledger/, "Financial diagnostics must compare stored and ledger balances");
+
 
 const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
 const receiptEnd = app.indexOf("window.printDormantReactivationReceipt", receiptStart);
