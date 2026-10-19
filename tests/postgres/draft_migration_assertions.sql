@@ -233,6 +233,10 @@ BEGIN
       AND entity_type='ledger_journal'
       AND entity_id=v_deposit::text
       AND outcome='success'
+      AND actor_user_id = '40000000-0000-0000-0000-000000000003'
+      AND branch_id = '10000000-0000-0000-0000-000000000001'
+      AND details->>'journal_number' = (SELECT journal_number FROM public.ledger_journals WHERE id=v_deposit)
+      AND details->>'transaction_type' = 'deposit'
       AND details->>'amount' = '100'
       AND details->>'currency_code' = 'UGX'
       AND details->>'requester_user_id' = '40000000-0000-0000-0000-000000000001'
