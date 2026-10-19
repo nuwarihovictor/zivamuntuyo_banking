@@ -104,3 +104,11 @@ The coordinated audit branch `integration/full-system-audit-2026-10` is based on
 New static CI checks validate core files, navigation shell, local asset references, responsive CSS presence and obvious accidental secret-key exposure. These checks are not a substitute for database security tests or browser/device acceptance. The audit branch does not apply SQL, merge itself, or deploy to Vercel.
 
 **Still release-blocking:** server-side individual/joint account eligibility and complete joint-holder approval; tested RLS/RPC/ledger integrity; authoritative loan schedules, repayments, arrears and reminders; real fingerprint-device integration if required for launch; receipt/chat testing; Windows 10/11 and Android acceptance; and verified Vercel preview/domain/rollback.
+
+
+## Integration pass 2 — 19 October 2026
+Repository changes now include joint-account holder controls, safer server-backed receipt printing, VIC LINE private direct-message controls, a loan due-date dashboard, and draft RPCs for account safeguards and staff alerts. The updated static guard validates the expected UI/RPC contracts.
+
+**Important live-schema finding:** the connected Supabase database was queried read-only and the existing `approve_account_request` function does not yet enforce the two-holder rule for JNT accounts. The live `create_bank_account_request` function also does not include the new individual-account serialization guard. The repository SQL is not applied to the database. Do not open/approve real joint accounts based on UI-only checks.
+
+**Not production-ready:** the loan servicing tables and RPCs remain uninstalled drafts; alert generation is not scheduled; private-message SQL is not installed; fingerprint capture requires an exact device and vendor SDK; printer and OS acceptance remain pending. The new integration commit must pass GitHub Actions and a Vercel preview smoke test before release review.
