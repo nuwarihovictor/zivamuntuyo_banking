@@ -69,3 +69,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql
       - name: Run account, joint-holder, branch-view, grants, and search-path assertions
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
+      - name: Test account-opening wrapper rollback in isolated fixture
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/opening_package_wrapper_atomicity.sql
