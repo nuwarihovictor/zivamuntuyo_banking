@@ -12,7 +12,7 @@ The current database seed values are:
 - `INS` — Institutional Account
 - `JNT` — Joint Account
 
-The migration uses exact `IND`/`JNT` type codes in both account-opening paths. The `create_bank_account_request` currency guard now validates against the active `public.currencies` catalogue rather than a hard-coded list.
+The migration uses exact `IND`/`JNT` type codes in both account-opening paths. Both `create_bank_account_request` and the legacy `open_account_request` now validate currency against the active `public.currencies` catalogue rather than relying on a hard-coded list or a three-letter format check alone.
 
 ## Preconditions
 
@@ -107,3 +107,11 @@ Read-only inspection of four live SECURITY DEFINER RPC definitions found the fol
 | `record_financial_activity` | Auth, role allowlist, branch scope, amount cap, receipt reference, category restrictions, customer/loan checks, audit event | **Hardening candidate:** its current SECURITY DEFINER setting uses `search_path = public, pg_temp`, unlike the account-opening draft's empty search path. Review and fully qualify object references before changing it. |
 
 Do not change production function definitions or grants as part of this source-only review. A follow-up migration for any financial RPC must preserve its signature, return shape, grants, and current accounting behavior and must be tested outside production first.
+
+
+## Follow-up source validation — 19 October 2026
+
+- Closed a source-level gap found during review: the legacy `open_account_request` previously checked only that the currency looked like a three-letter code, while the canonical request path checked that the currency was active in `public.currencies`. The legacy path now applies the same active-catalogue check.
+- Updated `tests/test_account_eligibility_migration.py` to assert that both account-opening paths validate the currency catalogue.
+- Rechecked source-level invariants after the change: all SECURITY DEFINER functions in this draft pin an empty search path; both account-opening paths have active-currency checks; the new joint-holder RPC is revoked from `PUBLIC` and `anon` and granted to `authenticated`.
+- These are source checks only. No PostgreSQL runtime test has been run; no GitHub Actions run is available for the latest commit. Do not treat these checks as SQL execution validation or a release approval.
