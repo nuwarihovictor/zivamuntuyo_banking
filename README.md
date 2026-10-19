@@ -19,6 +19,7 @@ See:
 - [Loan servicing design](docs/LOAN_SERVICING_AND_ARREARS_DESIGN.md)
 - [Loan servicing schema draft](docs/LOAN_SERVICING_SCHEMA_DRAFT.md)
 - [Fingerprint attendance compatibility](docs/attendance-device-compatibility.md)
+- [Manual attendance clock RPC draft](supabase/sql/staff_attendance_clock_rpc_draft.sql)
 
 ## Local development
 
