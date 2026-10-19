@@ -57,6 +57,7 @@ jobs:
               Path("supabase/migrations/20261019043000_account_eligibility_guards.sql"),
               Path("supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql"),
               Path("supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql"),
+              Path("supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
@@ -67,6 +68,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019043000_account_eligibility_guards.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql
       - name: Run account, joint-holder, branch-view, grants, and search-path assertions
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
       - name: Test account-opening wrapper rollback in isolated fixture
