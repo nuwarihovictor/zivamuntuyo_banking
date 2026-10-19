@@ -233,8 +233,95 @@ BEGIN
     RAISE EXCEPTION 'This customer already has an individual account; choose a joint account type if another holder is intended';
   END IF;
   v_currency := upper(trim(coalesce(p_currency_code,'UGX')));
-  IF length(v_currency)<>3 OR v_currency !~ '^[A-Z]{3}$' THEN
+  IF length(v_currency)<>3 OR v_currency !~ '^[A-Z]{3} || to_char(clock_timestamp(),'YYMMDDHH24MISS')
+    || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
+  INSERT INTO public.bank_accounts(account_number,account_type_id,currency_code,branch_id,status,created_by)
+  VALUES(v_account_number,p_account_type_id,v_currency,p_branch_id,'pending_approval',auth.uid())
+  RETURNING id INTO v_account_id;
+  INSERT INTO public.account_holders(account_id,customer_id,holder_role,is_primary)
+  VALUES(v_account_id,p_customer_id,'owner',true);
+  INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
+  VALUES(auth.uid(),p_branch_id,'account_request_created','bank_account',v_account_id::text,'success',
+    jsonb_build_object('entry_point','open_account_request','account_type_code',v_type_code,'currency_code',v_currency));
+  RETURN QUERY SELECT ba.id,ba.account_number,ba.status FROM public.bank_accounts ba WHERE ba.id=v_account_id;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.open_account_request(uuid,uuid,uuid,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.open_account_request(uuid,uuid,uuid,text) TO authenticated;
+
+-- Authorized path to add a second distinct holder to a pending joint account.
+-- Row-locking the account also serializes this operation against account approval.
+CREATE OR REPLACE FUNCTION public.add_pending_joint_account_holder(
+  p_account_id uuid,
+  p_customer_id uuid
+)
+RETURNS TABLE(account_id uuid, customer_id uuid, holder_role text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_role text;
+  v_branch uuid;
+  v_status text;
+  v_type_code text;
+  v_customer_status text;
+  v_customer_branch uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep WHERE ep.user_id=auth.uid() AND ep.is_active=true
+  ) THEN RAISE EXCEPTION 'Active employee profile required' USING ERRCODE='42501'; END IF;
+  v_role:=public.current_employee_role_code();
+  IF v_role IS NULL OR v_role NOT IN ('system_admin','bank_admin','branch_manager','accountant','teller') THEN
+    RAISE EXCEPTION 'Your staff role cannot add account holders' USING ERRCODE='42501';
+  END IF;
+  SELECT ba.branch_id,ba.status,upper(at.type_code)
+    INTO v_branch,v_status,v_type_code
+  FROM public.bank_accounts ba
+  JOIN public.account_types at ON at.id=ba.account_type_id
+  WHERE ba.id=p_account_id
+  FOR UPDATE OF ba;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Account request not found'; END IF;
+  IF v_status<>'pending_approval' THEN RAISE EXCEPTION 'Holders can only be added before account approval'; END IF;
+  IF v_type_code<>'JNT' THEN RAISE EXCEPTION 'Additional holders can only be added to a joint account'; END IF;
+  IF NOT public.current_employee_can_transact_in_branch(v_branch) THEN
+    RAISE EXCEPTION 'Branch access denied' USING ERRCODE='42501';
+  END IF;
+  SELECT c.status,c.branch_id INTO v_customer_status,v_customer_branch
+  FROM public.customers c WHERE c.id=p_customer_id;
+  IF NOT FOUND OR v_customer_status IS DISTINCT FROM 'active' THEN
+    RAISE EXCEPTION 'Additional holder must be an active customer';
+  END IF;
+  IF v_customer_branch IS NOT NULL AND NOT public.current_employee_can_transact_in_branch(v_customer_branch)
+     AND v_role NOT IN ('system_admin','bank_admin') THEN
+    RAISE EXCEPTION 'Additional holder is outside your authorized branch scope' USING ERRCODE='42501';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.account_holders ah WHERE ah.account_id=p_account_id AND ah.customer_id=p_customer_id) THEN
+    RAISE EXCEPTION 'This customer is already a holder on the account';
+  END IF;
+  INSERT INTO public.account_holders(account_id,customer_id,holder_role,is_primary)
+  VALUES(p_account_id,p_customer_id,'joint_owner',false);
+  INSERT INTO public.audit_events(actor_user_id,branch_id,action,entity_type,entity_id,outcome,details)
+  VALUES(auth.uid(),v_branch,'joint_account_holder_added','bank_account',p_account_id::text,'success',
+    jsonb_build_object('customer_id',p_customer_id,'holder_role','joint_owner'));
+  RETURN QUERY SELECT p_account_id,p_customer_id,'joint_owner'::text;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.add_pending_joint_account_holder(uuid,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.add_pending_joint_account_holder(uuid,uuid) TO authenticated;
+ THEN
     RAISE EXCEPTION 'Currency must be a three-letter currency code';
+  END IF;
+  -- Match the canonical entry point: only currencies enabled in the catalogue
+  -- may be used, including through this legacy RPC.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.currencies c
+    WHERE upper(c.code)=v_currency AND c.is_active=true
+  ) THEN
+    RAISE EXCEPTION 'Unsupported or inactive currency';
   END IF;
   v_account_number := 'ZVF' || to_char(clock_timestamp(),'YYMMDDHH24MISS')
     || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
