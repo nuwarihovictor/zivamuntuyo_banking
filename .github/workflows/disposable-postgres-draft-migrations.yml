@@ -44,44 +44,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           python -m pip install --disable-pip-version-check pglast
-      - name: Check browser JavaScript syntax
-        run: node --check app.js
-      - name: Run existing source-level regression tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
-      - name: Prepare isolated fixture schema
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_fixture.sql
-      - name: Parse migration SQL
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from pglast import parse_sql
-          files = [
-              Path("supabase/migrations/20261019043000_account_eligibility_guards.sql"),
-              Path("supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql"),
-              Path("supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql"),
-              Path("supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql"),
-              Path("supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql"),
-              Path("supabase/migrations/20261019090000_staff_attendance_event_rls.sql"),
-          ]
-          for path in files:
-              parse_sql(path.read_text(encoding="utf-8"))
-              print(f"SQL syntax parsed: {path}")
-          PY
-      - name: Execute all draft migrations in disposable PostgreSQL 17
-        run: |
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019043000_account_eligibility_guards.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019090000_staff_attendance_event_rls.sql
-      - name: Run account, joint-holder, branch-view, grants, and search-path assertions
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
-      - name: Test account-opening wrapper rollback in isolated fixture
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/opening_package_wrapper_atomicity.sql
-      - name: Test cash request branch and active-employee guards
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/cash_transaction_request_security.sql
-      - name: Test staff chat active-employee row security
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/staff_chat_rls_assertions.sql
-      - name: Test staff attendance event security and transition rules
-        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/staff_attendance_rls_assertions.sql
+      - name: Run consolidated release preflight against disposable PostgreSQL
+        env:
+          ZIVAMUNTUYO_DISPOSABLE_DB: "1"
+        run: python scripts/release_preflight.py
