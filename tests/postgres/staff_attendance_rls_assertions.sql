@@ -49,7 +49,7 @@ DO $cannot_spoof_device$
 BEGIN
   BEGIN
     INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,device_identifier,idempotency_key)
-    VALUES ('40000000-0000-0000-0000-000000000015','clock_out','device','UNTRUSTED-USB','fixture-spoof-device');
+    VALUES ('40000000-0000-0000-0000-000000000015','clock_in','device','UNTRUSTED-USB','fixture-spoof-device');
     RAISE EXCEPTION 'FAIL: browser staff spoofed trusted device event';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
