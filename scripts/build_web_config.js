@@ -93,7 +93,7 @@ const config = { supabaseUrl, supabaseAnonKey };
 const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\n";
 const outputDirectory = path.join(process.cwd(), "public");
 const sourceRoot = path.resolve(__dirname, "..");
-const publicAssets = ["index.html", "app.js", "styles.css", "logo.svg"];
+const publicAssets = ["index.html", "app.js", "styles.css", "logo.svg", "demo.html", "demo.js"];
 fs.mkdirSync(outputDirectory, { recursive: true });
 for (const asset of publicAssets) {
   fs.copyFileSync(path.join(sourceRoot, asset), path.join(outputDirectory, asset));
