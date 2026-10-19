@@ -117,6 +117,9 @@ DECLARE v_role text; v_branch uuid; v_currency text; v_status text;
         v_journal_id uuid; v_journal_number text; v_type text;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.employee_profiles ep WHERE ep.user_id=auth.uid() AND ep.is_active=true) THEN
+    RAISE EXCEPTION 'Active employee profile required' USING ERRCODE='42501';
+  END IF;
   v_role := public.current_employee_role_code();
   IF v_role IS NULL OR v_role NOT IN ('system_admin','bank_admin','branch_manager','accountant','teller') THEN
     RAISE EXCEPTION 'You are not authorized to request cash transactions';
@@ -188,6 +191,9 @@ DECLARE v_j public.ledger_journals%ROWTYPE; v_ba public.bank_accounts%ROWTYPE;
         v_role text; v_balance numeric; v_new_balance numeric;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.employee_profiles ep WHERE ep.user_id=auth.uid() AND ep.is_active=true) THEN
+    RAISE EXCEPTION 'Active employee profile required' USING ERRCODE='42501';
+  END IF;
   v_role:=public.current_employee_role_code();
   IF v_role IS NULL OR v_role NOT IN ('system_admin','general_manager','bank_admin','branch_manager','accountant') THEN
     RAISE EXCEPTION 'Not authorized to post cash transactions' USING ERRCODE='42501';
