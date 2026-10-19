@@ -137,7 +137,6 @@ A read-only aggregate query was run against the connected Supabase database. It 
 
 This is a limited snapshot, not a full accounting audit, not proof that every transaction is correct, and not a replacement for recurring monitoring. The read-only diagnostic query is checked into \`supabase/tests/financial_integrity_diagnostics.sql\`. No production data was changed.
 
-
 ### Attendance implementation added in this pass
 
 The Attendance page now includes a self-service manual web clock-in/out fallback with branch selection, status display, duplicate-punch protection, server timestamps, and audit events in a new SQL draft. It explicitly records `web` as the method and does not represent this as a fingerprint scan. The clock RPC draft has not been applied to Supabase. Actual fingerprint events remain blocked on the selected device model, SDK/API, license, driver and real-hardware testing.
