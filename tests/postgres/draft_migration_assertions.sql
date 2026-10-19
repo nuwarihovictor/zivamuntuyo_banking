@@ -393,3 +393,42 @@ BEGIN
   END IF;
 END
 $active_employee_cash_rpc_test$;
+
+
+-- Verify browser-facing cash RPC grants are narrow and intentional.
+DO $cash_rpc_acl_test$
+DECLARE
+  v_signature text;
+  v_proc_oid oid;
+  v_public_execute boolean;
+  v_anon_execute boolean;
+  v_auth_execute boolean;
+BEGIN
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.create_cash_transaction_request(uuid,text,numeric,text)',
+    'public.post_approved_cash_transaction(uuid,uuid)'
+  ]
+  LOOP
+    v_proc_oid := pg_catalog.to_regprocedure(v_signature);
+    IF v_proc_oid IS NULL THEN
+      RAISE EXCEPTION 'FAIL: expected cash RPC missing: %', v_signature;
+    END IF;
+
+    SELECT
+      coalesce(bool_or(x.grantee = 0 AND x.privilege_type = 'EXECUTE'),false),
+      coalesce(bool_or(x.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname='anon') AND x.privilege_type = 'EXECUTE'),false),
+      coalesce(bool_or(x.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname='authenticated') AND x.privilege_type = 'EXECUTE'),false)
+    INTO v_public_execute,v_anon_execute,v_auth_execute
+    FROM pg_catalog.pg_proc p
+    CROSS JOIN LATERAL pg_catalog.aclexplode(coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) x
+    WHERE p.oid=v_proc_oid;
+
+    IF v_public_execute OR v_anon_execute THEN
+      RAISE EXCEPTION 'FAIL: public or anon can execute %', v_signature;
+    END IF;
+    IF NOT v_auth_execute THEN
+      RAISE EXCEPTION 'FAIL: authenticated staff cannot execute %', v_signature;
+    END IF;
+  END LOOP;
+END
+$cash_rpc_acl_test$;
