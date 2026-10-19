@@ -27,13 +27,16 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
 
     def test_staff_chat_uses_authenticated_supabase_user(self):
         self.assertIn("db.auth.getUser()", self.app)
-        self.assertIn('db.from("staff_messages")', self.app)
+        self.assertIn('db.from("staff_chat_messages")', self.app)
         self.assertIn("sender_user_id:userData.user.id", self.app)
         self.assertIn("window.sendStaffMessage", self.app)
 
     def test_staff_chat_has_active_employee_rls_and_no_mutation_policy(self):
-        self.assertIn("ALTER TABLE public.staff_messages ENABLE ROW LEVEL SECURITY", self.chat_migration)
+        self.assertIn("ALTER TABLE public.staff_chat_messages ENABLE ROW LEVEL SECURITY", self.chat_migration)
         self.assertIn("ep.is_active = true", self.chat_migration)
+        self.assertIn("public.staff_messages", self.chat_migration)  # explicitly preserves existing private messages
+        self.assertNotIn("ALTER TABLE public.staff_messages", self.chat_migration)
+        self.assertNotIn("DROP POLICY IF EXISTS staff_messages_read_participants", self.chat_migration)
         self.assertIn("sender_user_id = (SELECT auth.uid())", self.chat_migration)
         self.assertNotIn("FOR UPDATE", self.chat_migration.upper())
         self.assertNotIn("FOR DELETE", self.chat_migration.upper())
