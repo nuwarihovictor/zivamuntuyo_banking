@@ -102,7 +102,7 @@
 
 - Preview build for code/test commit `0105b41e3793b6d8f613050869e86dc52db5629a` is `READY`: [open preview](https://zivamuntuyobanking-744r2l5je-infonuwarihovictor-1047s-projects.vercel.app).
 - The Vercel project has SSO protection enabled for non-custom-domain deployments. A prompt before the app loads may be Vercel/team authentication, not the banking application's own sign-in. Do not disable this protection as a workaround.
-- This is a branch preview (`target: null)), not a production deployment. The preview has not been proven to connect to staging because no Vercel environment variables are configured and the separate staging Supabase project is inactive.
+- This is a branch preview (`target: null`), not a production deployment. A dedicated banking staging database is still not provisioned; do not use production or any unrelated Supabase project for banking tests.
 
 
 ## Banking integrity and production-schema review — 2026-10-19
@@ -113,6 +113,16 @@
 - Read-only review of the current production definitions found the live cash-request and posting functions do not yet enforce the active-employee check; the live posting function lacks the posting audit event; and the live approval function does not reject an already populated `approved_by`. The reviewed draft migration corrects these gaps but has **not** been applied to production.
 - Read-only security advisor review reports 22 RLS-enabled tables without policies, one SECURITY DEFINER view finding for `branch_directory_public`, and 68 authenticated-executable SECURITY DEFINER function warnings. A separate grant query found direct anon/authenticated table privileges on `general_ledger_accounts` and `ledger_journal_entries` despite RLS being enabled with no policies; the draft migration targets those two tables and the branch view specifically. Do not blanket-revoke other grants without caller-by-caller review.
 - Current accounting RPC review confirms `list_trial_balance` returns active ledger accounts only and is not date-filtered; formal reconciliation still needs test fixtures for each currency/branch and accounting sign conventions.
-- Restored separate Supabase project `suopsvncczxlnyjhtfdy`; it is still starting and currently reports no public tables and no recorded migrations. Preview-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` have been configured for the release branch, scoped to that branch. Do not test financial flows against this empty database.
-- A production-shaped branch from the production project can apply the existing migration history into a fresh database without copying production data, but branch creation may incur hourly charges. Do not create it until the owner confirms the organization and the applicable quoted cost.
+- An earlier staging candidate `suopsvncczxlnyjhtfdy` was inspected and found to contain a Cornhill school-management schema (`school_settings`, `students`, `classes`, and attendance tables), not the banking schema. It must not be used for banking tests. The two branch-scoped Vercel variables that pointed to that unrelated project were changed to inert placeholder values immediately; they no longer point at that database.
+- The banking Vercel preview therefore currently has no valid Supabase connection. Do not deploy it as a functional preview or run financial workflows until a dedicated banking staging database exists and the correct branch-scoped URL/publishable key are configured.
+- A production-shaped Supabase development branch can apply production migration history to a fresh database without copying production data, but creating it can incur hourly charges. The Supabase cost-estimate tool requires the owner to identify/confirm the organization before it can provide a quote; do not create the branch before the organization and cost are confirmed.
 - No production migrations, production data writes, or production deployment were performed.
+
+
+## Accounting math verification and staging isolation correction — 2026-10-19
+
+- Extracted financial report grouping and statement arithmetic into deterministic helpers and added `tests/test_financial_report_math.js`, wired into release preflight.
+- Added sample reconciled balances in UGX and USD and verified per-currency debit/credit totals, income/expense/net result, balance-sheet claims and zero differences. Added an intentionally unbalanced UGX fixture and verified the report detects the difference rather than hiding it.
+- Exact branch-head CI for `1fd75809675cbea5630598305af6ef647664dfe2` passed run [#39235605037](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39235605037): 89 Python tests, JavaScript syntax checks, financial math tests, all seven draft migrations on disposable PostgreSQL 17, and all six SQL assertion scripts. No production database changes were made.
+- **Staging isolation correction:** inspection showed the previously selected Supabase project was the school-management database, not a banking staging project. The Vercel Preview variables for the banking branch have been neutralized to inert placeholder values. No banking schema migrations were applied to the school database and no financial test data was inserted.
+- Next staging step is to create a separate Supabase development branch/database from the banking production schema history, after the owner identifies the correct Supabase organization and approves the displayed cost estimate. Then configure the Vercel Preview URL and publishable key for that isolated branch and test only synthetic banking data.
