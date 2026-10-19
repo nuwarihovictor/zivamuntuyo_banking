@@ -52,7 +52,7 @@ LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.role', true), '') 
 CREATE OR REPLACE FUNCTION public.current_employee_can_transact_in_branch(uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE OR REPLACE FUNCTION public.is_active_branch_manager_for(uuid) RETURNS boolean
-LANGUAGE sql STABLE AS $ SELECT true $;
+LANGUAGE sql STABLE AS $$ SELECT true $$;
 
 -- Representative routines used to exercise the search_path/ACL hardening migration.
 CREATE OR REPLACE FUNCTION public.approval_limit_allows(text,text,uuid,text,numeric)
@@ -63,7 +63,7 @@ TO authenticated;
 CREATE OR REPLACE FUNCTION public.record_financial_activity(
   uuid,text,numeric,text,text,uuid,uuid,date
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp AS $ BEGIN RETURN; END $;
+SET search_path = public, pg_temp AS $$ BEGIN RETURN; END $$;
 
 INSERT INTO public.branches(id,branch_code,branch_name,is_head_office,is_active,address)
 VALUES ('10000000-0000-0000-0000-000000000001','HQ','Head Office',true,true,'private address');
