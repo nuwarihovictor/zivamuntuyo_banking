@@ -25,7 +25,7 @@ DO $cannot_spoof_employee$
 BEGIN
   BEGIN
     INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,idempotency_key)
-    VALUES ('40000000-0000-0000-0000-000000000017','clock_out','manual','fixture-spoof-employee');
+    VALUES ('40000000-0000-0000-0000-000000000017','clock_in','manual','fixture-spoof-employee');
     RAISE EXCEPTION 'FAIL: employee inserted attendance for another employee';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
