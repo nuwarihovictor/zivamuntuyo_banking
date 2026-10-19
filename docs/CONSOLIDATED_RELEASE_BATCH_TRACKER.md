@@ -89,3 +89,10 @@
 - Added regression tests for staff chat authentication, message length limits, safe message rendering, and attendance employee scoping / manual-source labeling.
 - Latest code/test commit: `fda7c9d8afa6b9c829290ef0c881b3065dcbd1fa`. A workflow result for this exact commit has not yet been returned by the current check; therefore the latest attendance patch and added staff tests are **pending exact-head CI verification**.
 - These are code and regression-test improvements only. Staff attendance remains manual, chat permissions still depend on database RLS, physical receipt printing remains untested, and staging/Windows/hardware acceptance remains outstanding.
+
+
+## CI failure diagnosis and next verification checkpoint — 2026-10-19
+
+- The exact-head disposable PostgreSQL workflow for commit `33a3431d55d413e1afb685cc4c0ffe41c6728ac4` failed in the Python regression stage, before the database migration assertions ran. The failure was two test-boundary lookups that incorrectly expected the receipt-print function to appear after the attendance function; the application defines the receipt handler earlier in the file. This is a regression-test slicing defect, not evidence of a failed SQL migration.
+- Corrective batch: use the attendance function's own closing boundary and explicitly scope attendance-history reads to the authenticated employee, not only to RLS. A new regression assertion checks this UI-level employee filter.
+- Exact-head CI must be rerun after this correction. No production deployment or production database change is authorised by this batch.
