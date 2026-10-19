@@ -30,4 +30,4 @@ These observations describe the database at the time of review; re-check before 
 
 ## Current branch verification
 
-The disposable PostgreSQL workflow passed on commit `b35f262bebd30800aa5ec03b0b2f97fcd618b733`: [run #39214501311](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39214501311). That run includes the search-path-safe UUID reference generator. Any later code changes require a fresh passing run before being treated as verified.
+The disposable PostgreSQL workflow passed on commit `5977d073225dc1e39e3b29815c6eb17c1a9d9686`: [run #39214823761](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39214823761). This includes the search-path-safe UUID reference generator and an injected audit-insert failure test proving that ledger entries, account balance, and journal status roll back together. Any later code changes require a fresh passing run before being treated as verified.
