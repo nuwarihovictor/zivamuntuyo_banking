@@ -148,8 +148,6 @@ window.setBranchActive = async function(id,active) {
   if(!confirm("Are you sure you want to "+action+" this branch? Existing financial history will be preserved."))return;
   const feedback=document.getElementById("branch-management-feedback");
   if(!db)return;
-  const button=document.querySelector('[onclick="window.setBranchActive(\\''+id+'\\','+active+')"]');
-  if(button)button.disabled=true;
   if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
   try {
     const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
@@ -159,7 +157,7 @@ window.setBranchActive = async function(id,active) {
   } catch(error) {
     if(feedback)feedback.textContent="Branch status change could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
   } finally {
-    if(button)button.disabled=false;
+    // Leave the branch directory usable after an RPC failure.
   }
 };
 
