@@ -545,3 +545,17 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .vicline-direct-sent .vicline-bubble{border-color:rgba(7,59,43,.18);background:rgba(7,59,43,.06)}
 .vicline-direct-received{margin-right:auto;max-width:88%}
 @media(max-width:640px){.joint-holder-row{grid-template-columns:minmax(0,1fr)}.joint-holder-row .joint-holder-remove{justify-self:start}.vicline-direct-sent,.vicline-direct-received{max-width:100%}}
+
+.loan-due-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:12px 0;padding:12px;border:1px solid var(--line,#dce5dd);border-radius:10px}
+.loan-due-legend span{font-size:13px;font-weight:600}
+.loan-servicing-status{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:#eef2ef;color:#27372d}
+.loan-due-upcoming .metric-val,.loan-due-upcoming{color:#17643a}
+.loan-due-today .metric-val,.loan-due-today{color:#1456a0}
+.loan-due-grace .metric-val,.loan-due-grace{color:#995a00}
+.loan-due-overdue .metric-val,.loan-due-overdue{color:#a32222}
+.loan-due-settled .metric-val,.loan-due-settled{color:#4b5550}
+.loan-due-overdue .loan-servicing-status{background:#fde7e7;color:#9e1c1c}
+.loan-due-grace .loan-servicing-status{background:#fff0d9;color:#8a5100}
+.loan-due-today .loan-servicing-status{background:#e5efff;color:#174d91}
+.loan-due-upcoming .loan-servicing-status{background:#e3f5e9;color:#17643a}
+.loan-due-settled .loan-servicing-status{background:#edf0ee;color:#4b5550}
