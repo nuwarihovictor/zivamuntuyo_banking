@@ -48,6 +48,20 @@ BEGIN
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: inactive currency was accepted'; END IF;
 
+  -- Legacy entry point must enforce the same active-currency catalogue.
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.open_account_request(
+      '30000000-0000-0000-0000-000000000002',
+      '20000000-0000-0000-0000-000000000001',
+      '10000000-0000-0000-0000-000000000001','USD'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Unsupported or inactive currency%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: legacy RPC accepted inactive currency'; END IF;
+
   v_failed := false;
   BEGIN
     PERFORM * FROM public.create_bank_account_request(
