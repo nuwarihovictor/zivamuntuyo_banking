@@ -112,3 +112,7 @@ Repository changes now include joint-account holder controls, safer server-backe
 **Important live-schema finding:** the connected Supabase database was queried read-only and the existing `approve_account_request` function does not yet enforce the two-holder rule for JNT accounts. The live `create_bank_account_request` function also does not include the new individual-account serialization guard. The repository SQL is not applied to the database. Do not open/approve real joint accounts based on UI-only checks.
 
 **Not production-ready:** the loan servicing tables and RPCs remain uninstalled drafts; alert generation is not scheduled; private-message SQL is not installed; fingerprint capture requires an exact device and vendor SDK; printer and OS acceptance remain pending. The new integration commit must pass GitHub Actions and a Vercel preview smoke test before release review.
+
+
+## Security advisor status — 19 October 2026
+The connected Supabase project was checked read-only. The advisor reports a security-definer view, 22 RLS-enabled tables without policies, and 68 SECURITY DEFINER functions executable by authenticated users. These need function-by-function and table-by-table review. Do not bulk-revoke grants or create broad policies; several modules rely on authorized RPCs and the pre-login branch directory is intentionally public-facing. See `docs/SUPABASE_SECURITY_REVIEW_2026-10-19.md`. Production remains blocked until this review is resolved and rechecked.
