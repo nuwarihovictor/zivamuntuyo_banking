@@ -63,6 +63,7 @@ def main() -> int:
 
     run(["node", "--check", "app.js"])
     run(["node", "--check", "scripts/build_web_config.js"])
+    run(["node", "tests/test_financial_report_math.js"])
     run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"])
 
     try:
