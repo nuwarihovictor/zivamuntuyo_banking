@@ -49,7 +49,7 @@ class WebConfigBuildTests(unittest.TestCase):
             "SUPABASE_PUBLISHABLE_KEY": "DISABLED"
         })
         self.assertEqual(result.returncode, 0, result.stderr)
-        config_match = re.search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        config_match = re.search(r"Object\.freeze\((\{.*\})\)", content)
         self.assertIsNotNone(config_match, content)
         self.assertEqual(json.loads(config_match.group(1)), {"supabaseUrl": "", "supabaseAnonKey": ""})
         self.assertIn("Preview backend disabled (explicit sentinel)", result.stdout)
@@ -61,7 +61,7 @@ class WebConfigBuildTests(unittest.TestCase):
             "SUPABASE_PUBLISHABLE_KEY": "inert-placeholder"
         })
         self.assertEqual(result.returncode, 0, result.stderr)
-        config_match = re.search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        config_match = re.search(r"Object\.freeze\((\{.*\})\)", content)
         self.assertIsNotNone(config_match, content)
         self.assertEqual(json.loads(config_match.group(1)), {"supabaseUrl": "", "supabaseAnonKey": ""})
         self.assertIn("Preview backend disabled (invalid preview URL)", result.stdout)
