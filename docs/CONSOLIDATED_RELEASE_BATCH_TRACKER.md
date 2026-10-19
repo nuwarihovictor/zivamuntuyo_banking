@@ -8,20 +8,21 @@
 - Working branch: fix/account-eligibility-guards-2026-10-19
 - Pull request: [Draft PR #15](https://github.com/nuwarihovictor/zivamuntuyo_banking/pull/15)
 - Production changes: **none authorised or performed by this batch**
-- Latest consolidated preflight commit: `bb01463745e7645e4969d4a2c8e60fe64c3c4324` (automated disposable PostgreSQL workflow passed)
+- Latest code-focused batch commit: `04ecda310de5a8801bb22e50ecc667532f75daa1` (receipt posted-status gate and reprint labels).
+- Full disposable PostgreSQL preflight passed for that code commit: [run #39224606015](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39224606015). This tracker update itself requires a fresh exact-head CI run before release.
 - Release state: **NO-GO until all applicable gates below are evidenced and an authorised release owner approves**
 
 ## Consolidated work matrix
 
 | Workstream | Code / automated work | Required evidence before release | State |
 |---|---|---|---|
-| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, six draft migrations, and five PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Consolidated run passed on `bb01463745e7645e4969d4a2c8e60fe64c3c4324`; rerun required after later changes |
+| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, six draft migrations, and five PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Code-focused batch passed on `04ecda310de5a8801bb22e50ecc667532f75daa1` in run #39224606015; a fresh run is required for the tracker-update commit |
 | Banking workflows | Verify account eligibility, individual/joint holder rules, deposits, withdrawals, approval separation, posting idempotency, ledger legs, audit atomicity, branch/currency boundaries | Production-shaped staging tests with synthetic data; debit/credit reconciliation and rollback evidence | Staging not confirmed |
-| Reports and accounting | Verify dashboards derive from posted ledger entries, preserve currency separation, and agree with trial balance / account movements | Reconciled report outputs for each test currency and branch | Needs verification |
+| Reports and accounting | Trial balance summary and CSV export use the authorized `list_trial_balance` RPC and group totals by currency; CSV escaping and formula-injection protections have regression tests | Reconciled report outputs for each test currency and branch in staging | Code/test coverage exists; accounting reconciliation in staging remains unverified |
 | Database security | Compare each replaced function with current schema; inspect owner, SECURITY DEFINER search path, execute grants, table grants, RLS policies, and every caller | Approved staging migration run and role/branch negative tests | Not confirmed |
 | Customer privacy | Minimise customer-directory fields; avoid displaying full national ID/passport values; preserve honest loading/error/empty states | Regression tests plus role-based staging verification | Code updated; tests need green run |
 | Staff chat and attendance | Separate group chat from private messages; block inactive staff; manual punches remain clearly non-biometric | Authenticated multi-user staging tests and event transition/deduplication checks | Automated coverage; staging pending |
-| Receipts | Print only posted transaction receipts; label reprints; check thermal formatting | Real printer make/model, driver, paper width, deposit/withdrawal print evidence on Windows 10 and 11 | Pending hardware |
+| Receipts | UI only offers posted cash receipts; print handler now requires explicit posted status, valid cash type/reference/positive finite amount, and labels repeated print actions in the current transaction list | Real printer make/model, driver, paper width, deposit/withdrawal print evidence on Windows 10 and 11; durable reprint audit across reloads if required | Code guard and regression tests passed; physical printer testing and durable reprint audit remain pending |
 | Fingerprint attendance | Build only against vendor-supported device SDK/API; keep privileged keys server-side | Reader make/model, firmware, SDK/driver support and witnessed enrolment/matching tests | Blocked on device details |
 | Windows 10/11 | Browser, sign-in/session expiry, branch permissions, zoom, keyboard, reconnect, print workflows | Completed Windows 10/11 field acceptance checklist with machine/browser versions and results | Pending physical testing |
 | Deployment and recovery | Verify Vercel deployment uses reviewed SHA and correct environment; confirm no secrets in browser; check monitoring and auth recovery | Staging deployment URL, backup restore drill, recovery contact, security review, approved change window | Not confirmed |
