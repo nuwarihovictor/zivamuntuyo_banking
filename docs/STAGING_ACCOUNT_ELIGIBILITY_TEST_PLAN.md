@@ -143,6 +143,12 @@ Use a dedicated disposable PostgreSQL/Supabase environment with synthetic custom
 
 For each case, save the exact test setup, expected SQLSTATE/result, actual result, and a query proving ledger balance invariants. Verify transaction functions preserve atomicity and use unique/idempotency constraints where applicable. Test the deployed UI separately from direct RPC calls.
 
+## Additional SECURITY DEFINER hardening draft
+
+A third draft migration, `supabase/migrations/20261019060000_pin_financial_definer_search_paths.sql`, was added after read-only metadata review found 18 authenticated-executable SECURITY DEFINER routines using `search_path = public, pg_temp`. It pins those routines to `pg_catalog, public, pg_temp` (with temporary objects last) and removes direct authenticated execution of the internal `approval_limit_allows` helper. The connected production schema confirms that `PUBLIC`, `anon`, and `authenticated` cannot create objects in the `public` schema. The migration remains a draft; verify the latest CI run and review each function's caller/authorization path before production.
+
+The CI fixture now includes representative functions to test the search-path setting and helper execution grants. It does not load all 18 production function bodies or prove their full authorization behavior.
+
 ## Remaining security work and release gate
 
 1. Function-by-function review of all 68 authenticated-executable SECURITY DEFINER functions: record intended callers, authorization checks, search_path, object qualification, and exact execute ACLs. Do not blanket-revoke.
