@@ -624,7 +624,7 @@ window.switchPage = function(pageName) {
            <div class="metric-card"><strong>Absence & leave</strong><p class="muted">Track absent days, approved leave, public holidays, rest days and missing punches separately.</p></div>
            <div class="metric-card"><strong>Payroll export</strong><p class="muted">Approved timesheets can later feed payroll summaries, with overtime and deductions shown separately.</p></div>
          </div>
-         <p class="muted">Schedule saving is available after the SQL setup is installed. Fingerprint capture, official attendance event capture, manager correction workflow and payroll integration are separate steps and are not enabled yet.</p>
+         <p class="muted">Schedule saving is available after the SQL setup is installed. Manual punches are recorded when the attendance database migration is installed. Fingerprint capture, manager correction approvals and payroll integration are separate steps and are not enabled yet.</p>
          <h3 style="margin:18px 0 8px;">Recorded timesheets</h3>
          <div class="form-grid">
            <label>From date<input type="date" id="timesheet-from"></label>
@@ -2502,7 +2502,7 @@ window.loadStaffAttendance = async function() {
     if(userError||!userData?.user)throw new Error("Sign in with your staff account first.");
     const {data,error}=await db.from("staff_attendance_events")
       .select("id,event_type,event_source,occurred_at,created_at,device_identifier")
-      .order("occurred_at",{ascending:false}).limit(30);
+      .order("created_at",{ascending:false}).limit(30);
     if(error)throw error;
     const rows=data||[];
     const latest=rows[0];
@@ -2527,7 +2527,7 @@ window.recordStaffAttendancePunch = async function() {
     const {data:userData,error:userError}=await db.auth.getUser();
     if(userError||!userData?.user)throw new Error("Your staff session has expired. Sign in again.");
     const {data:latestRows,error:latestError}=await db.from("staff_attendance_events")
-      .select("event_type,occurred_at").order("occurred_at",{ascending:false}).limit(1);
+      .select("event_type,created_at").order("created_at",{ascending:false}).limit(1);
     if(latestError)throw latestError;
     const latest=latestRows?.[0];
     const eventType=latest?.event_type==="clock_in"?"clock_out":"clock_in";
