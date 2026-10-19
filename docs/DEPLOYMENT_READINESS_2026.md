@@ -112,3 +112,12 @@ Repository changes now include joint-account holder controls, safer server-backe
 **Important live-schema finding:** the connected Supabase database was queried read-only and the existing `approve_account_request` function does not yet enforce the two-holder rule for JNT accounts. The live `create_bank_account_request` function also does not include the new individual-account serialization guard. The repository SQL is not applied to the database. Do not open/approve real joint accounts based on UI-only checks.
 
 **Not production-ready:** the loan servicing tables and RPCs remain uninstalled drafts; alert generation is not scheduled; private-message SQL is not installed; fingerprint capture requires an exact device and vendor SDK; printer and OS acceptance remain pending. The new integration commit must pass GitHub Actions and a Vercel preview smoke test before release review.
+
+
+## Live verification update — 19 October 2026
+
+- The latest available Vercel preview deployment was verified as **READY** and returned HTTP 200 for the app shell.
+- The deployed `app.js` and `styles.css` were fetched successfully. The JavaScript contains the joint-holder workflow, VIC LINE direct-message mode, loan due-date dashboard UI and manual attendance fallback; the CSS contains the corresponding due-status and direct-message styles.
+- This is a preview smoke check only. It does not validate authenticated RPC calls, actual database migrations, money posting, device capture, thermal-printer output or Windows hardware.
+- An attempt to trigger another Vercel deployment for the newest integration commit was blocked by the account's API deployment quota (HTTP 402; retry after 24 hours). No plan or billing settings were changed.
+- A Supabase development branch quote was returned at US$0.01344/hour. No branch was created because the user has not yet approved that recurring cost.
