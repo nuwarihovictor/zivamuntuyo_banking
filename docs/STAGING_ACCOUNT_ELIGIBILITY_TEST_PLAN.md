@@ -53,3 +53,14 @@ The migration now uses the exact `IND`/`JNT` codes in the legacy `open_account_r
 - The new joint-holder RPC and the legacy opening-function replacement need SQL review and staging execution before release.
 - The migration preserves existing execute grants for `approve_account_request`; compare ACLs and review SECURITY DEFINER authorization before deployment.
 - Keep live financial transactions disabled until account-opening, approvals, ledger posting, permissions, rollback and error handling are verified.
+
+## No-cost read-only validation performed on 2026-10-19
+
+- Verified account-type codes in the connected database: `BUS`, `FIX`, `GRP`, `IND`, `INS`, `JNT`.
+- Verified the `account_holders` role constraint permits `owner`, `joint_owner`, `authorized_signatory`, and `beneficial_owner`.
+- Verified `bank_accounts` has the expected status and product-type checks, a currency foreign key, and a default product type of `savings`.
+- Verified current live RPC ACLs read-only: `authenticated` can execute the three existing SECURITY DEFINER account RPCs (`create_bank_account_request`, `open_account_request`, `approve_account_request`). The proposed `add_pending_joint_account_holder` function does not exist in the live database yet.
+- Performed a static source check of the draft migration after switching IND/JNT guards to exact type codes. The static checks passed, but this is not equivalent to PostgreSQL parsing or execution.
+- GitHub Actions has not reported a run for the latest draft commit. No staging branch was created because the user declined additional paid Supabase compute.
+
+These checks were read-only. No customer, account, transaction, or production schema data was changed.
