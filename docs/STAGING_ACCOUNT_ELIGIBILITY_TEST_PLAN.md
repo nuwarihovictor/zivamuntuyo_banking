@@ -93,3 +93,17 @@ The advisor was read-only. No settings, policies, grants, views, or live databas
   `python -m unittest discover -s tests -p 'test_*.py' -v`
 - These tests are static source assertions only. They are intended as a cheap regression guard and do not prove the migration parses or executes correctly in PostgreSQL.
 - No GitHub Actions workflow was added, to avoid creating automated runner usage or costs without confirming the repository's billing configuration.
+
+
+## Targeted financial-RPC review — 19 October 2026
+
+Read-only inspection of four live SECURITY DEFINER RPC definitions found the following. This is source inspection only; no database objects were changed.
+
+| RPC | Observed controls | Follow-up |
+| --- | --- | --- |
+| `create_cash_transaction_request` | Authenticated caller, role allowlist, positive bounded amount, active account, branch transaction access | Confirm helper role checks also enforce active employment; consider explicit audit event for request creation |
+| `approve_cash_transaction_request` | Active employee, role allowlist, row lock, pending-status/type checks, no self-approval, branch scope, approval limit, audit event | Verify role/limit combinations with negative tests for each role and amount boundary |
+| `post_approved_cash_transaction` | Role allowlist, approved/pending status, requester/approver separation, duplicate-posting block, active account, branch scope, matching cash/customer ledgers, withdrawal balance check | Review the full posting function and ledger invariants with database integration tests |
+| `record_financial_activity` | Auth, role allowlist, branch scope, amount cap, receipt reference, category restrictions, customer/loan checks, audit event | **Hardening candidate:** its current SECURITY DEFINER setting uses `search_path = public, pg_temp`, unlike the account-opening draft's empty search path. Review and fully qualify object references before changing it. |
+
+Do not change production function definitions or grants as part of this source-only review. A follow-up migration for any financial RPC must preserve its signature, return shape, grants, and current accounting behavior and must be tested outside production first.
