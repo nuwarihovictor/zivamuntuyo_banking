@@ -94,7 +94,7 @@ window.loadBranchManagement = async function() {
         <label>Time zone<select name="timezone">${["Africa/Kampala","Africa/Nairobi","Africa/Kigali"].map(t=>'<option '+(t===(b.timezone||"Africa/Kampala")?'selected':'')+'>'+t+'</option>').join("")}</select></label>
         <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_head_office" ${b.is_head_office?"checked":""}> Head office</label>
         <button class="primary" type="submit">Save changes</button>
-        <button class="secondary" type="button" onclick="window.setBranchActive('${esc(b.id)}',${!b.is_active})">${b.is_active?"Archive branch":"Reactivate branch"}</button>
+        <button class="secondary" type="button" onclick="window.setBranchActive('${esc(b.id)}',${!b.is_active},this)">${b.is_active?"Archive branch":"Reactivate branch"}</button>
       </form>
     </details>
   `).join("")||'<p class="muted">No branch records are visible to your account.</p>';
@@ -143,11 +143,12 @@ window.updateBranch = async function(event,id) {
   }
 };
 
-window.setBranchActive = async function(id,active) {
+window.setBranchActive = async function(id,active,button) {
   const action=active?"reactivate":"archive";
   if(!confirm("Are you sure you want to "+action+" this branch? Existing financial history will be preserved."))return;
   const feedback=document.getElementById("branch-management-feedback");
   if(!db)return;
+  if(button)button.disabled=true;
   if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
   try {
     const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
@@ -157,7 +158,7 @@ window.setBranchActive = async function(id,active) {
   } catch(error) {
     if(feedback)feedback.textContent="Branch status change could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
   } finally {
-    // Leave the branch directory usable after an RPC failure.
+    if(button)button.disabled=false;
   }
 };
 
