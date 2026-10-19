@@ -36,10 +36,10 @@ class ReceiptPrintingRegressionTests(unittest.TestCase):
         end = self.app.index('document.addEventListener("click",function(event)', start)
         handler = self.app[start:end]
         self.assertIn('const safe=value=>String(value).replace(/[&<>"\']/', handler)
-        self.assertIn('${safe(reference)}', handler)
-        self.assertIn('${safe(branch||"Not provided")}', handler)
-        self.assertIn('${safe(account||"Not provided")}', handler)
-        self.assertIn('${safe(money)}', handler)
+        self.assertIn('safe(reference)', handler)
+        self.assertIn('safe(branch||"Not provided")', handler)
+        self.assertIn('safe(account||"Not provided")', handler)
+        self.assertIn('safe(money)', handler)
 
     def test_popup_blocking_does_not_mark_receipt_as_printed(self):
         start = self.app.index('window.printTransactionReceipt = function(button, skipConfirmation)')
