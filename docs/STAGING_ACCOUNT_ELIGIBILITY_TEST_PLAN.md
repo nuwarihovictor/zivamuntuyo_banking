@@ -72,3 +72,15 @@ These checks were read-only. No customer, account, transaction, or production sc
 - Compared the draft currency allowlist with the live currency catalogue and found USD was not configured although the earlier hard-coded list accepted it. Updated the draft to require a matching active row in `public.currencies`.
 - Tightened customer-branch checks in the legacy account-opening and joint-holder paths to use the transaction-scope helper instead of the broader branch-access helper.
 - These are source-level corrections only. The migration remains unapplied and must still be parsed/executed against a non-production PostgreSQL database before it can be considered validated.
+
+
+## Project-wide security blockers observed during read-only advisor check (2026-10-19)
+
+The current Supabase security advisor still reports the following findings. These are not fixed by this account-eligibility draft:
+
+- **ERROR:** `public.branch_directory_public` is a SECURITY DEFINER view. Review whether it should use `security_invoker = true` or be removed from exposed access, after checking the intended branch-directory use.
+- **WARN:** 68 SECURITY DEFINER functions are executable by `authenticated`. Review each function's authorization checks and intended caller; do not blanket-revoke grants because some are intentional RPC endpoints.
+- **INFO:** 22 public tables have RLS enabled but no policies. Confirm whether access is intentionally mediated only through narrowly authorized RPCs; otherwise add table-specific policies. Do not create broad generic policies.
+- **WARN:** Supabase leaked-password protection is disabled. This is an Auth project setting that needs an authorized administrator to enable after checking the desired sign-in policy.
+
+The advisor was read-only. No settings, policies, grants, views, or live database objects were changed. These findings should be tracked and resolved before the system is used for live financial transactions.
