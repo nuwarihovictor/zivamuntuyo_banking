@@ -2,13 +2,19 @@
 // ZIVAMUNTUYO FINANCIAL SERVICES LTD - COMMERCIAL BANKING CORE FRONTEND
 // ============================================================================
 
-const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
+const runtimeConfig = window.ZIVAMUNTUYO_CONFIG || {};
+const productionHost = window.location && window.location.hostname === "zivamuntuyobanking.vercel.app";
+const productionSupabaseUrl = "https://hwghiezvghdqxnhcnpwk.supabase.co";
+const productionPublishableKey = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
+// Preview/local deployments must provide explicit staging configuration. Only the
+// canonical production hostname may use the production fallback configuration.
+const SUPABASE_URL = runtimeConfig.supabaseUrl || (productionHost ? productionSupabaseUrl : "");
+const SUPABASE_ANON_KEY = runtimeConfig.supabaseAnonKey || (productionHost ? productionPublishableKey : "");
 window.currentEmployeeName = "";
 window.currentEmployeeRole = ""; 
 
 let db = null;
-if (window.supabase) {
+if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 

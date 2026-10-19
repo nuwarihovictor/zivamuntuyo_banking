@@ -18,10 +18,12 @@ Features depending on a draft migration are not active in a database until that 
 ## Safe deployment setup
 
 1. In Supabase Project Settings → API / API Keys, copy the project URL and public publishable key (or legacy anon key).
-2. Configure the expected public Supabase URL and publishable/anon key in the application using the project's approved configuration approach.
-3. **Never** put a Supabase `service_role` key or any secret in browser JavaScript, a public repository, a Vercel client-side variable, or the Windows attendance client.
-4. Import the private repository into Vercel. Review the deployment and security headers before sharing the URL with staff.
-5. Keep production migrations disabled until reviewed against the actual production schema and validated in a production-shaped staging environment.
+2. Configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` (or legacy `SUPABASE_ANON_KEY`) in the appropriate Vercel environment. The build script generates `app-config.js` from public keys only.
+3. Configure Preview with a separate staging Supabase project. The build script refuses the production project in Preview/local builds; without a backend configuration, the preview deliberately stays disconnected.
+4. Use the canonical production domain `zivamuntuyobanking.vercel.app` for the existing production fallback. Review production environment configuration before changing that fallback.
+5. **Never** put a Supabase `service_role` key or any secret in browser JavaScript, a public repository, a Vercel client-side variable, or the Windows attendance client.
+6. Import the private repository into Vercel. Review the deployment and security headers before sharing the URL with staff.
+7. Keep production migrations disabled until reviewed against the actual production schema and validated in a production-shaped staging environment.
 
 ## Development checks
 

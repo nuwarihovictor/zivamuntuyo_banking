@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+
+const productionUrl = "https://hwghiezvghdqxnhcnpwk.supabase.co";
+const target = String(process.env.VERCEL_ENV || "development").toLowerCase();
+const supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
+const publishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
+const legacyAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+
+function fail(message) {
+  process.stderr.write("Web config build refused: " + message + "\n");
+  process.exit(1);
+}
+
+if (publishableKey && legacyAnonKey && publishableKey !== legacyAnonKey) {
+  fail("SUPABASE_PUBLISHABLE_KEY and SUPABASE_ANON_KEY disagree; configure only one public key.");
+}
+const supabaseAnonKey = publishableKey || legacyAnonKey;
+if (Boolean(supabaseUrl) !== Boolean(supabaseAnonKey)) {
+  fail("SUPABASE_URL and one public publishable/anon key must be supplied together.");
+}
+
+if (supabaseUrl) {
+  let parsed;
+  try {
+    parsed = new URL(supabaseUrl);
+  } catch {
+    fail("SUPABASE_URL is not a valid URL.");
+  }
+  if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".supabase.co") ||
+      parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.username || parsed.password) {
+    fail("SUPABASE_URL must be an HTTPS Supabase project origin.");
+  }
+  if (target === "production" && parsed.origin !== productionUrl) {
+    fail("Production deployment must use the approved production Supabase project.");
+  }
+  if (target !== "production" && parsed.origin === productionUrl) {
+    fail("Preview/local builds may not connect to the production Supabase project.");
+  }
+  if (supabaseAnonKey.startsWith("sb_secret_")) {
+    fail("A Supabase secret key is forbidden in browser configuration.");
+  }
+  if (supabaseAnonKey.startsWith("eyJ")) {
+    const parts = supabaseAnonKey.split(".");
+    if (parts.length < 2) fail("JWT-style public key could not be inspected safely.");
+    let payload;
+    try {
+      payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    } catch {
+      fail("JWT-style key payload is invalid.");
+    }
+    if (["service_role", "supabase_admin"].includes(payload.role)) {
+      fail("A privileged service key is forbidden in browser configuration.");
+    }
+    if (payload.role !== "anon") {
+      fail("JWT-style browser key must carry the anon role.");
+    }
+  } else if (!supabaseAnonKey.startsWith("sb_publishable_")) {
+    fail("Only a Supabase publishable key or legacy anon JWT is allowed in browser configuration.");
+  }
+}
+
+const config = { supabaseUrl, supabaseAnonKey };
+const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\n";
+fs.writeFileSync(path.join(process.cwd(), "app-config.js"), output, { encoding: "utf8", mode: 0o644 });
+process.stdout.write("Generated browser configuration for " + (target || "development") +
+  " target. " + (supabaseUrl ? "Public key configured; no secret key emitted." : "No backend configured; app will fail closed.") + "\n");

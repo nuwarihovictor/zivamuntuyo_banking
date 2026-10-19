@@ -26,5 +26,6 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "node scripts/build_web_config.js"
 }

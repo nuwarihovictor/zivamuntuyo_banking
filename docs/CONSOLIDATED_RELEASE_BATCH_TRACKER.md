@@ -73,3 +73,10 @@
 - These are cumulative posted balances, not date-filtered statutory statements. Review account mappings, opening balances, closing entries, and reconciliations in production-shaped staging before treating them as formal financial statements.
 
 - Reporting limitation explicitly shown in the UI and CSV export: the current `list_trial_balance` RPC returns active ledger accounts and has no date-range parameters. Inactive ledger accounts with historical postings may be excluded; the new statements are provisional cumulative views until the RPC/report scope and account mapping are verified in staging.
+
+
+## Preview / production configuration isolation
+
+- Added a Vercel build step that generates `app-config.js` from public Supabase environment variables. Preview/local builds refuse the live production Supabase URL and reject secret/service-role keys; when no staging config is supplied, the preview stays disconnected instead of writing to production.
+- The canonical production hostname retains the existing public-key fallback so this draft change does not require a production env-var mutation. The build script and environment isolation have dedicated regression tests.
+- The Vercel project currently has no environment variables configured, and its separate candidate Supabase project is inactive. A functional staging preview therefore remains blocked until a separate active staging project and Preview environment variables are approved/configured.
