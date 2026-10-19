@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -34,7 +35,7 @@ class WebConfigBuildTests(unittest.TestCase):
         result, content = run_build({"VERCEL_ENV": "preview"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIsNotNone(content)
-        config_match = __import__("re").search(r"Object\\.freeze\\((\\{.*\\})\\)", content)
+        config_match = re.search(r"Object\.freeze\((\{.*\})\)", content)
         self.assertIsNotNone(config_match, content)
         config = json.loads(config_match.group(1))
         self.assertEqual(config, {"supabaseUrl": "", "supabaseAnonKey": ""})
