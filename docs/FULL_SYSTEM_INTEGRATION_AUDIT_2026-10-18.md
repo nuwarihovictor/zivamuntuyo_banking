@@ -140,3 +140,8 @@ This is a limited snapshot, not a full accounting audit, not proof that every tr
 ### Attendance implementation added in this pass
 
 The Attendance page now includes a self-service manual web clock-in/out fallback with branch selection, status display, duplicate-punch protection, server timestamps, and audit events in a new SQL draft. It explicitly records `web` as the method and does not represent this as a fingerprint scan. The clock RPC draft has not been applied to Supabase. Actual fingerprint events remain blocked on the selected device model, SDK/API, license, driver and real-hardware testing.
+
+
+## Supabase security advisor review — 19 October 2026
+
+The read-only security advisor returned 1 security-definer-view finding, 22 RLS-enabled tables with no policies, and 68 authenticated-executable SECURITY DEFINER function warnings. These findings require triage, not bulk changes: RPC-only tables may correctly deny direct access, and many functions are intended RPCs but still need explicit authorization review. The public branch-directory view returns only branch ID/code/name/head-office flag for pre-login branch selection, but its RLS-bypass behavior should be explicitly reviewed. See `docs/SUPABASE_SECURITY_REVIEW_2026-10-19.md`. No live changes were made.
