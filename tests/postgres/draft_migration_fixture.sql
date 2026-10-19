@@ -30,7 +30,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.general_ledger_accounts TO anon, 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.ledger_journal_entries TO anon, authenticated;
 
 CREATE TABLE public.employee_profiles (user_id uuid PRIMARY KEY, is_active boolean NOT NULL);
-CREATE TABLE public.customers (id uuid PRIMARY KEY, status text NOT NULL, branch_id uuid);
+CREATE TABLE public.customers (
+  id uuid PRIMARY KEY, status text NOT NULL, branch_id uuid,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE public.account_types (id uuid PRIMARY KEY, type_code text NOT NULL, type_name text, is_active boolean NOT NULL);
 CREATE TABLE public.currencies (code text PRIMARY KEY, is_active boolean NOT NULL);
 CREATE TABLE public.bank_accounts (

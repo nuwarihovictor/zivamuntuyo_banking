@@ -21,6 +21,7 @@ MIGRATIONS = (
     "supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql",
     "supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql",
     "supabase/migrations/20261019090000_staff_attendance_event_rls.sql",
+    "supabase/migrations/20261019100000_customer_kyc_review_rpc.sql",
 )
 SQL_CHECKS = (
     "tests/postgres/draft_migration_assertions.sql",
@@ -28,6 +29,7 @@ SQL_CHECKS = (
     "tests/postgres/cash_transaction_request_security.sql",
     "tests/postgres/staff_chat_rls_assertions.sql",
     "tests/postgres/staff_attendance_rls_assertions.sql",
+    "tests/postgres/customer_kyc_review_assertions.sql",
 )
 FIXTURE = "tests/postgres/draft_migration_fixture.sql"
 

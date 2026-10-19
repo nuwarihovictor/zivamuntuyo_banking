@@ -36,28 +36,68 @@ window.loadCustomerDirectory = async function() {
   }
   listEl.innerHTML = '<p class="muted">Loading customer records…</p>';
   try {
-    const { data, error } = await db.from("customers")
-      .select("id,full_name,customer_number,phone_number,status,created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    if (!data || data.length === 0) {
+    const [customerResult, roleResult] = await Promise.all([
+      db.from("customers")
+        .select("id,full_name,customer_number,phone_number,status,created_at")
+        .order("created_at", { ascending: false }),
+      db.rpc("current_employee_role_code")
+    ]);
+    if (customerResult.error) throw customerResult.error;
+    const data = Array.isArray(customerResult.data) ? customerResult.data : [];
+    const role = roleResult.error ? "" : String(roleResult.data || "");
+    const canReview = ["system_admin", "bank_admin", "branch_manager"].includes(role);
+    if (!data.length) {
       listEl.innerHTML = '<p class="muted">No customer records found yet. Register above to begin.</p>';
       return;
     }
-    listEl.innerHTML = data.map(cust => `
-      <div class="list-item">
-        <div>
-          <strong>${esc(cust.full_name)}</strong><br>
-          <span class="muted">${esc(cust.customer_number)} | Identification: held in restricted customer record</span>
-        </div>
-        <span class="badge-role">${esc(cust.status || "status unknown")}</span>
-        <span class="muted">${esc(cust.phone_number || "Phone not recorded")}</span>
-      </div>
-    `).join("");
+    listEl.innerHTML = data.map(cust => {
+      const status = String(cust.status || "status unknown");
+      const reviewControls = canReview && status === "pending_review"
+        ? '<div class="kyc-review-controls"><label for="kyc-review-reason-' + esc(cust.id) + '">Review reason (required, 8–500 characters)<input id="kyc-review-reason-' + esc(cust.id) + '" maxlength="500" minlength="8" autocomplete="off" placeholder="Record the KYC decision reason"></label>' +
+          '<button type="button" class="primary" data-kyc-review-for="' + esc(cust.id) + '" onclick="window.reviewCustomerKyc(\'' + esc(cust.id) + '\',\'approve\')">Approve KYC</button>' +
+          '<button type="button" class="secondary" data-kyc-review-for="' + esc(cust.id) + '" onclick="window.reviewCustomerKyc(\'' + esc(cust.id) + '\',\'reject\')">Reject KYC</button></div>'
+        : "";
+      return '<div class="list-item"><div><strong>' + esc(cust.full_name) + '</strong><br>' +
+        '<span class="muted">' + esc(cust.customer_number) + ' | Identification: held in restricted customer record</span><br>' +
+        '<span class="muted">' + esc(cust.phone_number || "Phone not recorded") + '</span>' +
+        reviewControls + '</div><span class="badge-role">' + esc(status) + '</span></div>';
+    }).join("");
   } catch (error) {
     listEl.innerHTML = '<p class="muted">Customer records could not be loaded. Check your connection and permissions, then retry. ' +
       esc(error?.message || "Request failed") +
       ' <button type="button" class="secondary" onclick="window.loadCustomerDirectory()">Retry</button></p>';
+  }
+};
+
+window.reviewCustomerKyc = async function(customerId, decision) {
+  const feedback = document.getElementById("cust-review-feedback");
+  const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!db || !idPattern.test(String(customerId || "")) || !["approve", "reject"].includes(decision)) {
+    if (feedback) feedback.textContent = "KYC review request is invalid or the database is unavailable.";
+    return;
+  }
+  const reasonInput = document.getElementById("kyc-review-reason-" + customerId);
+  const reason = String(reasonInput?.value || "").trim();
+  if (reason.length < 8 || reason.length > 500) {
+    if (feedback) feedback.textContent = "Enter a review reason between 8 and 500 characters before deciding.";
+    if (reasonInput) reasonInput.focus();
+    return;
+  }
+  const buttons = document.querySelectorAll('[data-kyc-review-for="' + customerId + '"]');
+  buttons.forEach(button => { button.disabled = true; });
+  if (feedback) feedback.textContent = "Submitting KYC decision to the audited database function…";
+  try {
+    const { error } = await db.rpc("review_customer_kyc", {
+      p_customer_id: customerId,
+      p_decision: decision,
+      p_reason: reason
+    });
+    if (error) throw error;
+    if (feedback) feedback.textContent = "KYC decision recorded. Refreshing customer status…";
+    await window.loadCustomerDirectory();
+  } catch (error) {
+    if (feedback) feedback.textContent = "KYC decision was not confirmed. The customer status has not been assumed changed. " + (error?.message || "Unexpected error");
+    buttons.forEach(button => { button.disabled = false; });
   }
 };
 
@@ -393,7 +433,8 @@ window.switchPage = function(pageName) {
         "VERIFIED CUSTOMER DIRECTORY",
         "Customer Directory & KYC Status",
         "View customer records and their current review status within your authorized branch scope.",
-        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+        `<p id="cust-review-feedback" class="muted" role="status" aria-live="polite"></p>
+        <div id="cust-list"><p class="muted">Loading customer records...</p></div>`
       )}
     `;
 

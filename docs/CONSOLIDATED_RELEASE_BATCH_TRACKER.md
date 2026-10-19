@@ -60,3 +60,5 @@
 - Production inspection was read-only. No production data, schema, migrations, merge, or deployment were changed by this batch. Exact-head CI and staging verification remain required.
 
 - Follow-up within the same combined batch: customer branch choices are now filtered against the database's system-admin, bank-admin branch-access, and branch-manager checks; the directory shows the customer's KYC status so pending customers are not mislabeled as active. This remains UI guidance only—the database RLS policy is authoritative.
+
+- KYC review is now a complete draft workflow: authorized reviewers can approve/reject only pending records, must provide a reason, and the database function records the decision in audit_events under an empty search_path. The new migration also revokes anonymous direct access to customer records. Disposable PostgreSQL assertions cover approve/reject, repeat-decision denial, cross-branch denial, unauthorized-role denial, audit rows, and anon grants.
