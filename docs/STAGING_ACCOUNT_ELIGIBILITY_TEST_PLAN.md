@@ -153,3 +153,16 @@ For each case, save the exact test setup, expected SQLSTATE/result, actual resul
 6. Run the migration against a disposable PostgreSQL 17 database, run the Python static tests, run integration tests, re-run security advisors, and capture evidence before requesting production approval.
 
 **Current state:** no PostgreSQL integration run is available in this session because there is no local PostgreSQL/Supabase CLI runtime, and the user declined paid staging compute. No live database objects, permissions, settings, or customer data have been modified. Production deployment remains blocked.
+
+## Disposable CI test harness (added 2026-10-19)
+
+A GitHub Actions workflow now starts an ephemeral PostgreSQL 17 service for each run; it does not connect to the live Supabase project and creates no paid Supabase branch. It runs the existing Python source checks, parses both draft SQL files, executes both migrations against a minimal isolated fixture schema, and asserts:
+- an individual account request is created pending;
+- duplicate individual account creation is rejected;
+- inactive currencies and inactive customers are rejected;
+- joint-account approval fails with one holder and succeeds after adding a distinct second holder;
+- anonymous branch-directory access returns only active branches through the invoker view;
+- direct ledger table privileges are absent for `anon` and `authenticated`, while branch-directory access remains available.
+
+**Scope limitation:** this is a disposable fixture, not a full clone of the production Supabase schema. It validates migration execution and selected account/view/ACL behaviors. It does **not** yet prove real transaction-approval limits, cross-branch denial against actual employee assignments, duplicate ledger posting/idempotency, ledger balance invariants, the full set of 68 SECURITY DEFINER functions, or Supabase Auth advisor outcomes. Those remain release blockers. Review the actual workflow result before treating the checks as passed.
+
