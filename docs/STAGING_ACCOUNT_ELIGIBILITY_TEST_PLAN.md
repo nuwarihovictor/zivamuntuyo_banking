@@ -172,3 +172,15 @@ A GitHub Actions workflow now starts an ephemeral PostgreSQL 17 service for each
 
 **Scope limitation:** this is a disposable fixture, not a full clone of the production Supabase schema. It validates migration execution and selected account/view/ACL behaviors. It does **not** yet prove real transaction-approval limits, cross-branch denial against actual employee assignments, duplicate ledger posting/idempotency, ledger balance invariants, the full set of 68 SECURITY DEFINER functions, or Supabase Auth advisor outcomes. Those remain release blockers. Review the actual workflow result before treating the checks as passed.
 
+
+
+## Cash RPC active-employment hardening — 19 October 2026
+
+A fourth draft migration, `20261019070000_require_active_employee_for_cash_rpcs.sql`, now adds an explicit active-`employee_profiles` check to `create_cash_transaction_request` and `post_approved_cash_transaction`. The existing role allowlists, branch checks, posting state checks, ledger validation, and return shapes are retained. Execute grants are explicitly restricted to `authenticated` for these RPCs, while existing non-browser service-role privileges are not broadly revoked.
+
+CI also includes fixture assertions that:
+- an inactive employee with a teller role cannot create a cash transaction request;
+- an inactive employee cannot post an approved request;
+- the denied posting leaves no ledger entries.
+
+**Validation limit:** the fixture uses representative function bodies and synthetic data in disposable PostgreSQL. It does not prove the full production schema, deployed UI compatibility, real employee-role helper behavior, or all execute grants in the live Supabase project. Do not apply the migration to production until the complete CI run is green, production function definitions/grants have been compared, and staging UI and transaction tests have passed.
