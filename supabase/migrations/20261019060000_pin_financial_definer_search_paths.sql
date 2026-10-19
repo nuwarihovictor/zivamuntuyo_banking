@@ -7,7 +7,7 @@ DECLARE
   v_proc record;
 BEGIN
   FOR v_proc IN
-    SELECT p.oid::regprocedure AS signature
+    SELECT p.proname, pg_catalog.oidvectortypes(p.proargtypes) AS argument_types
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public'
@@ -34,8 +34,8 @@ BEGIN
       AND p.prosecdef
   LOOP
     EXECUTE pg_catalog.format(
-      'ALTER FUNCTION %s SET search_path = pg_catalog, public, pg_temp',
-      v_proc.signature
+      'ALTER FUNCTION public.%I(%s) SET search_path = pg_catalog, public, pg_temp',
+      v_proc.proname, v_proc.argument_types
     );
   END LOOP;
 END
