@@ -41,3 +41,19 @@ This snapshot does not establish that all transaction paths are correct, and it 
 - [RLS enabled without policies](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
 
 **No live security change has been made.** Do not bulk-revoke functions or add broad RLS policies without confirming which app modules depend on them.
+
+
+## Follow-up live check — 19 October 2026, 04:06 UTC
+
+The read-only financial-integrity diagnostic script was executed against the connected live project. It returned an empty anomaly set for the checks listed in the script. Do not interpret this as a full audit or as permission to enable untested financial features.
+
+The Supabase advisor was queried again and reported:
+- 22 tables with RLS enabled and no table policies (RPC-only access may be intentional, but must be verified table by table).
+- 1 security-definer view: `public.branch_directory_public`.
+- 68 security-definer functions executable by authenticated users. Review their internal authorization and grants individually; do not bulk-revoke them because some are required application RPCs.
+
+The existing attendance schema uses one daily record per employee/date and accepts `fingerprint` as an attendance method, but there is no verified hardware ingestion path. The new `attendance_device_connector_schema_draft.sql` is additive design work only; it has not been applied to production. It records device event metadata, not biometric templates, and restricts the ingestion RPC to `service_role`.
+
+## Next safe database gate
+
+A separate Supabase development branch is needed to test the account, loan servicing, private-message and attendance migrations against the actual PostgreSQL version and constraints. The branch-creation quote returned **US$0.01344 per hour** (about US$0.32 per 24 hours if left running). Do not create it without explicit cost approval. Until staging exists, no production migration is being applied.
