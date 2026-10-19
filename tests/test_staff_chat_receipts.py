@@ -70,9 +70,9 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("Ledger entries already exist for this request; duplicate posting is blocked", self.cash_migration)
         self.assertIn("Insufficient available balance", self.cash_migration)
         self.assertIn("same currency and branch", self.cash_migration)
-        # Preserve production journal-reference generation while hardening the RPC.
-        self.assertIn("gen_random_bytes(3)", self.cash_migration)
-        self.assertIn("encode(gen_random_bytes(3),'hex')", self.cash_migration)
+        # The function pins an empty search_path, so use the pg_catalog UUID generator.
+        self.assertIn("pg_catalog.gen_random_uuid()", self.cash_migration)
+        self.assertNotIn("gen_random_bytes(3)", self.cash_migration)
         self.assertIn("REVOKE ALL ON FUNCTION public.post_approved_cash_transaction", self.cash_migration)
         self.assertIn("TO authenticated, service_role", self.cash_migration)
 
