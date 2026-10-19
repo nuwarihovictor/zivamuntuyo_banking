@@ -31,8 +31,22 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
 
     def test_customer_directory_uses_an_explicit_minimal_field_list(self):
         self.assertIn('db.from("customers")', self.app)
-        self.assertIn('.select("id,full_name,customer_number,phone_number,created_at")', self.app)
+        self.assertIn('.select("id,full_name,customer_number,phone_number,status,created_at")', self.app)
         self.assertNotIn('db.from("customers").select("*").order("created_at", { ascending: false })', self.app)
+
+    def test_customer_directory_shows_kyc_status_for_pending_records(self):
+        self.assertIn('.select("id,full_name,customer_number,phone_number,status,created_at")', self.app)
+        self.assertIn('esc(cust.status || "status unknown")', self.app)
+        self.assertIn('"Customer Directory & KYC Status"', self.app)
+
+    def test_registration_branch_options_match_database_insert_authorization(self):
+        options = self.app.split("window.loadCustomerRegistrationOptions = async function()", 1)[1].split("window.handleCustomerSubmit", 1)[0]
+        self.assertIn('db.rpc("is_active_system_admin")', options)
+        self.assertIn('db.rpc("is_active_bank_admin")', options)
+        self.assertIn('db.rpc("current_employee_has_branch_access", { target_branch_id: branch.id })', options)
+        self.assertIn('db.rpc("is_active_branch_manager_for", { target_branch_id: branch.id })', options)
+        self.assertIn("authorizedBranches.push(branch)", options)
+        self.assertIn("Branch permissions could not be verified", options)
 
     def test_customer_directory_does_not_render_national_id_or_passport_number(self):
         self.assertIn("Identification: held in restricted customer record", self.app)

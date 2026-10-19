@@ -58,3 +58,5 @@
 - Trial balance/report UI now validates currency and numeric fields before calculation or export, handles rejected RPC calls, and displays an accessible stop warning if any currency's debit/credit totals differ. Currency totals remain separate; the notice does not replace independent reconciliation.
 - Added regression tests for customer schema alignment and financial-report integrity.
 - Production inspection was read-only. No production data, schema, migrations, merge, or deployment were changed by this batch. Exact-head CI and staging verification remain required.
+
+- Follow-up within the same combined batch: customer branch choices are now filtered against the database's system-admin, bank-admin branch-access, and branch-manager checks; the directory shows the customer's KYC status so pending customers are not mislabeled as active. This remains UI guidance only—the database RLS policy is authoritative.

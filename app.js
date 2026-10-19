@@ -37,7 +37,7 @@ window.loadCustomerDirectory = async function() {
   listEl.innerHTML = '<p class="muted">Loading customer records…</p>';
   try {
     const { data, error } = await db.from("customers")
-      .select("id,full_name,customer_number,phone_number,created_at")
+      .select("id,full_name,customer_number,phone_number,status,created_at")
       .order("created_at", { ascending: false });
     if (error) throw error;
     if (!data || data.length === 0) {
@@ -50,7 +50,8 @@ window.loadCustomerDirectory = async function() {
           <strong>${esc(cust.full_name)}</strong><br>
           <span class="muted">${esc(cust.customer_number)} | Identification: held in restricted customer record</span>
         </div>
-        <span class="badge-role">${esc(cust.phone_number)}</span>
+        <span class="badge-role">${esc(cust.status || "status unknown")}</span>
+        <span class="muted">${esc(cust.phone_number || "Phone not recorded")}</span>
       </div>
     `).join("");
   } catch (error) {
@@ -390,8 +391,8 @@ window.switchPage = function(pageName) {
       )}
       ${panel(
         "VERIFIED CUSTOMER DIRECTORY",
-        "Active CIF Records",
-        "List of all registered bank customers.",
+        "Customer Directory & KYC Status",
+        "View customer records and their current review status within your authorized branch scope.",
         `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
       )}
     `;
@@ -1414,23 +1415,47 @@ window.loadCustomerRegistrationOptions = async function() {
   }
   select.disabled = true;
   try {
-    const { data, error } = await db.from("branches")
-      .select("id,branch_name,branch_code")
-      .eq("is_active", true)
-      .order("branch_name");
-    if (error) throw error;
-    const branches = Array.isArray(data) ? data : [];
-    if (!branches.length) {
-      select.innerHTML = '<option value="">No authorized active branches</option>';
+    const [branchResult, systemAdminResult, bankAdminResult] = await Promise.all([
+      db.from("branches").select("id,branch_name,branch_code").eq("is_active", true).order("branch_name"),
+      db.rpc("is_active_system_admin"),
+      db.rpc("is_active_bank_admin")
+    ]);
+    if (branchResult.error) throw branchResult.error;
+    if (systemAdminResult.error) throw systemAdminResult.error;
+    if (bankAdminResult.error) throw bankAdminResult.error;
+    const branches = Array.isArray(branchResult.data) ? branchResult.data : [];
+    const isSystemAdmin = systemAdminResult.data === true;
+    const isBankAdmin = bankAdminResult.data === true;
+    const authorizedBranches = [];
+    for (const branch of branches) {
+      if (isSystemAdmin) {
+        authorizedBranches.push(branch);
+        continue;
+      }
+      const [accessResult, managerResult] = await Promise.all([
+        isBankAdmin
+          ? db.rpc("current_employee_has_branch_access", { target_branch_id: branch.id })
+          : Promise.resolve({ data: false, error: null }),
+        db.rpc("is_active_branch_manager_for", { target_branch_id: branch.id })
+      ]);
+      if (accessResult.error) throw accessResult.error;
+      if (managerResult.error) throw managerResult.error;
+      if ((isBankAdmin && accessResult.data === true) || managerResult.data === true) {
+        authorizedBranches.push(branch);
+      }
+    }
+    if (!authorizedBranches.length) {
+      select.innerHTML = '<option value="">No branch is authorized for customer registration</option>';
+      if (feedback) feedback.textContent = "No branch is authorized for customer registration under your current role. Contact an administrator if this is unexpected.";
       return;
     }
     select.innerHTML = '<option value="">Choose responsible branch</option>' +
-      branches.map(branch => '<option value="' + esc(branch.id) + '">' +
+      authorizedBranches.map(branch => '<option value="' + esc(branch.id) + '">' +
         esc(branch.branch_name) + ' (' + esc(branch.branch_code) + ')</option>').join("");
     select.disabled = false;
   } catch (error) {
-    select.innerHTML = '<option value="">Branches unavailable — contact administrator</option>';
-    if (feedback) feedback.textContent = "Authorized branches could not be loaded. Customer registration is paused; retry after checking permissions and connection.";
+    select.innerHTML = '<option value="">Branch authorization unavailable</option>';
+    if (feedback) feedback.textContent = "Branch permissions could not be verified. Customer registration is paused; retry after checking permissions and connection.";
   }
 };
 
