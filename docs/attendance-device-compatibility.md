@@ -32,3 +32,5 @@ These are candidate integration paths, not a statement that every model has been
 
 ## Current state
 The web app contains a device-family selector and integration guidance only. No fingerprint scan, device connection, biometric storage, or official attendance write is enabled yet.
+
+See [fingerprint attendance integration foundation](fingerprint-attendance-integration-foundation.md) for the proposed normalized event contract, device-selection checklist, security controls, and acceptance tests. Since USB has been selected as the connection style, see the [Windows USB connector blueprint](windows-usb-fingerprint-connector-blueprint.md) for the proposed Windows service architecture. Both documents are design only; neither certifies hardware nor enables fingerprint ingestion.
