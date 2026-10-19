@@ -16,6 +16,8 @@ DECLARE
   v_account_id uuid := gen_random_uuid();
   v_account_number text;
   v_customer_branch uuid;
+  v_account_type_code text;
+  v_existing_individual_count integer := 0;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.employee_profiles ep WHERE ep.user_id=auth.uid() AND ep.is_active) THEN
@@ -31,13 +33,37 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.branches b WHERE b.id=p_branch_id AND b.is_active) THEN
     RAISE EXCEPTION 'Selected branch is inactive';
   END IF;
-  SELECT c.branch_id INTO v_customer_branch FROM public.customers c WHERE c.id=p_customer_id;
+  -- Serialize account-opening requests for the same customer. This makes the
+  -- individual-account limit safe against simultaneous requests from two sessions.
+  SELECT c.branch_id INTO v_customer_branch
+  FROM public.customers c
+  WHERE c.id=p_customer_id
+  FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Customer not found'; END IF;
   IF v_customer_branch IS NOT NULL AND NOT public.current_employee_can_transact_in_branch(v_customer_branch) THEN
     RAISE EXCEPTION 'Customer is outside your authorized branch scope';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.account_types at WHERE at.id=p_account_type_id AND at.is_active) THEN
-    RAISE EXCEPTION 'Choose a valid active account ownership type';
+  SELECT at.type_code INTO v_account_type_code
+  FROM public.account_types at
+  WHERE at.id=p_account_type_id AND at.is_active;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Choose a valid active account ownership type'; END IF;
+
+  -- Policy: one IND account per customer, but joint accounts (JNT) remain
+  -- allowed in addition to that individual account. Closed/rejected accounts
+  -- do not consume the allowance; pending, active, dormant and frozen accounts do.
+  IF v_account_type_code = 'IND' THEN
+    SELECT count(*) INTO v_existing_individual_count
+    FROM public.account_holders ah
+    JOIN public.bank_accounts ba ON ba.id=ah.account_id
+    JOIN public.account_types existing_type ON existing_type.id=ba.account_type_id
+    WHERE ah.customer_id=p_customer_id
+      AND ah.is_primary=true
+      AND existing_type.type_code='IND'
+      AND ba.status NOT IN ('closed','rejected');
+
+    IF v_existing_individual_count > 0 THEN
+      RAISE EXCEPTION 'This customer already has an individual account. A customer may have one individual account and may also have joint account(s), but cannot open a second individual account.';
+    END IF;
   END IF;
   IF p_product_type NOT IN ('savings','current','fixed_deposit','business','group','other') THEN
     RAISE EXCEPTION 'Unsupported account product';

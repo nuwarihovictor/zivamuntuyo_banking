@@ -33,7 +33,7 @@ function transactionModuleTabs(active){
 }
 
 function staffModuleTabs(active){
-  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","Team Chat","💬"]];
+  const tabs=[["Staff","Profiles & Roles","👥"],["Attendance","Attendance","🕒"],["StaffChat","VIC LINE platform 2026","✦"]];
   return '<div class="staff-module-tabs" role="navigation" aria-label="Staff module sections">'+tabs.map(([page,label,icon])=>'<button type="button" class="staff-module-tab '+(page===active?'active':'')+'" onclick="switchPage(\''+page+'\')" '+(page===active?'aria-current="page"':'')+'><span>'+icon+'</span><span>'+label+'</span></button>').join("")+'</div>';
 }
 
@@ -309,10 +309,10 @@ window.switchPage = function(pageName) {
         </form>`
       )}
       ${panel(
-        "VERIFIED CUSTOMER DIRECTORY",
-        "Active CIF Records",
-        "List of all registered bank customers.",
-        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+        "MEMBERS & CUSTOMER REGISTER",
+        "Excel-style member directory",
+        "Search, filter and export authorized customer records. Handle NIN/passport details as confidential financial data.",
+        `<div class="register-toolbar"><label for="customer-register-search">Search members<input id="customer-register-search" type="search" placeholder="Name, CIF, phone, email, address…" oninput="window.filterCustomerRegister()"></label><label for="customer-register-status">Status<select id="customer-register-status" onchange="window.filterCustomerRegister()"><option value="">All records</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><button type="button" class="secondary" onclick="window.exportCustomerRegister()">Export visible rows to Excel (CSV)</button></div><p id="customer-register-count" class="muted" aria-live="polite">Loading member records…</p><div id="cust-list" class="table-wrap"><p class="muted">Loading customer records…</p></div><p class="register-privacy-note">Exports contain confidential member information. Store and share them only with authorized staff.</p>`
       )}
     `;
 
@@ -320,23 +320,16 @@ window.switchPage = function(pageName) {
       db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
-        if (error || !data || data.length === 0) {
-          listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
-          return;
-        }
-        listEl.innerHTML = data.map(cust => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
-            </div>
-            <span class="badge-role">${esc(cust.phone_number)}</span>
-          </div>
-        `).join("");
+        if (error) { listEl.innerHTML = `<p class="muted">Member register could not be loaded. Check your staff access and connection.</p>`; return; }
+        window.customerRegisterRows = data || [];
+        window.filterCustomerRegister();
       }).catch(() => {
         const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No customer records found yet.</p>`;
+        if (listEl) listEl.innerHTML = `<p class="muted">A connection error prevented member records from loading.</p>`;
       });
+    } else {
+      const listEl=document.getElementById("cust-list");
+      if(listEl)listEl.innerHTML='<p class="muted">Database connection unavailable. No member records were loaded.</p>';
     }
   }
   else if (pageName === "Accounts") {
@@ -360,10 +353,18 @@ window.switchPage = function(pageName) {
             </select>
           </label>
           <label>Account ownership type *
-            <select name="account_type_id" id="account-type-id" required>
+            <select name="account_type_id" id="account-type-id" required onchange="window.toggleJointHolderFields()">
               <option value="">Loading account types…</option>
             </select>
+            <p class="muted">Individual ownership allows one individual account per customer. Joint accounts can be held in addition to that individual account.</p>
           </label>
+          <fieldset id="joint-holder-fieldset" class="document-upload-fieldset" hidden>
+            <legend>Joint account holders</legend>
+            <p class="muted">A joint account requires at least two different active customers. The selected customer above is the primary holder. Add at least one additional holder; every holder is verified again by the database.</p>
+            <div id="joint-holder-fields"></div>
+            <button type="button" class="secondary" onclick="window.addJointAccountHolderField()">+ Add another holder</button>
+            <p id="joint-holder-feedback" class="muted" role="status" aria-live="polite"></p>
+          </fieldset>
           <label>Account product *
             <select name="product_type" required>
               <option value="savings">Savings</option>
@@ -405,8 +406,7 @@ window.switchPage = function(pageName) {
         "BANK ACCOUNTS DIRECTORY",
         "Account status and stored balance",
         "The balance field below is the value stored on the account record; it is not independently reconciled against double-entry ledger postings. Do not use it as an audited balance until reconciliation is implemented.",
-        `<div class="notice-box">Balance integrity note: transaction requests should affect customer balances only after approved ledger posting. A stored account balance may be stale or not ledger-verified.</div>
-         <div id="acc-list"><p class="muted">Loading accounts directory...</p></div>`
+        `<div class="notice-box">Balances below distinguish stored values from posted-ledger values. A difference or missing ledger configuration must be investigated; exports are for authorized staff only.</div><div class="register-toolbar"><label for="account-register-search">Search accounts<input id="account-register-search" type="search" placeholder="Account number, member, phone, address…" oninput="window.filterAccountRegister()"></label><label for="account-register-status">Status<select id="account-register-status" onchange="window.filterAccountRegister()"><option value="">All records</option><option value="active">Active</option><option value="dormant">Dormant</option><option value="closed">Closed</option></select></label><button type="button" class="secondary" onclick="window.exportAccountRegister()">Export visible rows to Excel (CSV)</button></div><p id="account-register-count" class="muted" aria-live="polite">Loading account records…</p><div id="acc-list" class="table-wrap"><p class="muted">Loading accounts directory...</p></div><p class="register-privacy-note">Account exports include customer and balance information. Keep files secure and share only with authorized staff.</p>`
       )}
     `;
 
@@ -425,11 +425,11 @@ window.switchPage = function(pageName) {
         }
         if(typeSelect){
           if(typeResult.error) typeSelect.innerHTML='<option value="">Account types unavailable</option>';
-          else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
+          else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'" data-type-code="'+esc(t.type_code)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           const listEl = document.getElementById("acc-list");
           if (!listEl) return;
           if (error) {
@@ -437,33 +437,24 @@ window.switchPage = function(pageName) {
             return;
           }
           if (!data || data.length === 0) {
-            listEl.innerHTML = `<p class="muted">No accounts are visible for your branch access, or no accounts have been registered.</p>`;
+            window.accountRegisterRows=[];
+            window.renderAccountRegister([]);
             return;
           }
-          listEl.innerHTML = data.map(a => {
-            const stored = Number(a.stored_balance);
-            const ledger = a.ledger_balance === null || a.ledger_balance === undefined ? null : Number(a.ledger_balance);
-            const fmt = value => Number.isFinite(value)
-              ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              : "Not available";
-            const currency = (a.currency_code || "UGX").trim();
-            const reconciliation = !a.ledger_configured || ledger === null || !Number.isFinite(ledger)
-              ? '<span class="muted">Reconciliation: NOT CONFIGURED — customer liability ledger missing</span>'
-              : '<span class="muted">Difference (stored − ledger): ' + fmt(stored - ledger) + ' ' + esc(currency) + '</span>';
-            return `
-              <div class="list-item">
-                <div>
-                  <strong>${esc(a.account_number || "Account number unavailable")}</strong><br>
-                  <span class="muted">Stored balance: ${fmt(stored)} ${esc(currency)}</span><br>
-                  <span class="muted">Posted-ledger balance: ${ledger === null ? "Unavailable" : fmt(ledger)} ${esc(currency)}</span><br>
-                  ${reconciliation}<br>
-                  <span class="muted">Account UUID: ${esc(a.account_id)}</span><br>
-                  <span class="muted">Branch UUID: ${esc(a.branch_id || "Not assigned")}</span>
-                </div>
-                <span class="badge-role">${esc(a.account_status || "unknown")}</span>
-              </div>
-            `;
-          }).join("");
+          const [customersResult,branchesResult,accountDetailsResult]=await Promise.all([
+            db.from("customers").select("id,customer_number,full_name,phone_number,email,address,nin_or_passport"),
+            db.from("branches").select("id,branch_name,branch_code"),
+            db.from("bank_accounts").select("id,account_number,currency_code,balance,status,branch_id,account_holders(customer_id,customers(id,full_name,customer_number,phone_number,email,address,nin_or_passport))").limit(1000)
+          ]);
+          window.accountRegisterCustomers=customersResult.error?[]:(customersResult.data||[]);
+          window.accountRegisterBranches=branchesResult.error?[]:(branchesResult.data||[]);
+          const accountDetails=accountDetailsResult.error?[]:(accountDetailsResult.data||[]);
+          window.accountRegisterRows=data.map(row=>{
+            const detail=accountDetails.find(a=>String(a.id)===String(row.account_id))||{};
+            const holder=(detail.account_holders||[]).map(h=>h.customers).filter(Boolean);
+            return {...detail,...row,customer_id:row.customer_id||holder[0]?.id||holder[0]?.customer_id||detail.customer_id,customer_name:row.customer_name||holder.map(h=>h.full_name).filter(Boolean).join(", "),customer_number:row.customer_number||holder.map(h=>h.customer_number).filter(Boolean).join(", "),phone_number:row.phone_number||holder.map(h=>h.phone_number).filter(Boolean).join(", "),email:row.email||holder.map(h=>h.email).filter(Boolean).join(", "),address:row.address||holder.map(h=>h.address).filter(Boolean).join(" · "),account_status:row.account_status||detail.status,stored_balance:row.stored_balance??detail.balance,currency_code:row.currency_code||detail.currency_code,branch_id:row.branch_id||detail.branch_id};
+          });
+          window.renderAccountRegister(window.accountRegisterRows);
         })
         .catch(() => {
           const listEl = document.getElementById("acc-list");
@@ -568,6 +559,18 @@ window.switchPage = function(pageName) {
            <li>Store attendance events and device identifiers, not raw fingerprint images.</li>
            <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
          </ul>
+         <section class="attendance-clock-card" aria-labelledby="attendance-clock-title">
+           <h3 id="attendance-clock-title">Manual web attendance — fallback</h3>
+           <p class="muted">This records a web clock-in/out with an audit trail. It is not a fingerprint scan. Use the device workflow only after the exact fingerprint terminal or reader has been connected and tested.</p>
+           <label>Attendance branch<select id="attendance-clock-branch"><option value="">My home branch</option></select></label>
+           <div class="attendance-clock-actions">
+             <button type="button" class="primary" id="attendance-clock-in" onclick="window.clockInMyAttendance()">Clock in</button>
+             <button type="button" class="secondary" id="attendance-clock-out" onclick="window.clockOutMyAttendance()" disabled>Clock out</button>
+             <button type="button" class="secondary" onclick="window.loadMyAttendanceStatus()">Refresh status</button>
+           </div>
+           <p id="my-attendance-feedback" class="muted" role="status" aria-live="polite">Checking today's attendance…</p>
+           <div id="my-attendance-status"></div>
+         </section>
          <hr>
          <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
          <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. The schedule can be saved only after the attendance_policies.sql database setup is installed. Saving requires an authorized manager and creates an audit event.</p>
@@ -635,24 +638,83 @@ window.switchPage = function(pageName) {
     if (timesheetToInput && !timesheetToInput.value) timesheetToInput.value = timesheetToDate;
 
 window.loadAttendancePolicy();
+    window.loadMyAttendanceStatus();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
-      <span class="category-tag">Internal Communications</span>
-      <h2 class="page-heading">Team Chat</h2>
-      ${staffModuleTabs("StaffChat")}
-      ${panel(
-        "TEAM MESSAGES",
-        "Internal staff communication",
-        "Messaging is not connected to a database yet; this page does not send or store messages.",
-        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
-         <label>Message preview
-           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
-         </label>
-         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
-         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
-      )}
+      <div class="vicline-page">
+        ${staffModuleTabs("StaffChat")}
+        <section class="vicline-shell" aria-label="VIC LINE staff messaging">
+          <header class="vicline-topbar">
+            <div class="vicline-brand">
+              <div class="vicline-logo" aria-hidden="true"><span>✦</span></div>
+              <div class="vicline-brand-copy">
+                <span class="vicline-eyebrow">ZIVAMUNTUYO STAFF NETWORK</span>
+                <h2>VIC LINE <span>2026</span></h2>
+                <p>Stay connected with your team</p>
+              </div>
+            </div>
+            <div class="vicline-top-actions">
+              <span class="vicline-secure-pill"><span></span> Private staff chat</span>
+              <button type="button" class="vicline-icon-button" title="Refresh messages" aria-label="Refresh messages" onclick="window.loadStaffChat()">↻</button>
+            </div>
+          </header>
+          <div class="vicline-toolbar">
+            <div class="vicline-channel-title"><span class="vicline-channel-icon" aria-hidden="true">◎</span><div><strong>Messages</strong><small>Keep 10+ branch and team conversations within reach</small></div></div>
+            <div class="vicline-toolbar-actions">
+              <button type="button" class="vicline-settings-button" onclick="window.toggleVicLineSettings()" aria-expanded="false" id="vicline-settings-toggle"><span aria-hidden="true">⚙</span> Settings</button>
+              <label class="vicline-channel-picker">CONVERSATION TYPE<select id="vicline-mode" onchange="window.toggleVicLineMode()"><option value="channel">Team / branch channel</option><option value="direct">Private direct message</option></select></label><label class="vicline-channel-picker" id="vicline-channel-picker-wrap">OPEN CHANNEL<select id="staff-chat-branch" onchange="window.loadStaffChat()"><option value="">Bank-wide messages</option></select></label><label class="vicline-channel-picker" id="vicline-dm-picker-wrap" hidden>MESSAGE TO STAFF<select id="vicline-dm-recipient" onchange="window.loadStaffChat()"><option value="">Choose staff member</option></select></label>
+            </div>
+          </div>
+          <section class="vicline-settings-panel" id="vicline-settings-panel" hidden aria-labelledby="vicline-settings-title">
+            <div class="vicline-settings-heading"><div><h3 id="vicline-settings-title">VIC LINE settings</h3><p>Customize alerts and the look of your workspace on this device.</p></div><button type="button" class="vicline-close-settings" onclick="window.toggleVicLineSettings(false)" aria-label="Close settings">×</button></div>
+            <div class="vicline-settings-grid">
+              <label class="vicline-setting-row"><span><strong>Notification sounds</strong><small>Play a tone when a new message arrives while VIC LINE is open.</small></span><input type="checkbox" id="vicline-sound-enabled" checked onchange="window.saveVicLineSettings()"></label>
+              <label class="vicline-setting-row"><span><strong>Notification tone</strong><small>Choose the sound you prefer.</small></span><select id="vicline-sound-tone" onchange="window.saveVicLineSettings()"><option value="chime">Soft chime</option><option value="bell">Bell</option><option value="pop">Pop</option><option value="double">Double tone</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Sound volume</strong><small>Set notification loudness.</small></span><input type="range" id="vicline-sound-volume" min="0" max="100" value="55" oninput="window.updateVicLineVolumeLabel()" onchange="window.saveVicLineSettings()"><output id="vicline-volume-label">55%</output></label>
+              <label class="vicline-setting-row"><span><strong>Desktop notifications</strong><small>Ask permission to show browser alerts for new messages.</small></span><button type="button" class="secondary" id="vicline-notification-permission" onclick="window.enableVicLineDesktopNotifications()">Enable alerts</button></label>
+              <label class="vicline-setting-row"><span><strong>Appearance</strong><small>Choose a comfortable chat background.</small></span><select id="vicline-appearance" onchange="window.saveVicLineSettings()"><option value="light">Light</option><option value="soft">Soft lavender</option><option value="dark">Dark</option></select></label>
+              <label class="vicline-setting-row"><span><strong>Message density</strong><small>Choose how compact the conversation looks.</small></span><select id="vicline-density" onchange="window.saveVicLineSettings()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+            </div>
+            <div class="vicline-settings-footer"><button type="button" class="secondary" onclick="window.testVicLineNotificationTone()">▶ Test tone</button><span id="vicline-settings-feedback" role="status" aria-live="polite">Settings are saved on this device.</span></div>
+          </section>
+          <div class="vicline-inbox-layout">
+            <aside class="vicline-inbox-sidebar" aria-label="Available conversations"><div class="vicline-inbox-sidebar-heading"><strong>Conversations</strong><span id="vicline-conversation-count">Loading…</span></div><div id="vicline-conversation-list" class="vicline-conversation-list"><p class="muted">Loading conversations…</p></div><p class="vicline-sidebar-note">Each conversation follows bank-wide or branch access permissions.</p></aside>
+            <div class="vicline-chat-column">
+          <div class="vicline-conversation-heading">
+            <div class="vicline-conversation-avatar" aria-hidden="true">✦</div>
+            <div class="vicline-conversation-copy"><strong id="vicline-current-channel">VIC LINE team</strong><span>Internal communication space</span></div>
+            <span class="vicline-conversation-mark" title="Authorized staff channels">•••</span>
+          </div>
+          <p id="staff-chat-feedback" class="vicline-feedback" role="status" aria-live="polite">Loading secure messages…</p>
+          <div id="staff-chat-messages" class="staff-chat-messages vicline-messages" aria-live="polite"></div>
+          <div class="vicline-composer-wrap">
+            <form id="staff-chat-form" class="vicline-composer" onsubmit="window.sendStaffChatMessage(event)">
+              <label class="vicline-message-label" for="staff-chat-input">Message</label>
+              <textarea id="staff-chat-input" rows="1" maxlength="1000" required placeholder="Write a message…" aria-label="Write a staff message"></textarea>
+              <button type="submit" class="vicline-send-button" aria-label="Send message" title="Send message">➤</button>
+            </form>
+            <section class="staff-voice-note-tools vicline-voice-tools" aria-labelledby="staff-voice-note-heading">
+              <div class="vicline-voice-heading"><span class="vicline-mic-badge" aria-hidden="true">♫</span><div><h3 id="staff-voice-note-heading">Voice note</h3><p>Record a quick update for your team</p></div></div>
+              <div class="staff-voice-controls">
+                <button type="button" class="secondary" id="staff-voice-record" onclick="window.startStaffVoiceRecording()">🎙️ Record</button>
+                <button type="button" class="secondary" id="staff-voice-stop" onclick="window.stopStaffVoiceRecording()" disabled>Stop</button>
+                <button type="button" class="secondary" id="staff-voice-discard" onclick="window.discardStaffVoiceRecording()" disabled>Discard</button>
+                <button type="button" class="primary" id="staff-voice-send" onclick="window.sendStaffVoiceNote()" disabled>Send voice note</button>
+              </div>
+              <p id="staff-voice-feedback" class="muted" role="status" aria-live="polite">Microphone access is requested only when you press Record.</p>
+              <audio id="staff-voice-preview" controls hidden preload="metadata"></audio>
+              <p class="vicline-voice-note">Maximum 120 seconds and 3 MB. Preview before sending; audio never plays automatically.</p>
+            </section>
+            <p class="vicline-safety-note">Keep passwords, PINs and customer credentials out of chat. Live calls are planned for a later phase.</p>
+          </div>
+            </div>
+          </div>
+        </section>
+      </div>
     `;
+    window.applyVicLineSettings();
+    window.loadStaffChat().then(() => { if (!window.vicLinePollHandle) window.vicLineStartPolling(); });
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
@@ -669,6 +731,33 @@ window.loadAttendancePolicy();
       <span class="category-tag">Credit operations</span>
       <h2 class="page-heading">Loans & Credit</h2>
       <p class="muted">Register a loan application, attach evidence, and track independent review decisions. Approval here records a credit decision; it does not disburse funds or create a posted loan ledger.</p>
+      ${panel("LOAN REPAYMENT SCHEDULE PREVIEW","Estimate instalments and due dates","Planning calculator only. It does not approve, book, disburse or post a loan. Final schedules must be generated and stored by the secured database workflow using the approved product terms.",`
+        <form id="loan-schedule-preview-form" onsubmit="previewLoanRepaymentSchedule(event)">
+          <div class="form-grid">
+            <label>Principal amount *<input type="number" name="principal" min="1" step="0.01" required placeholder="e.g. 1000000"></label>
+            <label>Annual interest rate (%) *<input type="number" name="annual_rate" min="0" max="100" step="0.01" required value="24"></label>
+            <label>Term (months) *<input type="number" name="term_months" min="1" max="360" step="1" required value="12"></label>
+            <label>Interest method *<select name="method" required><option value="reducing_emi">Reducing balance — equal instalments</option><option value="reducing_equal_principal">Reducing balance — equal principal</option><option value="flat">Flat rate on original principal</option></select></label>
+            <label>First instalment due date *<input type="date" name="first_due_date" required></label>
+            <label>Grace period (days)<input type="number" name="grace_days" min="0" max="365" step="1" value="0"></label>
+          </div>
+          <p class="muted">Preview assumptions: monthly instalments; annual rate divided by 12; no fees, insurance, penalties, holiday adjustment or payment rounding policy included. Confirm the legally approved product method before quoting a borrower.</p>
+          <button type="submit" class="primary">Calculate repayment schedule</button>
+          <button type="button" class="secondary" onclick="document.getElementById('loan-schedule-preview').innerHTML='';document.getElementById('loan-schedule-preview-form').reset()">Clear preview</button>
+        </form>
+        <div id="loan-schedule-preview" aria-live="polite"></div>
+      `)}
+      ${panel("LOAN DUE-DATE CONTROL","Repayment due and arrears dashboard","Status is calculated from approved saved schedules and posted repayment allocations. If the database servicing schema is not installed, this panel will report that rather than inventing balances.",`
+        <div class="form-grid">
+          <label>Branch filter<select id="loan-due-branch"><option value="">All authorized branches</option></select></label>
+          <button type="button" class="secondary" onclick="window.loadLoanDueDashboard()">Refresh due dates</button>
+        </div>
+        <div class="loan-due-legend" aria-label="Loan servicing status legend"><span>🟢 Upcoming</span><span>🔵 Due today</span><span>🟠 Grace period</span><span>🔴 Overdue</span><span>⚫ Settled</span></div>
+        <div id="loan-due-feedback" class="muted" role="status" aria-live="polite">Loading saved loan schedules…</div>
+        <div id="loan-due-summary" class="grid-2"></div>
+        <div id="loan-due-list" class="table-wrap"></div>
+        <p class="muted">Days past due are measured from the contractual due date. Grace-period status is shown separately. Alert delivery and collection notes require the reviewed servicing database setup.</p>
+      `)}
       ${panel("NEW LOAN APPLICATION","Capture request and supporting evidence","Use an active customer and the branch responsible for the application. Attach ID, land title, chairperson letter and other supporting documents.",`
         <form id="loan-application-form" onsubmit="handleLoanApplicationSubmit(event)">
           <label>Customer *
@@ -716,6 +805,7 @@ window.loadAttendancePolicy();
     `;
     window.loadLoanApplicationFormOptions();
     window.loadLoanApplications();
+    window.loadLoanDueDashboard();
   }
   else if (pageName === "Approvals") {
     c.innerHTML = `
@@ -981,8 +1071,9 @@ window.loadTransactionMonitor = async function() {
     const type=String(r.transaction_type||"").toLowerCase();
     const isPosted=status==="posted";
     const isDeposit=type==="deposit";
-    const receiptButton=(isPosted&&isDeposit)
-      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(r.transaction_type||"deposit")+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print deposit receipt</button>'
+    const isReceiptEligible=isDeposit||type==="withdrawal";
+    const receiptButton=(isPosted&&isReceiptEligible)
+      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(type)+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print '+(type==="withdrawal"?"withdrawal":"deposit")+' receipt</button>'
       : "";
     return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><div class="transaction-status-actions"><span class="badge-role">'+esc(r.status||"unknown")+'</span>'+receiptButton+'</div></div>';
   }).join("");
@@ -1231,28 +1322,113 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loaded " + rows.length + " active ledger account(s) using posted journals only. Figures are grouped by currency.";
 };
 
+window.normalizeCustomerIdentity = function(value) {
+  return String(value || "").normalize("NFKC").trim().toUpperCase().replace(/[\\s-]+/g, "");
+};
+
+
+window.previewLoanRepaymentSchedule = function(event) {
+  event.preventDefault();
+  const form=event.target, host=document.getElementById("loan-schedule-preview");
+  if(!host)return;
+  const fd=new FormData(form), principal=Number(fd.get("principal")), annualRate=Number(fd.get("annual_rate"))/100;
+  const months=Number(fd.get("term_months")), grace=Number(fd.get("grace_days")||0), method=String(fd.get("method"));
+  const firstDate=String(fd.get("first_due_date")||"");
+  if(!(principal>0)||!(months>=1&&months<=360&&Number.isInteger(months))||annualRate<0||annualRate>1||!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!(grace>=0&&grace<=365)){
+    host.textContent="Check principal, rate, term, first due date and grace period.";return;
+  }
+  const monthly=annualRate/12;
+  const money2=n=>Number(n).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const dueDate=(iso,offset)=>{
+    const [y,m,d]=iso.split("-").map(Number), targetMonth=m-1+offset, targetYear=y+Math.floor(targetMonth/12), monthIndex=((targetMonth%12)+12)%12;
+    const lastDay=new Date(targetYear,monthIndex+1,0).getDate();
+    return new Date(targetYear,monthIndex,Math.min(d,lastDay));
+  };
+  let balance=principal,totalInterest=0,totalPrincipal=0,totalDue=0;
+  const emi=monthly===0?principal/months:(principal*monthly)/(1-Math.pow(1+monthly,-months));
+  const rows=[];
+  for(let i=1;i<=months;i++){
+    let interest,principalDue,payment;
+    if(method==="flat"){
+      interest=principal*monthly;
+      principalDue=principal/months;
+      payment=interest+principalDue;
+    }else if(method==="reducing_equal_principal"){
+      principalDue=i===months?balance:principal/months;
+      interest=balance*monthly;
+      payment=principalDue+interest;
+    }else{
+      interest=balance*monthly;
+      payment=i===months?balance+interest:emi;
+      principalDue=Math.min(balance,Math.max(0,payment-interest));
+      if(i===months)payment=principalDue+interest;
+    }
+    principalDue=Math.min(balance,principalDue);
+    if(i===months && method!=="flat" && method!=="reducing_equal_principal"){
+      principalDue=balance;
+      payment=principalDue+interest;
+    }
+    balance=Math.max(0,balance-principalDue);
+    totalInterest+=interest;totalPrincipal+=principalDue;totalDue+=payment;
+    const date=dueDate(firstDate,i-1);
+    const graceEnd=new Date(date.getTime());graceEnd.setDate(graceEnd.getDate()+grace);
+    rows.push({n:i,date:date.toISOString().slice(0,10),graceEnd:graceEnd.toISOString().slice(0,10),principal:principalDue,interest,payment,balance});
+  }
+  const methodName={flat:"Flat rate",reducing_emi:"Reducing balance — equal instalments",reducing_equal_principal:"Reducing balance — equal principal"}[method];
+  host.innerHTML='<div class="grid-2"><div class="metric-card"><h3>Estimated instalment</h3><div class="metric-val">'+money2(rows[0]?.payment||0)+'</div><p class="muted">UGX-equivalent in selected loan currency; amount may vary in final period.</p></div><div class="metric-card"><h3>Total estimated interest</h3><div class="metric-val">'+money2(totalInterest)+'</div><p class="muted">Method: '+esc(methodName)+'</p></div><div class="metric-card"><h3>Total scheduled payments</h3><div class="metric-val">'+money2(totalDue)+'</div></div><div class="metric-card"><h3>Final due date</h3><div class="metric-val">'+esc(rows[rows.length-1]?.date||"—")+'</div></div></div><div class="table-responsive"><table class="data-table"><thead><tr><th>#</th><th>Due date</th><th>Grace period ends</th><th>Principal</th><th>Interest</th><th>Instalment</th><th>Balance after payment</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+r.n+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.graceEnd)+'</td><td>'+money2(r.principal)+'</td><td>'+money2(r.interest)+'</td><td>'+money2(r.payment)+'</td><td>'+money2(r.balance)+'</td></tr>').join("")+'</tbody></table></div><p class="muted">PREVIEW ONLY — not a repayment demand or binding offer. Confirm rate basis, exact date rules, rounding, fees, holidays, grace treatment and approval before using with a borrower.</p>';
+};
+
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  if (feedback) feedback.textContent = "Registering customer KYC profile...";
+  if (!db) { if (feedback) feedback.textContent = "Database connection unavailable. No customer was registered."; return; }
+  if (feedback) feedback.textContent = "Checking identity uniqueness before registration…";
 
   const formData = new FormData(form);
+  const identity = window.normalizeCustomerIdentity(formData.get("nin_or_passport"));
+  const fullName = String(formData.get("full_name") || "").trim().replace(/\\s+/g, " ");
+  if (!identity || identity.length < 5) {
+    if (feedback) feedback.textContent = "Enter a valid National ID (NIN) or passport number. The identifier is required.";
+    return;
+  }
+  if (!fullName) { if (feedback) feedback.textContent = "Enter the customer's full legal name."; return; }
+
+  // UX pre-check only. The database's normalized unique index is the authoritative
+  // protection against duplicate identities and concurrent registration attempts.
+  const { data: existing, error: lookupError } = await db.from("customers")
+    .select("id,customer_number,full_name,nin_or_passport")
+    .limit(10000);
+  if (lookupError) {
+    if (feedback) feedback.textContent = "Identity check failed. Registration was stopped; check database access and try again.";
+    return;
+  }
+  const duplicate = (existing || []).find(row =>
+    window.normalizeCustomerIdentity(row.nin_or_passport) === identity
+  );
+  if (duplicate) {
+    if (feedback) feedback.textContent = "This National ID/passport is already registered to an existing customer. Do not create a second customer profile; verify the existing record and use it for eligible joint accounts.";
+    return;
+  }
+
   const payload = {
     customer_number: "CUST-" + Math.floor(100000 + Math.random() * 900000),
-    full_name: formData.get("full_name"),
-    nin_or_passport: formData.get("nin_or_passport"),
-    phone_number: formData.get("phone_number"),
-    email: formData.get("email"),
-    address: formData.get("address"),
+    full_name: fullName,
+    nin_or_passport: identity,
+    phone_number: String(formData.get("phone_number") || "").trim(),
+    email: String(formData.get("email") || "").trim() || null,
+    address: String(formData.get("address") || "").trim(),
     status: "active"
   };
 
   const { error } = await db.from("customers").insert([payload]);
   if (error) {
-    if (feedback) feedback.textContent = "Registration failed: " + error.message;
+    const message = /unique|duplicate|customers_identity_normalized_uidx/i.test(error.message || "")
+      ? "This National ID/passport is already registered. Search for the existing customer instead of creating another profile."
+      : "Registration failed. Check the required fields, your permissions and the database connection.";
+    if (feedback) feedback.textContent = message;
   } else {
-    if (feedback) feedback.textContent = "Customer successfully registered!";
+    if (feedback) feedback.textContent = "Customer registered. This customer profile can be linked to one individual account and to joint accounts; a second individual account is not permitted.";
     form.reset();
     setTimeout(() => window.switchPage("Customers"), 1000);
   }
@@ -1270,7 +1446,7 @@ window.searchAccountOpeningCustomers = async function(input) {
   if(!db){results.textContent="Database connection unavailable.";return;}
   results.textContent="Searching customers you can access…";
   try{
-    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").ilike("full_name","%"+term.replace(/[%_]/g,"\\window.handleAccountSubmit = async function(e) {")+"%").limit(10);
+    const safeTerm=term.replace(/[\\%_]/g, "\\$&");
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     const rows=(data||[]).filter(row=>["active","approved"].includes(String(row.status||"").toLowerCase()));
     if(!rows.length){results.textContent="No matching active or approved customer found in records you can access.";return;}
@@ -1283,48 +1459,150 @@ window.searchAccountOpeningCustomers = async function(input) {
   }catch(err){results.textContent="Customer search failed. Check the connection and try again.";}
 };
 
+window.toggleJointHolderFields = function() {
+  const select=document.getElementById("account-type-id");
+  const fieldset=document.getElementById("joint-holder-fieldset");
+  if(!select||!fieldset)return;
+  const code=String(select.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
+  fieldset.hidden=code!=="JNT";
+  if(code==="JNT"&&!document.querySelector("#joint-holder-fields .joint-holder-row"))window.addJointAccountHolderField();
+  fieldset.querySelectorAll("input,button").forEach(control=>{control.disabled=code!=="JNT";if(control.matches("input"))control.required=code==="JNT";});
+  const feedback=document.getElementById("joint-holder-feedback");
+  if(feedback)feedback.textContent=code==="JNT"?"Add at least one additional active customer. The account cannot be approved until two or more distinct holders are recorded.":"";
+};
+
+window.jointHolderFieldSequence=window.jointHolderFieldSequence||0;
+window.addJointAccountHolderField = function() {
+  const host=document.getElementById("joint-holder-fields");if(!host)return;
+  const index=++window.jointHolderFieldSequence;
+  const row=document.createElement("div");
+  row.className="joint-holder-row";
+  row.id="joint-holder-row-"+index;
+  row.dataset.index=String(index);
+  row.innerHTML='<label>Additional joint holder '+index+' *<input type="search" autocomplete="off" class="joint-holder-search" placeholder="Search active customer by name" oninput="window.searchJointAccountHolder(this)" required><input type="hidden" name="joint_holder_customer_id" required><div class="account-search-results joint-holder-results" role="listbox"></div><small class="joint-holder-selected muted">Choose a customer from the results.</small></label><button type="button" class="secondary joint-holder-remove" aria-label="Remove holder '+index+'">Remove</button>';
+  row.querySelector(".joint-holder-remove").addEventListener("click",()=>{row.remove();});
+  host.appendChild(row);
+};
+
+window.searchJointAccountHolder = async function(input) {
+  const row=input?.closest(".joint-holder-row"),results=row?.querySelector(".joint-holder-results"),hidden=row?.querySelector('input[name="joint_holder_customer_id"]'),selected=row?.querySelector(".joint-holder-selected");
+  if(!row||!results||!hidden)return;
+  hidden.value="";
+  if(selected)selected.textContent="Choose a customer from the results.";
+  const term=String(input.value||"").trim();
+  if(term.length<2){results.textContent=term?"Type at least 2 characters.":"";return;}
+  if(!db){results.textContent="Database connection unavailable.";return;}
+  results.textContent="Searching active customers…";
+  try{
+    const safe=term.replace(/[\\%_]/g,"\\$&");
+    const [names,numbers]=await Promise.all([
+      db.from("customers").select("id,full_name,customer_number,phone_number,status").eq("status","active").ilike("full_name","%"+safe+"%").limit(8),
+      db.from("customers").select("id,full_name,customer_number,phone_number,status").eq("status","active").ilike("customer_number","%"+safe+"%").limit(8)
+    ]);
+    if(names.error||numbers.error){results.textContent="Customer search unavailable. Check staff access.";return;}
+    const rows=[...(names.data||[]),...(numbers.data||[])].filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).slice(0,10);
+    if(!rows.length){results.textContent="No active customer found in records you can access.";return;}
+    results.innerHTML=rows.map((item,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(item.full_name||"Customer")+'</strong><span>'+esc(item.customer_number||"No customer number")+'</span><small>'+esc(item.phone_number||"")+'</small></button>').join("");
+    results.querySelectorAll(".account-search-option").forEach((button,i)=>button.addEventListener("click",()=>{
+      const item=rows[i];hidden.value=item.id;input.value=item.full_name||item.customer_number||"";
+      results.innerHTML="";
+      if(selected)selected.textContent="Selected "+(item.full_name||"customer")+" · "+(item.customer_number||"customer number");
+    }));
+  }catch(_){results.textContent="Customer search failed. Check the connection and try again.";}
+};
+
 window.handleAccountSubmit = async function(e) {
   e.preventDefault();
-  const form=e.target;
-  const feedback=document.getElementById("acc-feedback");
+  const form=e.target,feedback=document.getElementById("acc-feedback");
   if(!db){if(feedback)feedback.textContent="Database connection unavailable. No account request was submitted.";return;}
   const formData=new FormData(form);
   const customerId=String(formData.get("customer_id")||"").trim();
   const branchId=String(formData.get("branch_id")||"").trim();
   const accountTypeId=String(formData.get("account_type_id")||"").trim();
+  const typeCode=String(document.getElementById("account-type-id")?.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
+  const jointHolderIds=formData.getAll("joint_holder_customer_id").map(value=>String(value||"").trim()).filter(Boolean);
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)){
-    if(feedback)feedback.textContent="Enter a valid customer UUID.";return;
+    if(feedback)feedback.textContent="Select the primary customer from the search results.";return;
   }
   if(!branchId||!accountTypeId){if(feedback)feedback.textContent="Choose a branch and account ownership type.";return;}
+  if(form.dataset.createdAccountId && (customerId!==form.dataset.createdPrimaryCustomerId || branchId!==form.dataset.createdBranchId || accountTypeId!==form.dataset.createdAccountTypeId || typeCode!==form.dataset.createdTypeCode)){
+    if(feedback)feedback.textContent="A previous account request is awaiting joint-holder completion. Restore its original primary customer, branch and ownership type before retrying; do not create another request.";return;
+  }
+  if(typeCode==="JNT"){
+    if(!jointHolderIds.length){if(feedback)feedback.textContent="A joint account needs at least one additional holder.";return;}
+    const all=[customerId,...jointHolderIds];
+    if(all.some(id=>!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))||new Set(all).size!==all.length){
+      if(feedback)feedback.textContent="Choose at least two different customers. The same customer cannot be added twice.";return;
+    }
+  }
+  if(typeCode==="IND"&&jointHolderIds.length){
+    if(feedback)feedback.textContent="Additional holders are only allowed for joint accounts. Select the joint ownership type or remove the extra holders.";return;
+  }
   const button=form.querySelector('button[type="submit"]');
   if(button)button.disabled=true;
-  if(feedback)feedback.textContent="Submitting account request for approval…";
+  let result=null;
   try{
-    const {data,error}=await db.rpc("create_bank_account_request_with_opening_package",{
-      p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
-      p_product_type:formData.get("product_type")||"savings",
-      p_currency_code:formData.get("currency_code")||"UGX"
-    });
-    if(error)throw error;
-    const result=Array.isArray(data)?data[0]:data;
-    const packageResult=result;
+    const existingAccountId=String(form.dataset.createdAccountId||"");
+    if(existingAccountId){
+      result={account_id:existingAccountId,account_number:String(form.dataset.createdAccountNumber||""),account_status:"pending_approval"};
+      if(feedback)feedback.textContent="Finishing the existing pending account request and retrying holder registration…";
+    }else{
+      if(feedback)feedback.textContent="Submitting account request and recording the opening package…";
+      const {data,error}=await db.rpc("create_bank_account_request_with_opening_package",{
+        p_customer_id:customerId,p_branch_id:branchId,p_account_type_id:accountTypeId,
+        p_product_type:formData.get("product_type")||"savings",
+        p_currency_code:formData.get("currency_code")||"UGX"
+      });
+      if(error)throw error;
+      result=Array.isArray(data)?data[0]:data;
+      if(!result?.account_id)throw new Error("The server did not return the account request ID.");
+      form.dataset.createdAccountId=String(result.account_id);
+      form.dataset.createdAccountNumber=String(result.account_number||"");
+      form.dataset.createdPrimaryCustomerId=customerId;
+      form.dataset.createdBranchId=branchId;
+      form.dataset.createdAccountTypeId=accountTypeId;
+      form.dataset.createdTypeCode=typeCode;
+      window.lastAccountOpeningReceipt={
+        receipt_number:String(result.receipt_number||""),
+        account_number:String(result.account_number||""),
+        date:new Date().toLocaleString("en-UG"),
+        amount:Number(result.amount||0),
+        share_amount:Number(result.share_amount||0),
+        shares_issued:Number(result.shares_issued||0),
+        security_reserve:Number(result.security_reserve||0),
+        bundled_opening_costs:Number(result.bundled_opening_costs||0),
+        collection_status:String(result.collection_status||"")
+      };
+    }
+    if(typeCode==="JNT"){
+      const holderFeedback=document.getElementById("joint-holder-feedback");
+      if(holderFeedback)holderFeedback.textContent="Recording joint holders securely…";
+      for(const holderId of jointHolderIds){
+        const {error}=await db.rpc("add_joint_account_holder_to_pending_request",{
+          p_account_id:String(result.account_id),p_customer_id:holderId,p_holder_role:"joint_owner"
+        });
+        if(error)throw new Error("Account request "+String(result.account_number||result.account_id)+" exists but holder registration is incomplete. It must remain pending. "+error.message+" Correct the holder selections and submit again to retry this same request.");
+      }
+      if(holderFeedback)holderFeedback.textContent="All selected holders were accepted by the database. Approval still requires at least two distinct holders.";
+    }
     const files=Array.from(form.querySelector('input[name="account_documents"]')?.files||[]);
     let documentStatus="";
     if(files.length){
       const uploaded=await window.uploadApplicationDocuments("account-opening",customerId,files,String(formData.get("account_document_category")||"other"));
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
-    window.lastAccountOpeningReceipt = {
-      receipt_number:String(packageResult?.receipt_number||"recorded"),
-      account_number:String(result?.account_number||"created"),
-      date:new Date().toLocaleString("en-UG"),
-      amount:30000,share_amount:10000,security_reserve:8500,bundled_opening_costs:11500
-    };
-    if(feedback)feedback.innerHTML="Account request submitted for approval. Reference: "+String(result?.account_number||"created")+" · Status: "+String(result?.account_status||"pending_approval")+" · UGX 30,000 received and allocated automatically"+documentStatus+' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print UGX 30,000 receipt</button>';
+    const receipt=window.lastAccountOpeningReceipt;
+    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received"&&Math.abs(Number(receipt.amount)-(Number(receipt.share_amount||0)+Number(receipt.security_reserve||0)+Number(receipt.bundled_opening_costs||0)))<0.01;
+    const holderSummary=typeCode==="JNT"?" · Joint holders recorded: "+(new Set([customerId,...jointHolderIds]).size):"";
+    if(feedback)feedback.textContent="Account request submitted. Reference: "+String(result.account_number||"created")+" · Status: "+String(result.account_status||"pending_approval")+holderSummary+documentStatus+(hasReceipt?" · Opening package collection confirmed by the server.":" · No paid receipt was returned by the server; do not print a payment receipt.");
+    if(hasReceipt)feedback.insertAdjacentHTML("beforeend",' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print receipt '+esc(receipt.receipt_number)+'</button>');
+    delete form.dataset.createdAccountId;delete form.dataset.createdAccountNumber;delete form.dataset.createdPrimaryCustomerId;delete form.dataset.createdBranchId;delete form.dataset.createdAccountTypeId;delete form.dataset.createdTypeCode;
     form.reset();
+    const holderHost=document.getElementById("joint-holder-fields");if(holderHost)holderHost.innerHTML="";
+    window.toggleJointHolderFields();
     setTimeout(()=>window.switchPage("Accounts"),1200);
   }catch(err){
-    if(feedback)feedback.textContent="Account request failed: "+(err?.message||"Unexpected error");
+    if(feedback)feedback.textContent="Account request could not be fully completed: "+(err?.message||"Unexpected error");
   }finally{if(button)button.disabled=false;}
 };
 
@@ -1441,7 +1719,7 @@ window.searchLoanCustomers = async function(input) {
   results.textContent="Searching customers available to your staff account…";
   try{
     const safe=term.replace(/[,%_]/g," ");
-    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safe+"%,customer_number.ilike.%"+safe+"%").in("status",["active","approved"]).limit(12);
+    const {data,error}=await db.from("customers").select("id,customer_number,full_name,phone_number,status").or("full_name.ilike.%"+safeTerm+"%,customer_number.ilike.%"+safeTerm+"%").limit(10);
     if(error){results.textContent="Customer search unavailable: "+error.message;return;}
     if(!data?.length){results.textContent="No active or approved matching customers found.";return;}
     results.innerHTML=data.map((x,i)=>'<button type="button" class="account-search-option" role="option" data-index="'+i+'"><strong>'+esc(x.full_name||"Customer")+'</strong><span>'+esc(x.customer_number||"No customer number")+'</span><small>'+esc(x.phone_number||"")+'</small></button>').join("");
@@ -1479,6 +1757,49 @@ window.handleLoanApplicationSubmit = async function(e) {
     await window.loadLoanApplications();
   }catch(err){if(feedback)feedback.textContent="Loan application failed: "+(err?.message||"Unexpected error");}
   finally{if(button)button.disabled=false;}
+};
+
+window.loadLoanDueDashboard = async function(){
+  const feedback=document.getElementById("loan-due-feedback"),host=document.getElementById("loan-due-list"),summary=document.getElementById("loan-due-summary"),branchSelect=document.getElementById("loan-due-branch");
+  if(!feedback||!host)return;
+  if(!db){feedback.textContent="Database connection unavailable. No due-date figures are being shown.";return;}
+  feedback.textContent="Loading approved schedules and posted repayment allocations…";
+  try{
+    if(branchSelect&&branchSelect.options.length<=1){
+      const branches=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+      if(!branches.error)branchSelect.innerHTML='<option value="">All authorized branches</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+    }
+    const branchId=branchSelect?.value||null;
+    const {data,error}=await db.rpc("list_loan_due_alert_dashboard",{p_branch_id:branchId,p_limit:250});
+    if(error){
+      feedback.textContent="Live loan servicing is not yet available: "+error.message+". Review and apply the loan servicing schema and dashboard RPC in a non-production database before enabling this feature.";
+      host.innerHTML="";if(summary)summary.innerHTML="";return;
+    }
+    const rows=data||[];
+    const fmt=(value,currency="UGX")=>currency+" "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2});
+    const meta={
+      upcoming:{label:"🟢 Upcoming",className:"loan-due-upcoming"},
+      due_today:{label:"🔵 Due today",className:"loan-due-today"},
+      grace_period:{label:"🟠 Grace period",className:"loan-due-grace"},
+      overdue:{label:"🔴 Overdue",className:"loan-due-overdue"},
+      settled:{label:"⚫ Settled",className:"loan-due-settled"}
+    };
+    const counts={upcoming:0,due_today:0,grace_period:0,overdue:0,settled:0};
+    rows.forEach(row=>{if(Object.hasOwn(counts,row.servicing_status))counts[row.servicing_status]++;});
+    if(summary)summary.innerHTML=[
+      ["Overdue instalments",counts.overdue,"loan-due-overdue"],
+      ["Due today",counts.due_today,"loan-due-today"],
+      ["Within grace period",counts.grace_period,"loan-due-grace"],
+      ["Upcoming instalments",counts.upcoming,"loan-due-upcoming"]
+    ].map(([label,count,cls])=>'<div class="metric-card '+cls+'"><div class="metric-sub">'+label+'</div><div class="metric-val">'+count+'</div></div>').join("");
+    if(!rows.length){host.innerHTML='<p class="muted">No unpaid instalments were returned for your authorized scope. This is not proof that loan servicing is configured unless the RPC succeeded.</p>';feedback.textContent="Servicing query completed successfully. No unpaid instalments returned.";return;}
+    host.innerHTML='<table class="data-table"><thead><tr><th>Loan / customer</th><th>Instalment</th><th>Due / grace end</th><th>Outstanding</th><th>DPD</th><th>Status</th><th>Branch</th></tr></thead><tbody>'+rows.map(row=>{
+      const state=meta[row.servicing_status]||{label:esc(row.servicing_status||"Unknown"),className:""};
+      const currency="UGX";
+      return '<tr><td><strong>'+esc(row.loan_account_number||"Loan")+'</strong><br><span class="muted">'+esc(row.customer_name||"Customer")+'</span></td><td>#'+esc(row.installment_no)+'<br><span class="muted">Due '+fmt(row.total_due,currency)+' · Paid '+fmt(row.total_paid,currency)+'</span></td><td>'+esc(row.due_date||"—")+'<br><span class="muted">Grace ends '+esc(row.grace_end_date||"—")+'</span></td><td><strong>'+fmt(row.outstanding_amount,currency)+'</strong></td><td>'+Number(row.days_past_due||0)+'</td><td><span class="loan-servicing-status '+state.className+'">'+state.label+'</span></td><td>'+esc(row.branch_name||"Unassigned")+'</td></tr>';
+    }).join("")+'</tbody></table>';
+    feedback.textContent=rows.length+" unpaid instalment(s) loaded from approved schedules and posted allocations. Figures are database-derived.";
+  }catch(_){feedback.textContent="A connection error prevented the loan servicing dashboard from loading.";}
 };
 
 window.loadLoanApplications = async function() {
@@ -1745,13 +2066,367 @@ document.addEventListener("click", function(event) {
   if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
 });
 
-window.previewStaffMessage = function() {
-  const input = document.getElementById("chat-preview");
-  const output = document.getElementById("chat-preview-result");
-  if (!input || !output) return;
-  output.textContent = input.value.trim()
-    ? "Draft preview only: " + input.value.trim()
-    : "Enter a message to preview. Nothing has been sent or saved.";
+window.staffVoiceRecorder = null;
+window.staffVoiceStream = null;
+window.staffVoiceChunks = [];
+window.staffVoiceBlob = null;
+window.staffVoiceMimeType = "";
+window.staffVoiceStartedAt = 0;
+window.staffVoiceTimer = null;
+window.staffVoiceChannelAtStart = null;
+window.staffVoicePreviewUrl = null;
+
+function staffVoiceFormatTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+function staffVoiceSetButtons(state) {
+  const record = document.getElementById("staff-voice-record");
+  const stop = document.getElementById("staff-voice-stop");
+  const discard = document.getElementById("staff-voice-discard");
+  const send = document.getElementById("staff-voice-send");
+  if (!record || !stop || !discard || !send) return;
+  record.disabled = state === "recording" || state === "ready" || state === "uploading";
+  stop.disabled = state !== "recording";
+  discard.disabled = state !== "ready";
+  send.disabled = state !== "ready";
+}
+
+window.startStaffVoiceRecording = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const preview = document.getElementById("staff-voice-preview");
+  if (!db || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    if (feedback) feedback.textContent = "Voice recording is not supported in this browser. Try a current Chrome or Edge browser over HTTPS.";
+    return;
+  }
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const supported = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+    const mime = supported.find(type => MediaRecorder.isTypeSupported(type)) || "";
+    const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    window.staffVoiceStream = stream;
+    window.staffVoiceRecorder = recorder;
+    window.staffVoiceChunks = [];
+    window.staffVoiceBlob = null;
+    window.staffVoiceMimeType = (recorder.mimeType || mime || "audio/webm").split(";")[0].toLowerCase();
+    window.staffVoiceChannelAtStart = (document.getElementById("staff-chat-branch") || {}).value || "";
+    window.staffVoiceStartedAt = Date.now();
+    if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+    window.staffVoicePreviewUrl = null;
+    if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+    recorder.ondataavailable = event => { if (event.data && event.data.size) window.staffVoiceChunks.push(event.data); };
+    recorder.onerror = () => {
+      if (feedback) feedback.textContent = "The browser could not record audio. Stop and try again.";
+      window.stopStaffVoiceRecording();
+    };
+    recorder.onstop = () => {
+      const duration = Math.ceil((Date.now() - window.staffVoiceStartedAt) / 1000);
+      const blob = new Blob(window.staffVoiceChunks, { type: window.staffVoiceMimeType });
+      window.staffVoiceBlob = blob;
+      if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+      window.staffVoiceStream = null;
+      if (window.staffVoiceTimer) clearInterval(window.staffVoiceTimer);
+      window.staffVoiceTimer = null;
+      if (blob.size > 3145728) {
+        window.staffVoiceBlob = null;
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "This recording is larger than 3 MB. Record a shorter note.";
+        return;
+      }
+      if (!blob.size || duration < 1) {
+        staffVoiceSetButtons("idle");
+        if (feedback) feedback.textContent = "The recording was too short or empty. Please record again.";
+        return;
+      }
+      window.staffVoiceDuration = Math.min(duration, 120);
+      window.staffVoicePreviewUrl = URL.createObjectURL(blob);
+      if (preview) { preview.src = window.staffVoicePreviewUrl; preview.hidden = false; }
+      staffVoiceSetButtons("ready");
+      if (feedback) feedback.textContent = "Preview the recording before sending (" + staffVoiceFormatTime(window.staffVoiceDuration) + ", " + Math.ceil(blob.size / 1024) + " KB).";
+    };
+    recorder.start(500);
+    staffVoiceSetButtons("recording");
+    if (feedback) feedback.textContent = "Recording… 00:00 / 02:00";
+    window.staffVoiceTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - window.staffVoiceStartedAt) / 1000);
+      if (feedback) feedback.textContent = "Recording… " + staffVoiceFormatTime(elapsed) + " / 02:00";
+      if (elapsed >= 120) window.stopStaffVoiceRecording();
+    }, 500);
+  } catch (error) {
+    if (window.staffVoiceStream) window.staffVoiceStream.getTracks().forEach(track => track.stop());
+    window.staffVoiceStream = null;
+    staffVoiceSetButtons("idle");
+    if (feedback) feedback.textContent = error && error.name === "NotAllowedError"
+      ? "Microphone permission was denied. Allow microphone access in your browser settings and try again."
+      : "Microphone unavailable. Check that it is connected and not being used by another app.";
+  }
+};
+
+window.stopStaffVoiceRecording = function() {
+  if (window.staffVoiceRecorder && window.staffVoiceRecorder.state === "recording") {
+    try { window.staffVoiceRecorder.stop(); } catch (error) {}
+  }
+};
+
+window.discardStaffVoiceRecording = function() {
+  const preview = document.getElementById("staff-voice-preview");
+  if (window.staffVoicePreviewUrl) URL.revokeObjectURL(window.staffVoicePreviewUrl);
+  window.staffVoicePreviewUrl = null;
+  window.staffVoiceBlob = null;
+  window.staffVoiceChunks = [];
+  if (preview) { preview.pause(); preview.removeAttribute("src"); preview.hidden = true; }
+  staffVoiceSetButtons("idle");
+  const feedback = document.getElementById("staff-voice-feedback");
+  if (feedback) feedback.textContent = "Recording discarded.";
+};
+
+window.sendStaffVoiceNote = async function() {
+  const feedback = document.getElementById("staff-voice-feedback");
+  const selector = document.getElementById("staff-chat-branch");
+  const blob = window.staffVoiceBlob;
+  if (!db || !blob) return;
+  const branchId = selector && selector.value ? selector.value : null;
+  if ((branchId || "") !== (window.staffVoiceChannelAtStart || "")) {
+    if (feedback) feedback.textContent = "The conversation changed after recording. Discard this note and record it in the intended channel.";
+    return;
+  }
+  if (blob.size > 3145728 || !window.staffVoiceDuration || window.staffVoiceDuration > 120) {
+    if (feedback) feedback.textContent = "This recording exceeds the allowed size or duration.";
+    return;
+  }
+  const sendButton = document.getElementById("staff-voice-send");
+  staffVoiceSetButtons("uploading");
+  if (sendButton) sendButton.disabled = true;
+  if (feedback) feedback.textContent = "Uploading voice note securely…";
+  let uploadedPath = null;
+  try {
+    const { data: userData, error: userError } = await db.auth.getUser();
+    if (userError || !userData || !userData.user) throw new Error("Your signed-in user could not be verified. Sign in again.");
+    const ext = window.staffVoiceMimeType === "audio/mp4" ? "m4a"
+      : window.staffVoiceMimeType === "audio/ogg" ? "ogg"
+      : window.staffVoiceMimeType === "audio/mpeg" ? "mp3"
+      : window.staffVoiceMimeType === "audio/wav" ? "wav" : "webm";
+    const channelKey = branchId || "global";
+    uploadedPath = userData.user.id + "/" + channelKey + "/" + crypto.randomUUID() + "." + ext;
+    const { error: uploadError } = await db.storage.from("staff-voice-notes").upload(uploadedPath, blob, {
+      contentType: window.staffVoiceMimeType,
+      cacheControl: "300",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { error: registerError } = await db.rpc("register_staff_voice_note", {
+      p_branch_id: branchId,
+      p_storage_path: uploadedPath,
+      p_mime_type: window.staffVoiceMimeType,
+      p_byte_size: blob.size,
+      p_duration_seconds: window.staffVoiceDuration
+    });
+    if (registerError) throw registerError;
+    window.discardStaffVoiceRecording();
+    if (feedback) feedback.textContent = "Voice note sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  } catch (error) {
+    if (uploadedPath) {
+      try { await db.storage.from("staff-voice-notes").remove([uploadedPath]); } catch (cleanupError) {}
+    }
+    if (feedback) feedback.textContent = "Voice note was not confirmed as sent. " + (error && error.message ? error.message : "Check your connection and try again.");
+    staffVoiceSetButtons("ready");
+  }
+};
+
+window.vicLineSeenMessages = window.vicLineSeenMessages || {};
+window.vicLineSeenTimestamps = window.vicLineSeenTimestamps || {};
+window.vicLineSettingsDefaults = { soundEnabled:true, tone:"chime", volume:55, appearance:"light", density:"comfortable" };
+window.getVicLineSettings = function() {
+  try { return { ...window.vicLineSettingsDefaults, ...JSON.parse(localStorage.getItem("zfs-vic-line-settings") || "{}") }; }
+  catch (_) { return { ...window.vicLineSettingsDefaults }; }
+};
+window.applyVicLineSettings = function() {
+  const settings=window.getVicLineSettings(), shell=document.querySelector(".vicline-shell");
+  if(shell){shell.dataset.appearance=settings.appearance;shell.dataset.density=settings.density;}
+  const set=(id,value)=>{const el=document.getElementById(id);if(el&&value!==undefined)el.value=String(value);};
+  const sound=document.getElementById("vicline-sound-enabled");if(sound)sound.checked=!!settings.soundEnabled;
+  set("vicline-sound-tone",settings.tone);set("vicline-sound-volume",settings.volume);set("vicline-appearance",settings.appearance);set("vicline-density",settings.density);
+  window.updateVicLineVolumeLabel();
+  const button=document.getElementById("vicline-notification-permission");
+  if(button&&"Notification" in window)button.textContent=Notification.permission==="granted"?"Alerts enabled":"Enable alerts";
+};
+window.saveVicLineSettings = function() {
+  const el=id=>document.getElementById(id);
+  const existing=window.getVicLineSettings();const settings={soundEnabled:!!el("vicline-sound-enabled")?.checked,tone:el("vicline-sound-tone")?.value||"chime",volume:Math.max(0,Math.min(100,Number(el("vicline-sound-volume")?.value||55))),desktopNotifications:existing.desktopNotifications===true,appearance:el("vicline-appearance")?.value||"light",density:el("vicline-density")?.value||"comfortable"};
+  try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}
+  window.applyVicLineSettings();
+  const feedback=el("vicline-settings-feedback");if(feedback)feedback.textContent="Your VIC LINE preferences have been saved on this device.";
+};
+window.updateVicLineVolumeLabel=function(){const slider=document.getElementById("vicline-sound-volume"),label=document.getElementById("vicline-volume-label");if(slider&&label)label.textContent=slider.value+"%";};
+window.toggleVicLineSettings=function(force){const panel=document.getElementById("vicline-settings-panel"),button=document.getElementById("vicline-settings-toggle");if(!panel)return;const open=typeof force==="boolean"?force:panel.hidden;panel.hidden=!open;if(button)button.setAttribute("aria-expanded",String(open));};
+window.enableVicLineDesktopNotifications=async function(){
+  const feedback=document.getElementById("vicline-settings-feedback");
+  if(!("Notification" in window)){if(feedback)feedback.textContent="This browser does not support desktop notifications.";return;}
+  let permission=Notification.permission;
+  if(permission==="default")permission=await Notification.requestPermission();
+  if(feedback)feedback.textContent=permission==="granted"?"Browser notifications enabled.":"Notifications were not enabled. Check this site's browser permissions.";
+  if(permission==="granted"){const settings=window.getVicLineSettings();settings.desktopNotifications=true;try{localStorage.setItem("zfs-vic-line-settings",JSON.stringify(settings));}catch(_){}}
+  const button=document.getElementById("vicline-notification-permission");if(button)button.textContent=permission==="granted"?"Alerts enabled":"Enable alerts";
+};
+window.playVicLineTone=function(toneOverride){
+  const settings=window.getVicLineSettings();if(!settings.soundEnabled&&!toneOverride)return;
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(!AudioContextClass)return;
+  try{
+    const ctx=new AudioContextClass();if(ctx.state==="suspended")ctx.resume();
+    const tone=toneOverride||settings.tone,volume=Math.max(0,Math.min(1,Number(settings.volume)/100))*.14;
+    const notes=tone==="bell"?[880]:tone==="pop"?[520]:tone==="double"?[660,880]:[740,988];
+    notes.forEach((frequency,index)=>{const start=ctx.currentTime+index*(tone==="double"?.15:.1),osc=ctx.createOscillator(),gain=ctx.createGain();osc.type=tone==="pop"?"triangle":"sine";osc.frequency.setValueAtTime(frequency,start);gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),start+.018);gain.gain.exponentialRampToValueAtTime(.0001,start+(tone==="pop"?.12:.24));osc.connect(gain);gain.connect(ctx.destination);osc.start(start);osc.stop(start+.27);});
+    setTimeout(()=>ctx.close().catch(()=>{}),650);
+  }catch(_){}
+};
+window.testVicLineNotificationTone=function(){window.playVicLineTone(window.getVicLineSettings().tone);const f=document.getElementById("vicline-settings-feedback");if(f)f.textContent="Playing a preview of your selected tone.";};
+window.notifyVicLineNewMessage=function(message,channelName){
+  const settings=window.getVicLineSettings();if(settings.soundEnabled)window.playVicLineTone();
+  if(settings.desktopNotifications&&"Notification" in window&&Notification.permission==="granted"&&document.hidden){try{const n=new Notification("VIC LINE · "+channelName,{body:String(message||"New staff message").slice(0,140),tag:"vic-line-"+channelName});n.onclick=()=>{window.focus();n.close();};}catch(_){}}
+};
+window.toggleVicLineMode=function(){
+  const mode=document.getElementById("vicline-mode")?.value||"channel";
+  const channelWrap=document.getElementById("vicline-channel-picker-wrap"),dmWrap=document.getElementById("vicline-dm-picker-wrap"),voice=document.querySelector(".vicline-voice-tools"),sidebarNote=document.querySelector(".vicline-sidebar-note");
+  if(channelWrap)channelWrap.hidden=mode==="direct";
+  if(dmWrap)dmWrap.hidden=mode!=="direct";
+  if(voice)voice.hidden=mode==="direct";
+  if(sidebarNote)sidebarNote.textContent=mode==="direct"?"Private conversations are visible only to their participants.":"Each conversation follows bank-wide or branch access permissions.";
+  window.loadStaffChat();
+};
+window.renderVicLineConversationList=function(branches){
+  const list=document.getElementById("vicline-conversation-list"),count=document.getElementById("vicline-conversation-count"),selector=document.getElementById("staff-chat-branch");if(!list||!selector)return;
+  const current=selector.value||"",conversations=[{id:"",name:"Bank-wide messages",short:"All staff",icon:"✦"}].concat((branches||[]).map(b=>({id:b.id,name:b.branch_name,short:"Branch conversation",icon:"◎"})));
+  selector.innerHTML=conversations.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join("");
+  if(conversations.some(item=>String(item.id)===String(current)))selector.value=current;
+  list.innerHTML=conversations.map(item=>'<button type="button" class="vicline-conversation-item '+(String(item.id)===String(selector.value||"")?"active":"")+'" data-conversation-id="'+esc(item.id)+'" onclick="window.openVicLineConversation(this.dataset.conversationId)"><span class="vicline-list-avatar">'+item.icon+'</span><span class="vicline-list-copy"><strong>'+esc(item.name)+'</strong><small>'+esc(item.short)+'</small></span><span class="vicline-list-arrow">›</span></button>').join("");
+  if(count)count.textContent=conversations.length+" conversation"+(conversations.length===1?"":"s");
+};
+window.openVicLineConversation=function(id){const selector=document.getElementById("staff-chat-branch");if(!selector)return;selector.value=id||"";window.loadStaffChat();};
+window.loadStaffChat=async function(options={}){
+  const feedback=document.getElementById("staff-chat-feedback"),list=document.getElementById("staff-chat-messages"),selector=document.getElementById("staff-chat-branch");if(!feedback||!list||!selector)return;
+  if(!db){feedback.textContent="Database connection unavailable. Messages were not loaded.";return;}
+  const mode=document.getElementById("vicline-mode")?.value||"channel";
+  if(mode==="direct"){
+    feedback.textContent="Loading private staff conversations…";
+    try{
+      const staffSelect=document.getElementById("vicline-dm-recipient");
+      if(!staffSelect){feedback.textContent="Direct-message selector is unavailable.";return;}
+      const previousRecipient=staffSelect.value||"";
+      const directory=await db.rpc("list_vic_line_staff_directory");
+      if(directory.error){feedback.textContent="Private messaging is not installed or staff directory access was denied: "+directory.error.message;list.innerHTML="";return;}
+      const staff=(directory.data||[]).filter(item=>item.user_id&&item.user_id!==window.currentUserId);
+      staffSelect.innerHTML='<option value="">Choose staff member</option>'+staff.map(item=>'<option value="'+esc(item.user_id)+'">'+esc(item.full_name||item.employee_number||"Staff member")+(item.branch_name?' · '+esc(item.branch_name):"")+'</option>').join("");
+      if(staff.some(item=>String(item.user_id)===String(previousRecipient)))staffSelect.value=previousRecipient;
+      else if(staff.length)staffSelect.value=String(staff[0].user_id);
+      const recipientId=staffSelect.value;
+      const recipient=staff.find(item=>String(item.user_id)===String(recipientId));
+      const title=document.getElementById("vicline-current-channel");
+      if(title)title.textContent=recipient?"Private · "+recipient.full_name:"Private direct messages";
+      if(!recipientId){list.innerHTML='<p class="muted">No other active staff members are available for private messaging.</p>';feedback.textContent="Staff directory loaded.";return;}
+      const result=await db.rpc("list_vic_line_direct_messages",{p_recipient_user_id:recipientId,p_limit:100});
+      if(result.error){feedback.textContent="Private messages could not be loaded. Apply the reviewed VIC LINE private-message SQL in the test database first. "+result.error.message;list.innerHTML="";return;}
+      const messages=(result.data||[]).slice().reverse();
+      list.innerHTML=messages.map(m=>{
+        const sent=String(m.direction)==="sent",sender=sent?"You":(m.sender_name||"Staff member");
+        const when=m.sent_at?new Date(m.sent_at).toLocaleString():"";
+        return '<article class="staff-chat-message '+(sent?'vicline-direct-sent':'vicline-direct-received')+'"><div class="vicline-message-avatar" aria-hidden="true">'+(sent?'Y':esc(String(sender).trim().charAt(0).toUpperCase()||'S'))+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(when)+(sent?'':(m.read_at?' · Read':' · Delivered'))+'</span></div><div class="vicline-bubble"><p class="staff-chat-text">'+esc(m.message_text)+'</p></div></div></article>';
+      }).join("")||'<p class="muted">No private messages with this colleague yet. Send the first message below.</p>';
+      const unread=messages.filter(m=>m.direction==="received"&&!m.read_at);
+      await Promise.all(unread.map(m=>db.rpc("mark_vic_line_direct_message_read",{p_message_id:m.message_id})));
+      feedback.textContent=messages.length+" private message"+(messages.length===1?"":"s")+" loaded. Messages are visible only to the sender and recipient.";
+      list.scrollTop=list.scrollHeight;
+    }catch(error){feedback.textContent="A connection error prevented private messages from loading. Check the database functions and try again.";}
+    return;
+  }
+  feedback.textContent="Loading messages and voice notes…";
+  try{
+    const currentValue=selector.value||"";
+    const [branchResult,messageResult,voiceResult]=await Promise.all([
+      db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name"),
+      db.rpc("list_staff_channel_messages",{p_branch_id:currentValue||null,p_limit:100}),
+      db.rpc("list_staff_voice_notes",{p_branch_id:currentValue||null,p_limit:100})
+    ]);
+    if(branchResult.error){feedback.textContent="Branch channels could not be loaded: "+branchResult.error.message;return;}
+    window.renderVicLineConversationList(branchResult.data||[]);selector.value=currentValue;
+    const selected=[...selector.options].find(o=>o.value===currentValue),channelName=selected?selected.textContent:"Bank-wide messages";
+    const title=document.getElementById("vicline-current-channel");if(title)title.textContent=currentValue?channelName:"VIC LINE team";
+    const conversationList=document.getElementById("vicline-conversation-list");if(conversationList)conversationList.querySelectorAll("[data-conversation-id]").forEach(b=>b.classList.toggle("active",b.dataset.conversationId===currentValue));
+    if(messageResult.error){feedback.textContent="Messages could not be loaded: "+messageResult.error.message;list.innerHTML="";return;}
+    if(voiceResult.error)feedback.textContent="Text messages loaded, but voice notes are unavailable until the voice-note database setup is applied: "+voiceResult.error.message;
+    const items=(messageResult.data||[]).map(m=>({kind:"text",data:m,at:new Date(m.created_at).getTime()||0}));
+    const notes=voiceResult.error?[]:(voiceResult.data||[]);
+    const noteItems=await Promise.all(notes.map(async note=>{const {data,error}=await db.storage.from("staff-voice-notes").createSignedUrl(note.storage_path,300);return{kind:"voice",data:note,url:error||!data?"":data.signedUrl,at:new Date(note.created_at).getTime()||0};}));
+    const merged=items.concat(noteItems).sort((a,b)=>a.at-b.at),newest=merged.length?merged[merged.length-1].data:null,newestId=newest&&(newest.id||newest.message_id||newest.storage_path||newest.created_at),seenKey=currentValue||"bankwide",previous=window.vicLineSeenMessages[seenKey];
+    if(options.polling&&newestId&&previous&&String(newestId)!==String(previous)){
+      const newItems=merged.filter(item=>item.at>(window.vicLineSeenTimestamps[seenKey]||0));
+      const incoming=newItems.filter(item=>{const sender=String(item.data.sender_name||item.data.sender_employee_number||"");return !sender||sender!==String(window.currentEmployeeName||"");}).pop();
+      if(incoming)window.notifyVicLineNewMessage(incoming.kind==="voice"?"New voice note received":incoming.data.message_text,channelName);
+    }
+    window.vicLineSeenMessages[seenKey]=newestId;window.vicLineSeenTimestamps[seenKey]=newest?(new Date(newest.created_at).getTime()||0):0;
+    list.innerHTML=merged.map(item=>{
+      const m=item.data,sender=m.sender_name||m.sender_employee_number||"Staff member",initials=sender.trim().split(/\\s+/).slice(0,2).map(part=>part.charAt(0)).join("").toUpperCase()||"S",time=m.created_at?new Date(m.created_at).toLocaleString():"";
+      if(item.kind==="voice"){const player=item.url?'<audio controls preload="none" aria-label="Voice note from '+esc(sender)+'" src="'+esc(item.url)+'"></audio>':'<p class="muted">Audio playback unavailable. Refresh and check your channel access.</p>';return '<article class="staff-chat-message staff-voice-message"><div class="vicline-message-avatar" aria-hidden="true">'+esc(initials)+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(time)+'</span></div><div class="vicline-bubble vicline-audio-bubble"><p class="staff-voice-label">🎙️ Voice note · '+esc(staffVoiceFormatTime(m.duration_seconds))+'</p>'+player+'</div></div></article>';}
+      return '<article class="staff-chat-message"><div class="vicline-message-avatar" aria-hidden="true">'+esc(initials)+'</div><div class="vicline-message-body"><div class="staff-chat-message-heading"><strong>'+esc(sender)+'</strong><span class="muted">'+esc(time)+'</span></div><div class="vicline-bubble"><p class="staff-chat-text">'+esc(m.message_text)+'</p></div></div></article>';
+    }).join("")||'<p class="muted">No messages in this conversation yet. You can send the first message.</p>';
+    feedback.textContent=merged.length+" item"+(merged.length===1?"":"s")+" loaded. New-message checks run while VIC LINE is open.";
+  }catch(error){feedback.textContent="A connection error prevented messages and voice notes from loading.";}
+};
+window.pollVicLineAllConversations=async function(){
+  if(!db||!document.getElementById("staff-chat-branch"))return;
+  try{
+    const branchResult=await db.from("branches").select("id,branch_name").eq("is_active",true).order("branch_name");
+    if(branchResult.error)return;
+    const channels=[{id:"",name:"Bank-wide messages"}].concat((branchResult.data||[]).map(b=>({id:b.id,name:b.branch_name})));
+    await Promise.all(channels.map(async channel=>{
+      const key=channel.id||"bankwide";
+      const [messages,voices]=await Promise.all([
+        db.rpc("list_staff_channel_messages",{p_branch_id:channel.id||null,p_limit:1}),
+        db.rpc("list_staff_voice_notes",{p_branch_id:channel.id||null,p_limit:1})
+      ]);
+      if(messages.error)return;
+      const latestText=(messages.data||[]).map(m=>({kind:"text",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0];
+      const latestVoice=!voices.error?(voices.data||[]).map(m=>({kind:"voice",data:m,at:new Date(m.created_at).getTime()||0})).sort((a,b)=>b.at-a.at)[0]:null;
+      const latest=[latestText,latestVoice].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
+      if(!latest){if(window.vicLineSeenTimestamps[key]===undefined)window.vicLineSeenTimestamps[key]=0;return;}
+      const previous=window.vicLineSeenTimestamps[key];
+      if(previous!==undefined&&previous>0&&latest.at>previous){
+        const sender=String(latest.data.sender_name||latest.data.sender_employee_number||"");
+        if(!sender||sender!==String(window.currentEmployeeName||""))window.notifyVicLineNewMessage(latest.kind==="voice"?"New voice note received":latest.data.message_text,channel.name);
+      }
+      window.vicLineSeenMessages[key]=latest.data.id||latest.data.message_id||latest.data.storage_path||latest.data.created_at;
+      window.vicLineSeenTimestamps[key]=latest.at;
+    }));
+    if(!document.hidden&&document.getElementById("staff-chat-branch"))await window.loadStaffChat();
+  }catch(_){}
+};
+window.vicLineStartPolling=function(){if(window.vicLinePollHandle)clearInterval(window.vicLinePollHandle);window.vicLinePollHandle=setInterval(()=>{window.pollVicLineAllConversations();},30000);};
+window.sendStaffChatMessage = async function(event) {
+  event.preventDefault();
+  const form=event.currentTarget,input=document.getElementById("staff-chat-input"),feedback=document.getElementById("staff-chat-feedback"),selector=document.getElementById("staff-chat-branch"),mode=document.getElementById("vicline-mode")?.value||"channel";
+  const submitButton=form?.querySelector('button[type="submit"]'),message=input?input.value.trim():"";
+  if(!db||!form||!input||!form.reportValidity()||!message)return;
+  if(submitButton)submitButton.disabled=true;
+  if(feedback)feedback.textContent="Sending "+(mode==="direct"?"private message…":"channel message…");
+  try{
+    let error=null;
+    if(mode==="direct"){
+      const recipientId=document.getElementById("vicline-dm-recipient")?.value||"";
+      if(!recipientId){if(feedback)feedback.textContent="Choose a staff member before sending a private message.";return;}
+      const result=await db.rpc("send_vic_line_direct_message",{p_recipient_user_id:recipientId,p_message_text:message});
+      error=result.error;
+    }else{
+      const result=await db.rpc("send_staff_channel_message",{p_message:message,p_branch_id:selector&&selector.value?selector.value:null});
+      error=result.error;
+    }
+    if(error){if(feedback)feedback.textContent="Message was not sent: "+error.message;return;}
+    input.value="";
+    if(feedback)feedback.textContent="Message sent. Refreshing conversation…";
+    await window.loadStaffChat();
+  }catch(error){if(feedback)feedback.textContent="A connection error prevented the message from being sent. Check the conversation before retrying.";}
+  finally{if(submitButton)submitButton.disabled=false;}
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
@@ -1764,18 +2439,20 @@ window.printTransactionReceipt = function(button, skipConfirmation) {
   const type=String(button.dataset.receiptType||"").toLowerCase();
   const amount=Number(button.dataset.receiptAmount);
   const currency=button.dataset.receiptCurrency||"";
-  if(type!=="deposit"||!reference||!Number.isFinite(amount)||amount<=0){
-    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit.";
+  if(!["deposit","withdrawal"].includes(type)||!reference||!Number.isFinite(amount)||amount<=0){
+    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit or withdrawal.";
     return;
   }
-  if(!skipConfirmation && !confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
+  const label=type==="withdrawal"?"WITHDRAWAL":"DEPOSIT";
+  const amountLabel=type==="withdrawal"?"AMOUNT PAID OUT":"AMOUNT RECEIVED";
+  if(!skipConfirmation && !confirm("Print the receipt for posted "+type+" "+reference+"? Verify the transaction reference and amount."))return;
   const printWindow=window.open("","_blank","width=420,height=700");
-  if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
+  if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print "+type+" receipt again.";return;}
   const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   const money=amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+" "+currency;
-  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deposit Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER DEPOSIT RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>DEPOSIT</span></div><hr class="line"><p class="label">AMOUNT RECEIVED</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${label} Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER ${label} RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>${label}</span></div><hr class="line"><p class="label">${amountLabel}</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\\/script></body></html>`);
   printWindow.document.close();
-  if(status)status.textContent="Receipt opened for printing for posted deposit "+reference+".";
+  if(status)status.textContent="Receipt opened for printing for posted "+type+" "+reference+".";
 };
 document.addEventListener("click",function(event){
   const receiptButton=event.target.closest(".transaction-print-receipt");
@@ -1833,6 +2510,55 @@ window.saveAttendancePolicy = async function() {
   if(error){feedback.textContent="Policy was not confirmed saved. Ensure attendance_policies.sql is installed and your account has manager permissions. Details: "+error.message;return;}
   feedback.textContent="Policy saved successfully (ID: "+String(data||"") +"). Changes were audit-logged. Official clock events and timesheets still require their separate implementation.";
 };
+window.loadMyAttendanceStatus=async function(){
+  const feedback=document.getElementById("my-attendance-feedback"),host=document.getElementById("my-attendance-status"),branchSelect=document.getElementById("attendance-clock-branch"),clockIn=document.getElementById("attendance-clock-in"),clockOut=document.getElementById("attendance-clock-out");
+  if(!feedback||!host)return;
+  if(!db){feedback.textContent="Database connection unavailable. No attendance action was recorded.";return;}
+  try{
+    if(branchSelect&&branchSelect.options.length<=1){
+      const branches=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+      if(!branches.error)branchSelect.innerHTML='<option value="">My home branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+    }
+    const {data,error}=await db.rpc("get_my_attendance_status",{p_branch_id:branchSelect?.value||null});
+    if(error){feedback.textContent="Attendance clock RPC is not installed or access was denied. Review staff_attendance_clock_rpc_draft.sql in a non-production database first. "+error.message;host.innerHTML="";return;}
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row){
+      feedback.textContent="No attendance record returned for today. Clock in when you begin work.";
+      host.innerHTML='<div class="notice-box">Status: Not clocked in today. Method: not recorded.</div>';
+      if(clockIn)clockIn.disabled=false;if(clockOut)clockOut.disabled=true;return;
+    }
+    const method=value=>String(value||"not recorded").replaceAll("_"," ");
+    host.innerHTML='<div class="notice-box"><strong>'+esc(row.attendance_status||"recorded")+'</strong><br>Branch: '+esc(row.branch_name||"")+'<br>Date: '+esc(row.work_date||"")+'<br>Clock in: '+esc(row.clock_in_at?new Date(row.clock_in_at).toLocaleString():"Missing")+' ('+esc(method(row.clock_in_method))+')<br>Clock out: '+esc(row.clock_out_at?new Date(row.clock_out_at).toLocaleString():"Not yet recorded")+(row.clock_out_method?' ('+esc(method(row.clock_out_method))+')':"")+'</div>';
+    if(row.clock_out_at){feedback.textContent="Today's attendance is closed. Ask an authorized supervisor to correct an error.";if(clockIn)clockIn.disabled=true;if(clockOut)clockOut.disabled=true;}
+    else{feedback.textContent="Clock-in is recorded. Clock out when your shift ends.";if(clockIn)clockIn.disabled=true;if(clockOut)clockOut.disabled=false;}
+  }catch(_){feedback.textContent="A connection error prevented attendance status from loading.";}
+};
+window.clockInMyAttendance=async function(){
+  const feedback=document.getElementById("my-attendance-feedback"),branchId=document.getElementById("attendance-clock-branch")?.value||null;
+  if(!db||!feedback)return;
+  const button=document.getElementById("attendance-clock-in");if(button)button.disabled=true;
+  feedback.textContent="Recording web clock-in…";
+  try{
+    const {data,error}=await db.rpc("clock_in_my_attendance",{p_branch_id:branchId});
+    if(error)throw error;
+    const row=Array.isArray(data)?data[0]:data;
+    feedback.textContent="Clock-in recorded by the database at "+(row?.clock_in_at?new Date(row.clock_in_at).toLocaleString():"the server time")+". Method: web, not fingerprint.";
+    await window.loadMyAttendanceStatus();
+  }catch(error){feedback.textContent="Clock-in was not recorded: "+(error?.message||"connection error");if(button)button.disabled=false;}
+};
+window.clockOutMyAttendance=async function(){
+  const feedback=document.getElementById("my-attendance-feedback");if(!db||!feedback)return;
+  const button=document.getElementById("attendance-clock-out");if(button)button.disabled=true;
+  feedback.textContent="Recording web clock-out…";
+  try{
+    const {data,error}=await db.rpc("clock_out_my_attendance");
+    if(error)throw error;
+    const row=Array.isArray(data)?data[0]:data;
+    feedback.textContent="Clock-out recorded by the database at "+(row?.clock_out_at?new Date(row.clock_out_at).toLocaleString():"the server time")+". Method: web, not fingerprint.";
+    await window.loadMyAttendanceStatus();
+  }catch(error){feedback.textContent="Clock-out was not recorded: "+(error?.message||"connection error");if(button)button.disabled=false;}
+};
+
 window.previewAttendancePolicy = function(event) {
   if (event && event.preventDefault) event.preventDefault();
   const read = id => document.getElementById(id);
@@ -2048,14 +2774,19 @@ window.printInstitutionPayrollReceipt = function(){
 
 window.printAccountOpeningReceipt = function(){
   const r=window.lastAccountOpeningReceipt;
-  if(!r){alert("No account-opening receipt is available in this session.");return;}
-  const text="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nACCOUNT OPENING PACKAGE RECEIPT\nReceipt No: "+r.receipt_number+"\nAccount No: "+r.account_number+"\nDate: "+r.date+"\n\nTOTAL RECEIVED: UGX 30,000\n\nAUTOMATIC ALLOCATION\nNon-withdrawable share capital: UGX 10,000 (1 share)\nRestricted security reserve: UGX 8,500 (not withdrawable)\nBundled opening fees: UGX 11,500 (opening form + initial cheque book + initial transaction log book)\n\nTOTAL ALLOCATED: UGX 30,000\n\nNo manual allocation by the teller. Each component is recorded to its designated account.\nThank you.";
+  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)||Math.abs(Number(r.amount)-(Number(r.share_amount||0)+Number(r.security_reserve||0)+Number(r.bundled_opening_costs||0)))>=0.01){
+    alert("No reconciled server-confirmed account-opening receipt is available. A missing or unbalanced collection allocation must be resolved before printing.");
+    return;
+  }
+  const money=value=>"UGX "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
+  const total=Number(r.amount),shares=Number(r.share_amount||0),reserve=Number(r.security_reserve||0),costs=Number(r.bundled_opening_costs||0);
+  const allocated=shares+reserve+costs;
+  const body="ZIVAMUNTUYO FINANCIAL SERVICES LTD\nACCOUNT OPENING PACKAGE RECEIPT\nReceipt No: "+r.receipt_number+"\nAccount No: "+r.account_number+"\nDate: "+r.date+"\n\nTOTAL RECEIVED: "+money(total)+"\n\nSERVER-RECORDED ALLOCATION\nShare capital: "+money(shares)+" ("+Number(r.shares_issued||0)+" share(s))\nRestricted security reserve: "+money(reserve)+"\nBundled opening costs: "+money(costs)+"\n\nTOTAL ALLOCATED: "+money(allocated)+"\nAllocation difference: "+money(total-allocated)+"\n\nReceipt generated from the server-confirmed collection record. Keep it with the teller's daily reconciliation.";
   const win=window.open("","_blank","width=700,height=650");
-  if(!win){alert("Allow pop-ups to print the account-opening receipt.");return;}
-  win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · UGX 30,000</div><pre>"+text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
+  if(!win){alert("Allow pop-ups to print the receipt.");return;}
+  win.document.write("<!doctype html><html><head><title>Account Opening Receipt</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#111}pre{white-space:pre-wrap;font:14px monospace;line-height:1.6}.stamp{border:2px solid #16764a;padding:8px;display:inline-block;font-weight:bold}</style></head><body><div class='stamp'>PAID · "+money(total)+"</div><pre>"+body.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><script>window.onload=function(){window.print();};<\/script></body></html>");
   win.document.close();
 };
-
 
 
 window.printDormantReactivationReceipt = function(){
@@ -2428,4 +3159,87 @@ window.attachInstitutionPayrollEvidence = async function(){
   if(error)throw error;
   if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
  }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
+
+
+// Excel-style customer and account registers. Data comes only from the signed-in user's authorized database queries.
+window.customerRegisterRows = window.customerRegisterRows || [];
+window.accountRegisterRows = window.accountRegisterRows || [];
+window.accountRegisterCustomers = window.accountRegisterCustomers || [];
+window.accountRegisterBranches = window.accountRegisterBranches || [];
+
+window.registerCsvCell = function(value) {
+  let textValue = value === null || value === undefined ? "" : String(value);
+  // Prevent spreadsheet formula execution when exporting user-controlled values.
+  if (/^[\\s]*[=+@-]/.test(textValue)) textValue = "'" + textValue;
+  return '"' + textValue.replace(/"/g, '""') + '"';
+};
+window.downloadRegisterCsv = function(filename, headers, rows) {
+  const csv = [headers, ...rows].map(row => row.map(window.registerCsvCell).join(",")).join("\\r\\n");
+  const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; link.style.display = "none";
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+window.customerRegisterView = function() {
+  const q=(document.getElementById("customer-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("customer-register-status")?.value||"").toLowerCase();
+  return (window.customerRegisterRows||[]).filter(c=>{
+    const active=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"inactive":"active";
+    const fields=[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status].join(" ").toLowerCase();
+    return (!q||fields.includes(q))&&(!status||active===status);
+  });
+};
+window.filterCustomerRegister = function() {
+  const target=document.getElementById("cust-list");if(!target)return;
+  const rows=window.customerRegisterView();
+  const count=document.getElementById("customer-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.customerRegisterRows||[]).length+" member record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No member records match the current search or filter.</p>';return;}
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Member / legal name</th><th>CIF number</th><th>NIN / Passport</th><th>Phone</th><th>Email</th><th>Address</th><th>Status</th><th>Registered</th></tr></thead><tbody>'+rows.map(c=>{
+    const status=c.is_active===false||String(c.status||"").toLowerCase()==="inactive"?"Inactive":esc(c.status||"Active / registered");
+    return '<tr><td>'+esc(c.full_name||"—")+'</td><td>'+esc(c.customer_number||"—")+'</td><td>'+esc(c.nin_or_passport||"—")+'</td><td>'+esc(c.phone_number||"—")+'</td><td>'+esc(c.email||"—")+'</td><td>'+esc(c.address||"—")+'</td><td><span class="badge-role">'+status+'</span></td><td>'+esc(c.created_at?new Date(c.created_at).toLocaleDateString():"—")+'</td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportCustomerRegister = function() {
+  const rows=window.customerRegisterView();
+  if(!rows.length){alert("There are no member rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" member record(s), including confidential identification and contact information, to a CSV file that opens in Excel? Store it securely."))return;
+  window.downloadRegisterCsv("zivamuntuyo-members-"+new Date().toISOString().slice(0,10)+".csv",["Member name","CIF number","NIN or passport","Phone","Email","Address","Status","Registered"],rows.map(c=>[c.full_name,c.customer_number,c.nin_or_passport,c.phone_number,c.email,c.address,c.status||(c.is_active===false?"Inactive":"Active / registered"),c.created_at]));
+};
+window.accountRegisterView = function() {
+  const q=(document.getElementById("account-register-search")?.value||"").trim().toLowerCase();
+  const status=(document.getElementById("account-register-status")?.value||"").toLowerCase();
+  const customers=window.accountRegisterCustomers||[],branches=window.accountRegisterBranches||[];
+  return (window.accountRegisterRows||[]).map(a=>{
+    const customer=customers.find(c=>String(c.id)===String(a.customer_id||a.customer_uuid))||null;
+    const branch=branches.find(b=>String(b.id)===String(a.branch_id))||null;
+    return {...a,_member:customer?.full_name||a.customer_name||a.full_name||"Not linked in register",_cif:customer?.customer_number||a.customer_number||"",_phone:customer?.phone_number||a.phone_number||"",_email:customer?.email||a.email||"",_address:customer?.address||a.address||"",_branch:branch?.branch_name||a.branch_name||a.branch_id||"Not assigned"};
+  }).filter(a=>{
+    const st=String(a.account_status||a.status||"unknown").toLowerCase();
+    const search=[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.account_type,a.product_type,a.currency_code,a.account_status].join(" ").toLowerCase();
+    return (!q||search.includes(q))&&(!status||st===status||((status==="active")&&st==="open"));
+  });
+};
+window.filterAccountRegister = function() {
+  const target=document.getElementById("acc-list");if(!target)return;
+  const rows=window.accountRegisterView();
+  const count=document.getElementById("account-register-count");
+  if(count)count.textContent=rows.length+" of "+(window.accountRegisterRows||[]).length+" account record(s)";
+  if(!rows.length){target.innerHTML='<p class="muted">No accounts match this search/filter, or no accounts are visible under your permissions.</p>';return;}
+  const fmt=v=>v===null||v===undefined||v===""?"Unavailable":Number.isFinite(Number(v))?Number(v).toLocaleString("en-UG",{minimumFractionDigits:2,maximumFractionDigits:2}):"Unavailable";
+  target.innerHTML='<table class="data-table register-data-table"><thead><tr><th>Account number</th><th>Member</th><th>CIF</th><th>Phone</th><th>Address</th><th>Branch</th><th>Product</th><th>Currency</th><th>Stored balance</th><th>Posted-ledger balance</th><th>Reconciliation difference</th><th>Status</th></tr></thead><tbody>'+rows.map(a=>{
+    const stored=Number(a.stored_balance),ledger=a.ledger_balance===null||a.ledger_balance===undefined?null:Number(a.ledger_balance);
+    const diff=(!a.ledger_configured||ledger===null||!Number.isFinite(ledger)||!Number.isFinite(stored))?"Not configured":fmt(stored-ledger);
+    return '<tr><td>'+esc(a.account_number||"Unavailable")+'</td><td>'+esc(a._member)+'</td><td>'+esc(a._cif||"—")+'</td><td>'+esc(a._phone||"—")+'</td><td>'+esc(a._address||"—")+'</td><td>'+esc(a._branch)+'</td><td>'+esc(a.product_type||a.account_type||a.account_type_name||"—")+'</td><td>'+esc(a.currency_code||"UGX")+'</td><td>'+fmt(a.stored_balance)+'</td><td>'+fmt(a.ledger_balance)+'</td><td>'+diff+'</td><td><span class="badge-role">'+esc(a.account_status||a.status||"unknown")+'</span></td></tr>';
+  }).join("")+'</tbody></table>';
+};
+window.exportAccountRegister = function() {
+  const rows=window.accountRegisterView();
+  if(!rows.length){alert("There are no account rows to export.");return;}
+  if(!window.confirm("Export "+rows.length+" account record(s), including customer contact/address details and balances, to an Excel-compatible CSV? Store it securely."))return;
+  const fmt=v=>v===null||v===undefined?"":v;
+  window.downloadRegisterCsv("zivamuntuyo-accounts-"+new Date().toISOString().slice(0,10)+".csv",["Account number","Member name","CIF number","Phone","Email","Address","Branch","Product","Currency","Stored balance","Posted-ledger balance","Account status","Account UUID","Branch UUID"],rows.map(a=>[a.account_number,a._member,a._cif,a._phone,a._email,a._address,a._branch,a.product_type||a.account_type||a.account_type_name,a.currency_code,fmt(a.stored_balance),fmt(a.ledger_balance),a.account_status||a.status,a.account_id,a.branch_id]));
 };
