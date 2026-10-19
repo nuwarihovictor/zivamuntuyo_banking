@@ -46,3 +46,52 @@ CREATE POLICY staff_attendance_active_employee_insert
 
 -- Browser staff cannot update or delete historical punches. Trusted device ingestion
 -- must use a separately authenticated Windows connector/server and a service role kept server-side.
+
+-- Serialize punch transitions per employee so duplicate clock-ins/outs cannot be
+-- recorded concurrently. Use insertion order for workflow state, not device time.
+CREATE OR REPLACE FUNCTION public.enforce_staff_attendance_transition()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+  v_active boolean;
+  v_last_event text;
+BEGIN
+  SELECT ep.is_active INTO v_active
+  FROM public.employee_profiles ep
+  WHERE ep.user_id = NEW.employee_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_active IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'Active employee profile required for attendance'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT e.event_type INTO v_last_event
+  FROM public.staff_attendance_events e
+  WHERE e.employee_user_id = NEW.employee_user_id
+  ORDER BY e.created_at DESC, e.id DESC
+  LIMIT 1;
+
+  IF v_last_event IS NULL AND NEW.event_type <> 'clock_in' THEN
+    RAISE EXCEPTION 'First attendance punch must be clock_in'
+      USING ERRCODE = '23514';
+  ELSIF v_last_event = 'clock_in' AND NEW.event_type <> 'clock_out' THEN
+    RAISE EXCEPTION 'Employee is already clocked in'
+      USING ERRCODE = '23514';
+  ELSIF v_last_event = 'clock_out' AND NEW.event_type <> 'clock_in' THEN
+    RAISE EXCEPTION 'Employee must clock in before clock_out'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.enforce_staff_attendance_transition() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS staff_attendance_transition_guard ON public.staff_attendance_events;
+CREATE TRIGGER staff_attendance_transition_guard
+BEFORE INSERT ON public.staff_attendance_events
+FOR EACH ROW EXECUTE FUNCTION public.enforce_staff_attendance_transition();
