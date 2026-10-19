@@ -4,7 +4,6 @@ These tests do not simulate a browser, printer, or live database. They guard
 important receipt preconditions until isolated end-to-end testing is available.
 """
 from pathlib import Path
-import re
 import unittest
 
 
@@ -37,9 +36,18 @@ class ReceiptPrintSafetyTests(unittest.TestCase):
         self.assertIn('return;', code[popup_failure:increment])
 
     def test_receipt_fields_are_escaped_before_html_insertion(self):
-        self.assertIn('const safe=value=>String(value).replace(', self.receipt_function)
-        for field in ("reference", "transactionDate", "branch", "account", "money"):
-            self.assertIn('safe(' + field + ')', self.receipt_function)
+        code = self.receipt_function
+        self.assertIn('const safe=value=>String(value).replace(', code)
+        # Optional display fallbacks are intentionally applied before escaping.
+        for expression in (
+            'safe(reference)',
+            'safe(transactionDate||"Not provided")',
+            'safe(branch||"Not provided")',
+            'safe(account||"Not provided")',
+            'safe(money)',
+        ):
+            with self.subTest(expression=expression):
+                self.assertIn(expression, code)
 
     def test_reprint_is_labelled_as_copy_not_new_transaction(self):
         self.assertIn('REPRINT COPY — NOT A NEW TRANSACTION', self.receipt_function)
