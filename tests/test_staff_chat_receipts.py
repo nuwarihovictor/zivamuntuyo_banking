@@ -53,8 +53,9 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn('db.rpc("admin_create_branch"', self.app)
         self.assertIn('db.rpc("admin_update_branch"', self.app)
         self.assertIn('db.rpc("admin_set_branch_active"', self.app)
-        self.assertIn("Branch was not created:", self.app)
-        self.assertIn("Branch changes were not saved:", self.app)
+        self.assertIn("Branch creation could not be confirmed", self.app)
+        self.assertIn("Branch update could not be confirmed", self.app)
+        self.assertIn("Branch status change could not be confirmed", self.app)
 
     def test_manual_attendance_is_not_misrepresented_as_biometric(self):
         self.assertIn("no fingerprint device is connected yet", self.app)
