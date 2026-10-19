@@ -1,0 +1,69 @@
+name: Disposable PostgreSQL draft-migration tests
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [fix/account-eligibility-guards-2026-10-19]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-draft-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: banking_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d banking_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: banking_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL client and static test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          python -m pip install --disable-pip-version-check pglast
+      - name: Run existing source-level regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Prepare isolated fixture schema
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_fixture.sql
+      - name: Parse migration SQL
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+          files = [
+              Path("supabase/migrations/20261019043000_account_eligibility_guards.sql"),
+              Path("supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql"),
+          ]
+          for path in files:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"SQL syntax parsed: {path}")
+          PY
+      - name: Execute both draft migrations in disposable PostgreSQL 17
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019043000_account_eligibility_guards.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql
+      - name: Run account, joint-holder, branch-view, and grants assertions
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/draft_migration_assertions.sql
