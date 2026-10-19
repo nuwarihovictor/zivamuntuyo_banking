@@ -20,6 +20,31 @@ BEGIN
 END
 $active_can_read_own$;
 
+DO $cannot_double_clock_in$
+BEGIN
+  BEGIN
+    INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,idempotency_key)
+    VALUES ('40000000-0000-0000-0000-000000000015','clock_in','manual','fixture-double-clockin');
+    RAISE EXCEPTION 'FAIL: repeated clock-in was accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$cannot_double_clock_in$;
+
+INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,idempotency_key)
+VALUES ('40000000-0000-0000-0000-000000000015','clock_out','manual','fixture-clockout-00015');
+
+DO $cannot_clock_out_twice$
+BEGIN
+  BEGIN
+    INSERT INTO public.staff_attendance_events(employee_user_id,event_type,event_source,idempotency_key)
+    VALUES ('40000000-0000-0000-0000-000000000015','clock_out','manual','fixture-double-clockout');
+    RAISE EXCEPTION 'FAIL: repeated clock-out was accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$cannot_clock_out_twice$;
+
 DO $cannot_spoof_device$
 BEGIN
   BEGIN
