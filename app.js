@@ -343,7 +343,7 @@ window.switchPage = function(pageName) {
     `;
 
     if (db) {
-      db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      db.from("customers").select("id,full_name,customer_number,phone_number,created_at").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
         if (error || !data || data.length === 0) {
@@ -354,7 +354,7 @@ window.switchPage = function(pageName) {
           <div class="list-item">
             <div>
               <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
+              <span class="muted">${esc(cust.customer_number)} | Identification: held in restricted customer record</span>
             </div>
             <span class="badge-role">${esc(cust.phone_number)}</span>
           </div>
