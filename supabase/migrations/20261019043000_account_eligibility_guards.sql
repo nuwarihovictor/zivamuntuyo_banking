@@ -21,6 +21,7 @@ DECLARE
   v_account_id uuid := gen_random_uuid();
   v_account_number text;
   v_customer_branch uuid;
+  v_customer_status text;
   v_type_label text;
   v_type_code text;
 BEGIN
@@ -45,8 +46,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.branches b WHERE b.id=p_branch_id AND b.is_active) THEN
     RAISE EXCEPTION 'Selected branch is inactive';
   END IF;
-  SELECT c.branch_id INTO v_customer_branch FROM public.customers c WHERE c.id=p_customer_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Customer not found'; END IF;
+  SELECT c.status,c.branch_id INTO v_customer_status,v_customer_branch
+  FROM public.customers c WHERE c.id=p_customer_id;
+  IF NOT FOUND OR v_customer_status IS DISTINCT FROM 'active' THEN
+    RAISE EXCEPTION 'Customer must be active before an account can be opened';
+  END IF;
   IF v_customer_branch IS NOT NULL AND NOT public.current_employee_can_transact_in_branch(v_customer_branch) THEN
     RAISE EXCEPTION 'Customer is outside your authorized branch scope' USING ERRCODE='42501';
   END IF;
