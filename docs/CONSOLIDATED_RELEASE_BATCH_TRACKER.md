@@ -71,3 +71,5 @@
 
 - The live ledger schema constrains `ledger_type` to asset, liability, equity, income, and expense. The report page now builds per-currency cumulative income-statement and balance-sheet views from the same validated posted-ledger RPC rows, displays reconciliation warnings, and provides a formula-safe CSV summary export.
 - These are cumulative posted balances, not date-filtered statutory statements. Review account mappings, opening balances, closing entries, and reconciliations in production-shaped staging before treating them as formal financial statements.
+
+- Reporting limitation explicitly shown in the UI and CSV export: the current `list_trial_balance` RPC returns active ledger accounts and has no date-range parameters. Inactive ledger accounts with historical postings may be excluded; the new statements are provisional cumulative views until the RPC/report scope and account mapping are verified in staging.

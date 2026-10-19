@@ -997,7 +997,7 @@ window.loadAttendancePolicy();
          <div id="reports-detail"></div>
          <section class="panel"><h3>Cumulative income statement view</h3><div id="reports-income-statement"></div></section>
          <section class="panel"><h3>Balance sheet view</h3><div id="reports-balance-sheet"></div></section>
-         <p class="muted">Statement views are calculated from configured ledger types and all posted balances (not a date-filtered period). Verify the chart of accounts, closing entries, and reconciliation before using them as formal financial statements.</p>`
+         <p class="muted">Statement views use the active ledger accounts returned by the posted-ledger RPC and are cumulative, not date-filtered. Inactive accounts with historical postings may be excluded. Verify account mappings, opening balances, closing entries, and reconciliation before formal financial reporting.</p>`
       )}
     `;
 
@@ -1319,7 +1319,7 @@ window.exportFinancialStatementsCsv = function() {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  if (feedback) feedback.textContent = "Exported " + rows.length + " statement summary rows. These are cumulative posted balances, not date-filtered statutory statements.";
+  if (feedback) feedback.textContent = "Exported " + rows.length + " statement summary rows. These are cumulative active-ledger balances, not date-filtered statutory statements.";
 };
 
 window.loadFinancialReports = async function() {

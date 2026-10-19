@@ -52,6 +52,11 @@ class FinancialReportExportTests(unittest.TestCase):
         self.assertIn('type:"text/csv;charset=utf-8;"', handler)
         self.assertIn("No loaded statement rows to export.", handler)
 
+    def test_statement_views_disclose_active_account_and_no_date_filter_limitations(self):
+        self.assertIn("active ledger accounts returned by the posted-ledger RPC", self.app)
+        self.assertIn("Inactive accounts with historical postings may be excluded", self.app)
+        self.assertIn("not date-filtered", self.app)
+
     def test_no_report_data_cannot_be_exported_as_a_valid_report(self):
         handler = self.app.split("window.exportFinancialReportsCsv = function()", 1)[1].split("window.loadFinancialReports = async function()", 1)[0]
         self.assertIn("No loaded trial-balance rows to export.", handler)
