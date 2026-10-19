@@ -365,7 +365,6 @@ window.switchPage = function(pageName) {
             <button type="button" class="secondary" onclick="window.addJointAccountHolderField()">+ Add another holder</button>
             <p id="joint-holder-feedback" class="muted" role="status" aria-live="polite"></p>
           </fieldset>
-          </label>
           <label>Account product *
             <select name="product_type" required>
               <option value="savings">Savings</option>
