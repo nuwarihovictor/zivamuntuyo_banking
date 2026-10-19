@@ -67,5 +67,29 @@ class FinancialReportIntegrityTests(unittest.TestCase):
         self.assertIn("exportButton.disabled = true", report)
 
 
+
+class CashTransactionIntegritySourceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.migration = (ROOT / "supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql").read_text(encoding="utf-8")
+        cls.assertions = (ROOT / "tests/postgres/draft_migration_assertions.sql").read_text(encoding="utf-8")
+
+    def test_cash_request_and_approval_are_audited_and_reapproval_is_blocked(self):
+        self.assertIn("'cash_transaction_requested'", self.migration)
+        self.assertIn("'cash_transaction_approved'", self.migration)
+        self.assertIn("approved_by IS NULL AND approved_at IS NULL", self.migration)
+        self.assertIn("Only unapproved pending cash transaction requests can be approved", self.migration)
+        self.assertIn("FAIL: a second approval overwrote the first approver", self.assertions)
+        self.assertIn("FAIL: duplicate approval created extra approval audit event", self.assertions)
+
+    def test_cash_posting_requires_active_employee_and_separate_approver(self):
+        post = self.migration.split("CREATE OR REPLACE FUNCTION public.post_approved_cash_transaction", 1)[1]
+        self.assertIn("Active employee profile required", post)
+        self.assertIn("v_j.created_by=auth.uid() OR v_j.approved_by=auth.uid()", post)
+        self.assertIn("Ledger entries already exist for this request; duplicate posting is blocked", post)
+        self.assertIn("'cash_transaction_posted'", post)
+        self.assertIn("INSERT INTO public.audit_events", post)
+
+
 if __name__ == "__main__":
     unittest.main()
