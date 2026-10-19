@@ -346,7 +346,11 @@ window.switchPage = function(pageName) {
       db.from("customers").select("id,full_name,customer_number,phone_number,created_at").order("created_at", { ascending: false }).then(({ data, error }) => {
         const listEl = document.getElementById("cust-list");
         if (!listEl) return;
-        if (error || !data || data.length === 0) {
+        if (error) {
+          listEl.innerHTML = `<p class="muted">Customer records could not be loaded. Check your connection or access permissions. Details: ${esc(error.message)}</p>`;
+          return;
+        }
+        if (!data || data.length === 0) {
           listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
           return;
         }
