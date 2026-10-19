@@ -506,3 +506,74 @@ BEGIN
   END LOOP;
 END
 $cash_rpc_acl_test$;
+
+-- A failed audit insert must roll back the entire financial posting.
+CREATE OR REPLACE FUNCTION public.test_fail_cash_post_audit() RETURNS trigger
+LANGUAGE plpgsql
+AS $trigger$
+BEGIN
+  IF NEW.action = 'cash_transaction_posted' THEN
+    RAISE EXCEPTION 'Injected failure on cash posting audit';
+  END IF;
+  RETURN NEW;
+END
+$trigger$;
+
+DROP TRIGGER IF EXISTS test_fail_cash_post_audit ON public.audit_events;
+CREATE TRIGGER test_fail_cash_post_audit
+BEFORE INSERT ON public.audit_events
+FOR EACH ROW EXECUTE FUNCTION public.test_fail_cash_post_audit();
+
+DO $cash_post_audit_atomicity_test$
+DECLARE
+  v_journal uuid;
+  v_failed boolean := false;
+  v_entries integer;
+  v_balance numeric;
+  v_status text;
+BEGIN
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_journal
+  FROM public.create_cash_transaction_request(
+    '50000000-0000-0000-0000-000000000001','deposit',25,'CI audit atomicity'
+  ) r;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_journal);
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  PERFORM set_config('test.role','accountant',false);
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(
+      v_journal,'60000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Injected failure on cash posting audit%' THEN
+      v_failed := true;
+    ELSE
+      RAISE;
+    END IF;
+  END;
+
+  SELECT count(*) INTO v_entries FROM public.ledger_entries WHERE journal_id=v_journal;
+  SELECT balance INTO v_balance FROM public.bank_accounts
+  WHERE id='50000000-0000-0000-0000-000000000001';
+  SELECT status INTO v_status FROM public.ledger_journals WHERE id=v_journal;
+
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: injected audit insert failure was not observed'; END IF;
+  IF v_entries <> 0 THEN RAISE EXCEPTION 'FAIL: audit failure left % ledger entries',v_entries; END IF;
+  IF v_balance <> 100 THEN RAISE EXCEPTION 'FAIL: audit failure changed account balance to %',v_balance; END IF;
+  IF v_status <> 'pending_approval' THEN RAISE EXCEPTION 'FAIL: audit failure changed journal status to %',v_status; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_posted' AND entity_id=v_journal::text
+  ) THEN RAISE EXCEPTION 'FAIL: failed posting left a success audit event'; END IF;
+END
+$cash_post_audit_atomicity_test$;
+
+DROP TRIGGER test_fail_cash_post_audit ON public.audit_events;
+DROP FUNCTION public.test_fail_cash_post_audit();
