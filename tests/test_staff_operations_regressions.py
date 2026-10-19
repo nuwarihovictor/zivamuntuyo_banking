@@ -42,6 +42,15 @@ class StaffOperationsRegressionTests(unittest.TestCase):
         self.assertIn("if(latestError)throw latestError", punch)
         self.assertIn("if(error)throw error", punch)
 
+
+    def test_attendance_history_query_is_scoped_to_authenticated_employee(self):
+        start = self.app.index("window.loadStaffAttendance = async function()")
+        end = self.app.index("\\n};", start)
+        loader = self.app[start:end]
+        self.assertIn("await db.auth.getUser()", loader)
+        self.assertIn('.eq("employee_user_id",userData.user.id)', loader)
+        self.assertIn('.limit(30)', loader)
+
     def test_manual_attendance_is_not_described_as_biometric_verification(self):
         start = self.app.index("window.recordStaffAttendancePunch = async function()")
         end = len(self.app)
