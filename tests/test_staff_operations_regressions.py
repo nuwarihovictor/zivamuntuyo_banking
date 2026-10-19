@@ -45,7 +45,7 @@ class StaffOperationsRegressionTests(unittest.TestCase):
 
     def test_attendance_history_query_is_scoped_to_authenticated_employee(self):
         start = self.app.index("window.loadStaffAttendance = async function()")
-        end = self.app.index("\\n};", start)
+        end = self.app.index("\n};", start)
         loader = self.app[start:end]
         self.assertIn("await db.auth.getUser()", loader)
         self.assertIn('.eq("employee_user_id",userData.user.id)', loader)
