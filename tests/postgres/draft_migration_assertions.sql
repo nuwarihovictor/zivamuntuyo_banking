@@ -343,3 +343,53 @@ BEGIN
   IF v_status <> 'pending_approval' THEN RAISE EXCEPTION 'FAIL: failed posting changed journal status to %',v_status; END IF;
 END
 $failure_recovery_test$;
+
+
+
+-- Active-employment gate for cash transaction request and posting.
+DO $active_employee_cash_rpc_test$
+DECLARE
+  v_failed boolean := false;
+  v_journal uuid;
+  v_cash uuid := '60000000-0000-0000-0000-000000000001';
+BEGIN
+  INSERT INTO public.employee_profiles(user_id,is_active)
+  VALUES ('40000000-0000-0000-0000-000000000004',false)
+  ON CONFLICT (user_id) DO UPDATE SET is_active=false;
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000004',false);
+  PERFORM set_config('test.role','teller',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  BEGIN
+    PERFORM * FROM public.create_cash_transaction_request(
+      '50000000-0000-0000-0000-000000000001','deposit',10,'inactive employee request'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Active employee profile required%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: inactive employee created cash request'; END IF;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.role','teller',false);
+  SELECT r.journal_id INTO v_journal FROM public.create_cash_transaction_request(
+    '50000000-0000-0000-0000-000000000001','deposit',10,'inactive employee posting denial'
+  ) r;
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.role','bank_admin',false);
+  PERFORM set_config('test.approval_limit_allowed','true',false);
+  PERFORM * FROM public.approve_cash_transaction_request(v_journal);
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000004',false);
+  PERFORM set_config('test.role','accountant',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_journal,v_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Active employee profile required%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: inactive employee posted cash transaction'; END IF;
+  IF EXISTS (SELECT 1 FROM public.ledger_entries WHERE journal_id=v_journal) THEN
+    RAISE EXCEPTION 'FAIL: inactive employee posting denial left ledger entries';
+  END IF;
+END
+$active_employee_cash_rpc_test$;
