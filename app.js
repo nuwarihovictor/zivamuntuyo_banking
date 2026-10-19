@@ -925,6 +925,7 @@ window.loadAttendancePolicy();
              <input id="reports-branch-id" type="text" placeholder="Optional branch UUID">
            </label>
            <button type="button" class="secondary" onclick="loadFinancialReports()">Refresh reports</button>
+           <button type="button" class="secondary" id="reports-export-csv" onclick="window.exportFinancialReportsCsv()" disabled>Export trial balance CSV</button>
          </div>
          <div id="reports-feedback" class="muted" aria-live="polite">Loading ledger report…</div>
          <div id="reports-summary"></div>
@@ -1169,8 +1170,51 @@ window.handleFinancialActivitySubmit=async function(e){
  }catch(err){if(feedback)feedback.textContent="Entry not recorded: "+err.message;}finally{if(button)button.disabled=false;}
 };
 
+window._financialReportRows = [];
+window.exportFinancialReportsCsv = function() {
+  const feedback = document.getElementById("reports-feedback");
+  const button = document.getElementById("reports-export-csv");
+  const rows = Array.isArray(window._financialReportRows) ? window._financialReportRows : [];
+  if (!rows.length) {
+    if (feedback) feedback.textContent = "No loaded trial-balance rows to export. Refresh reports first.";
+    if (button) button.disabled = true;
+    return;
+  }
+  const columns = [
+    ["ledger_account_id", "ledger_account_id"],
+    ["account_code", "account_code"],
+    ["account_name", "account_name"],
+    ["ledger_type", "ledger_type"],
+    ["currency_code", "currency_code"],
+    ["debit_total", "debit_total"],
+    ["credit_total", "credit_total"]
+  ];
+  const csvCell = value => {
+    let text = value == null ? "" : String(value);
+    if (/^[=+@\\-\\t\\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
+  rows.forEach(row => lines.push(columns.map(([key]) => csvCell(row[key])).join(",")));
+  const blob = new Blob(["\\uFEFF" + lines.join("\\r\\n") + "\\r\\n"], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const date = new Date().toISOString().slice(0,10);
+  link.href = url;
+  link.download = "zivamuntuyo-trial-balance-" + date + ".csv";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (feedback) feedback.textContent = "Exported " + rows.length + " authorized trial-balance rows. Keep the file confidential.";
+};
+
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
+  const exportButton = document.getElementById("reports-export-csv");
+  window._financialReportRows = [];
+  if (exportButton) exportButton.disabled = true;
   const summary = document.getElementById("reports-summary");
   const detail = document.getElementById("reports-detail");
   const branchInput = document.getElementById("reports-branch-id");
@@ -1193,6 +1237,8 @@ window.loadFinancialReports = async function() {
     return;
   }
   const rows = data || [];
+  window._financialReportRows = rows;
+  if (exportButton) exportButton.disabled = rows.length === 0;
   if (!rows.length) {
     feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
     return;
