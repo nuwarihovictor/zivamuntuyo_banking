@@ -1,8 +1,6 @@
 \set ON_ERROR_STOP on
 -- Runs only against the disposable fixture after all draft migrations.
--- Branch 1 is created by the shared fixture; add branch 2 for cross-branch denial.
-INSERT INTO public.branches(id,branch_code,branch_name,is_active)
-VALUES ('10000000-0000-0000-0000-000000000002','MBR','Mbarara',true);
+-- The shared fixture and prior assertions already create branch IDs 1 and 2.
 INSERT INTO public.employee_profiles(user_id,is_active)
 VALUES
  ('40000000-0000-0000-0000-000000000011',true),
