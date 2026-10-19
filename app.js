@@ -1799,7 +1799,7 @@ window.loadStaffChat = async function() {
   try{
     const {data:userData,error:userError}=await db.auth.getUser();
     if(userError||!userData?.user) throw new Error("Sign in with your staff account to view messages.");
-    const {data,error}=await db.from("staff_messages")
+    const {data,error}=await db.from("staff_chat_messages")
       .select("id,sender_user_id,message_body,created_at")
       .order("created_at",{ascending:false}).limit(100);
     if(error) throw error;
@@ -1829,7 +1829,7 @@ window.sendStaffMessage = async function(event) {
   try{
     const {data:userData,error:userError}=await db.auth.getUser();
     if(userError||!userData?.user) throw new Error("Your staff session has expired. Sign in again.");
-    const {error}=await db.from("staff_messages").insert({sender_user_id:userData.user.id,message_body:message});
+    const {error}=await db.from("staff_chat_messages").insert({sender_user_id:userData.user.id,message_body:message});
     if(error) throw error;
     input.value="";
     await window.loadStaffChat();
