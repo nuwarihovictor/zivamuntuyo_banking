@@ -107,3 +107,9 @@ These checkboxes distinguish repository implementation from unperformed environm
 - [x] Run read-only aggregate checks for posted journal balance/currency/audit fields, stored account balances versus posted liability ledger, multiple IND accounts and joint-holder counts.
 - [x] Check in repeatable diagnostic SQL at \`supabase/tests/financial_integrity_diagnostics.sql\`.
 - [ ] Add this diagnostic to a controlled staging/release checklist and establish a recurring owner/schedule for monitoring.
+
+
+## Attendance fallback — 19 October 2026
+- [x] Add manual web clock-in/out controls and current-day status display.
+- [x] Draft server-side clock-in/out RPCs with branch access, duplicate daily record protection, server timestamps, policy-based late/early status and audit events.
+- [ ] Apply/test attendance RPCs in staging; complete device connector only after the exact fingerprint model/SDK is selected.
