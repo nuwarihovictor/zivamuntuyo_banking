@@ -2858,6 +2858,35 @@ async function handleStaffLogin(event) {
   }
 }
 
+async function handlePasswordReset() {
+  const feedback = document.getElementById("login-feedback");
+  const button = document.getElementById("password-reset-button");
+  const email = document.getElementById("login-email")?.value?.trim() || "";
+  if (!db) {
+    if (feedback) feedback.textContent = "Secure database connection is unavailable. Contact the system administrator.";
+    return;
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (feedback) feedback.textContent = "Enter your staff email above first, then request a reset link.";
+    document.getElementById("login-email")?.focus();
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = "Sending reset link…"; }
+  if (feedback) feedback.textContent = "Requesting a secure password-reset email…";
+  try {
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) throw error;
+    // Keep the response generic to avoid revealing whether an email is registered.
+    if (feedback) feedback.textContent = "If this address belongs to a staff account, a password-reset email will be sent. Check your inbox and spam folder. If it does not arrive, contact the system administrator.";
+  } catch (error) {
+    if (feedback) feedback.textContent = "The reset request could not be confirmed. Check your connection and try again, or contact the system administrator.";
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Forgot password? Send a reset link"; }
+  }
+}
+
 async function handleStaffSignOut() {
   if (!db) return;
   pendingBranchOpen = null;
@@ -2881,6 +2910,7 @@ function initApp() {
   initAppearanceControls();
   const loginForm = document.getElementById("login-form");
   if (loginForm) loginForm.addEventListener("submit", handleStaffLogin);
+  document.getElementById("password-reset-button")?.addEventListener("click", handlePasswordReset);
   document.getElementById("bank-wide-login-button")?.addEventListener("click", window.openBankWideStaffLogin);
   document.getElementById("back-to-branch-directory")?.addEventListener("click", window.returnToBranchDirectory);
   const signOutButton = document.getElementById("sign-out-button");
