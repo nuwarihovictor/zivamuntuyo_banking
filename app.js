@@ -2,19 +2,25 @@
 // ZIVAMUNTUYO FINANCIAL SERVICES LTD - COMMERCIAL BANKING CORE FRONTEND
 // ============================================================================
 
-const SUPABASE_URL = "https://hwghiezvghdqxnhcnpwk.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
+const runtimeConfig = window.ZIVAMUNTUYO_CONFIG || {};
+const productionHost = window.location && window.location.hostname === "zivamuntuyobanking.vercel.app";
+const productionSupabaseUrl = "https://hwghiezvghdqxnhcnpwk.supabase.co";
+const productionPublishableKey = "sb_publishable_uRGcpKo1-033QnltdseN7A_Kl2LFRBa";
+// Preview/local deployments must provide explicit staging configuration. Only the
+// canonical production hostname may use the production fallback configuration.
+const SUPABASE_URL = runtimeConfig.supabaseUrl || (productionHost ? productionSupabaseUrl : "");
+const SUPABASE_ANON_KEY = runtimeConfig.supabaseAnonKey || (productionHost ? productionPublishableKey : "");
 window.currentEmployeeName = "";
 window.currentEmployeeRole = ""; 
 
 let db = null;
-if (window.supabase) {
+if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
 function esc(str) {
   if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function panel(title, subtitle, desc, contentHtml) {
@@ -26,6 +32,80 @@ function panel(title, subtitle, desc, contentHtml) {
     </div>
   `;
 }
+
+window.loadCustomerDirectory = async function() {
+  const listEl = document.getElementById("cust-list");
+  if (!listEl) return;
+  if (!db) {
+    listEl.innerHTML = '<p class="muted">Database connection unavailable. Customer records were not loaded. <button type="button" class="secondary" onclick="window.loadCustomerDirectory()">Retry</button></p>';
+    return;
+  }
+  listEl.innerHTML = '<p class="muted">Loading customer records…</p>';
+  try {
+    const [customerResult, roleResult] = await Promise.all([
+      db.from("customers")
+        .select("id,full_name,customer_number,phone_number,status,created_at")
+        .order("created_at", { ascending: false }),
+      db.rpc("current_employee_role_code")
+    ]);
+    if (customerResult.error) throw customerResult.error;
+    const data = Array.isArray(customerResult.data) ? customerResult.data : [];
+    const role = roleResult.error ? "" : String(roleResult.data || "");
+    const canReview = ["system_admin", "bank_admin", "branch_manager"].includes(role);
+    if (!data.length) {
+      listEl.innerHTML = '<p class="muted">No customer records found yet. Register above to begin.</p>';
+      return;
+    }
+    listEl.innerHTML = data.map(cust => {
+      const status = String(cust.status || "status unknown");
+      const reviewControls = canReview && status === "pending_review"
+        ? '<div class="kyc-review-controls"><label for="kyc-review-reason-' + esc(cust.id) + '">Review reason (required, 8–500 characters)<input id="kyc-review-reason-' + esc(cust.id) + '" maxlength="500" minlength="8" autocomplete="off" placeholder="Record the KYC decision reason"></label>' +
+          '<button type="button" class="primary" data-kyc-review-for="' + esc(cust.id) + '" onclick="window.reviewCustomerKyc(\'' + esc(cust.id) + '\',\'approve\')">Approve KYC</button>' +
+          '<button type="button" class="secondary" data-kyc-review-for="' + esc(cust.id) + '" onclick="window.reviewCustomerKyc(\'' + esc(cust.id) + '\',\'reject\')">Reject KYC</button></div>'
+        : "";
+      return '<div class="list-item"><div><strong>' + esc(cust.full_name) + '</strong><br>' +
+        '<span class="muted">' + esc(cust.customer_number) + ' | Identification: held in restricted customer record</span><br>' +
+        '<span class="muted">' + esc(cust.phone_number || "Phone not recorded") + '</span>' +
+        reviewControls + '</div><span class="badge-role">' + esc(status) + '</span></div>';
+    }).join("");
+  } catch (error) {
+    listEl.innerHTML = '<p class="muted">Customer records could not be loaded. Check your connection and permissions, then retry. ' +
+      esc(error?.message || "Request failed") +
+      ' <button type="button" class="secondary" onclick="window.loadCustomerDirectory()">Retry</button></p>';
+  }
+};
+
+window.reviewCustomerKyc = async function(customerId, decision) {
+  const feedback = document.getElementById("cust-review-feedback");
+  const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!db || !idPattern.test(String(customerId || "")) || !["approve", "reject"].includes(decision)) {
+    if (feedback) feedback.textContent = "KYC review request is invalid or the database is unavailable.";
+    return;
+  }
+  const reasonInput = document.getElementById("kyc-review-reason-" + customerId);
+  const reason = String(reasonInput?.value || "").trim();
+  if (reason.length < 8 || reason.length > 500) {
+    if (feedback) feedback.textContent = "Enter a review reason between 8 and 500 characters before deciding.";
+    if (reasonInput) reasonInput.focus();
+    return;
+  }
+  const buttons = document.querySelectorAll('[data-kyc-review-for="' + customerId + '"]');
+  buttons.forEach(button => { button.disabled = true; });
+  if (feedback) feedback.textContent = "Submitting KYC decision to the audited database function…";
+  try {
+    const { error } = await db.rpc("review_customer_kyc", {
+      p_customer_id: customerId,
+      p_decision: decision,
+      p_reason: reason
+    });
+    if (error) throw error;
+    if (feedback) feedback.textContent = "KYC decision recorded. Refreshing customer status…";
+    await window.loadCustomerDirectory();
+  } catch (error) {
+    if (feedback) feedback.textContent = "KYC decision was not confirmed. The customer status has not been assumed changed. " + (error?.message || "Unexpected error");
+    buttons.forEach(button => { button.disabled = false; });
+  }
+};
 
 function transactionModuleTabs(active){
   const tabs=[["Transactions","Overview","📋"],["Deposits","Deposits","⬇️"],["Withdrawals","Withdrawals","⬆️"]];
@@ -94,7 +174,7 @@ window.loadBranchManagement = async function() {
         <label>Time zone<select name="timezone">${["Africa/Kampala","Africa/Nairobi","Africa/Kigali"].map(t=>'<option '+(t===(b.timezone||"Africa/Kampala")?'selected':'')+'>'+t+'</option>').join("")}</select></label>
         <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_head_office" ${b.is_head_office?"checked":""}> Head office</label>
         <button class="primary" type="submit">Save changes</button>
-        <button class="secondary" type="button" onclick="window.setBranchActive('${esc(b.id)}',${!b.is_active})">${b.is_active?"Archive branch":"Reactivate branch"}</button>
+        <button class="secondary" type="button" onclick="window.setBranchActive('${esc(b.id)}',${!b.is_active},this)">${b.is_active?"Archive branch":"Reactivate branch"}</button>
       </form>
     </details>
   `).join("")||'<p class="muted">No branch records are visible to your account.</p>';
@@ -105,11 +185,21 @@ window.createBranch = async function(event) {
   const form=event.currentTarget, feedback=document.getElementById("branch-management-feedback");
   if(!db||!form.reportValidity())return;
   const data=new FormData(form);
-  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on",is_active:true};
+  const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
   if(feedback)feedback.textContent="Creating branch…";
-  const {error}=await db.rpc("admin_create_branch",{p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
-  if(error){if(feedback)feedback.textContent="Branch was not created: "+error.message;return;}
-  form.reset();await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_create_branch",{p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
+    if(error)throw error;
+    form.reset();
+    if(feedback)feedback.textContent="Branch created. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch creation could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(submit)submit.disabled=false;
+  }
 };
 
 window.updateBranch = async function(event,id) {
@@ -118,23 +208,39 @@ window.updateBranch = async function(event,id) {
   if(!db||!form.reportValidity())return;
   const data=new FormData(form);
   const payload={branch_code:String(data.get("branch_code")||"").trim().toUpperCase(),branch_name:String(data.get("branch_name")||"").trim(),country_id:data.get("country_id"),address:String(data.get("address")||"").trim()||null,timezone:data.get("timezone")||"Africa/Kampala",is_head_office:data.get("is_head_office")==="on"};
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
   if(feedback)feedback.textContent="Saving branch changes…";
-  const {error}=await db.rpc("admin_update_branch",{p_branch_id:id,p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
-  if(error){if(feedback)feedback.textContent="Branch changes were not saved: "+error.message;return;}
-  await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_update_branch",{p_branch_id:id,p_branch_code:payload.branch_code,p_branch_name:payload.branch_name,p_country_id:payload.country_id,p_address:payload.address,p_timezone:payload.timezone,p_is_head_office:payload.is_head_office});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Branch updated. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch update could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(submit)submit.disabled=false;
+  }
 };
 
-window.setBranchActive = async function(id,active) {
+window.setBranchActive = async function(id,active,button) {
   const action=active?"reactivate":"archive";
   if(!confirm("Are you sure you want to "+action+" this branch? Existing financial history will be preserved."))return;
   const feedback=document.getElementById("branch-management-feedback");
   if(!db)return;
+  if(button)button.disabled=true;
   if(feedback)feedback.textContent=(active?"Reactivating":"Archiving")+" branch…";
-  const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
-  if(error){if(feedback)feedback.textContent="Branch status was not changed: "+error.message;return;}
-  await window.loadBranchManagement();
+  try {
+    const {error}=await db.rpc("admin_set_branch_active",{p_branch_id:id,p_is_active:active});
+    if(error)throw error;
+    if(feedback)feedback.textContent="Branch status updated. Refreshing directory…";
+    await window.loadBranchManagement();
+  } catch(error) {
+    if(feedback)feedback.textContent="Branch status change could not be confirmed. Refresh the directory before retrying. "+(error?.message||"Unexpected error");
+  } finally {
+    if(button)button.disabled=false;
+  }
 };
-
 
 window.switchPage = function(pageName) {
   document.querySelectorAll('.nav').forEach(btn => {
@@ -289,55 +395,57 @@ window.switchPage = function(pageName) {
         "Register New Bank Customer",
         "Capture verified customer identification details before account creation.",
         `<form id="cust-form" onsubmit="handleCustomerSubmit(event)">
-          <label>Full Legal Name * 
-            <input type="text" name="full_name" required placeholder="e.g. Nuwariho Victor">
+          <label>Customer type *
+            <select name="customer_type" required>
+              <option value="individual">Individual</option>
+              <option value="business">Business</option>
+              <option value="organization">Organization</option>
+            </select>
           </label>
-          <label>National ID (NIN) or Passport * 
-            <input type="text" name="nin_or_passport" required placeholder="CM12345678ABCD">
+          <label>Full Legal Name / Registered Name *
+            <input type="text" name="full_name" maxlength="200" required autocomplete="name" placeholder="Full legal or registered name">
           </label>
-          <label>Phone Number * 
-            <input type="tel" name="phone_number" required placeholder="+256 700 000000">
+          <label>Identification type *
+            <select name="identification_type" required>
+              <option value="national_id">National ID (NIN)</option>
+              <option value="passport">Passport</option>
+              <option value="business_registration">Business registration</option>
+              <option value="other">Other approved identification</option>
+            </select>
           </label>
-          <label>Email Address 
-            <input type="email" name="email" placeholder="victor@zivamuntuyo.com">
+          <label>Identification number *
+            <input type="text" name="identification_number" maxlength="120" required autocomplete="off" placeholder="Enter verified identification number">
           </label>
-          <label>Physical Address * 
-            <input type="text" name="address" required placeholder="Kampala, Uganda">
+          <label>Phone Number *
+            <input type="tel" name="phone_number" maxlength="50" required autocomplete="tel" placeholder="+256 700 000000">
           </label>
-          <button type="submit" class="primary">Register Customer (CIF)</button>
-          <p id="cust-feedback" class="muted"></p>
+          <label>Email Address
+            <input type="email" name="email" maxlength="254" autocomplete="email" placeholder="customer@example.com">
+          </label>
+          <label>Physical Address *
+            <input type="text" name="physical_address" maxlength="500" required autocomplete="street-address" placeholder="Town / street / locality">
+          </label>
+          <label>Branch responsible for KYC review *
+            <select name="branch_id" id="customer-branch-id" required>
+              <option value="">Loading authorized branches…</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Submit Customer for KYC Review</button>
+          <p id="cust-feedback" class="muted" role="status" aria-live="polite"></p>
+          <p class="muted">New customers remain pending review until an authorized officer approves them. A pending customer cannot open an account.</p>
         </form>`
       )}
       ${panel(
         "VERIFIED CUSTOMER DIRECTORY",
-        "Active CIF Records",
-        "List of all registered bank customers.",
-        `<div id="cust-list"><p class="muted">Loading customer records...</p></div>`
+        "Customer Directory & KYC Status",
+        "View customer records and their current review status within your authorized branch scope.",
+        `<p id="cust-review-feedback" class="muted" role="status" aria-live="polite"></p>
+        <div id="cust-list"><p class="muted">Loading customer records...</p></div>`
       )}
     `;
 
-    if (db) {
-      db.from("customers").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-        const listEl = document.getElementById("cust-list");
-        if (!listEl) return;
-        if (error || !data || data.length === 0) {
-          listEl.innerHTML = `<p class="muted">No customer records found yet. Register above to begin.</p>`;
-          return;
-        }
-        listEl.innerHTML = data.map(cust => `
-          <div class="list-item">
-            <div>
-              <strong>${esc(cust.full_name)}</strong><br>
-              <span class="muted">${esc(cust.customer_number)} | NIN: ${esc(cust.nin_or_passport)}</span>
-            </div>
-            <span class="badge-role">${esc(cust.phone_number)}</span>
-          </div>
-        `).join("");
-      }).catch(() => {
-        const listEl = document.getElementById("cust-list");
-        if (listEl) listEl.innerHTML = `<p class="muted">No customer records found yet.</p>`;
-      });
-    }
+    window.loadCustomerRegistrationOptions();
+    window.loadCustomerDirectory();
   }
   else if (pageName === "Accounts") {
     c.innerHTML = `
@@ -375,14 +483,8 @@ window.switchPage = function(pageName) {
             </select>
           </label>
           <label>Currency *
-            <select name="currency_code" required>
-              <option value="UGX">UGX — Ugandan shilling</option>
-              <option value="USD">USD — US dollar</option>
-              <option value="KES">KES — Kenyan shilling</option>
-              <option value="TZS">TZS — Tanzanian shilling</option>
-              <option value="RWF">RWF — Rwandan franc</option>
-              <option value="BIF">BIF — Burundian franc</option>
-              <option value="CDF">CDF — Congolese franc</option>
+            <select name="currency_code" id="account-currency-code" required>
+              <option value="">Loading active currencies…</option>
             </select>
           </label>
           <fieldset class="document-upload-fieldset">
@@ -415,10 +517,12 @@ window.switchPage = function(pageName) {
     if (db) {
       Promise.all([
         db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name"),
-        db.from("account_types").select("id,type_name,type_code").eq("is_active",true).order("type_name")
-      ]).then(([branchResult,typeResult])=>{
+        db.from("account_types").select("id,type_name,type_code").eq("is_active",true).order("type_name"),
+        db.from("currencies").select("code").eq("is_active",true).order("code")
+      ]).then(([branchResult,typeResult,currencyResult])=>{
         const branchSelect=document.getElementById("account-branch-id");
         const typeSelect=document.getElementById("account-type-id");
+        const currencySelect=document.getElementById("account-currency-code");
         if(branchSelect){
           if(branchResult.error) branchSelect.innerHTML='<option value="">Branches unavailable</option>';
           else branchSelect.innerHTML='<option value="">Choose branch</option>'+(branchResult.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
@@ -426,6 +530,10 @@ window.switchPage = function(pageName) {
         if(typeSelect){
           if(typeResult.error) typeSelect.innerHTML='<option value="">Account types unavailable</option>';
           else typeSelect.innerHTML='<option value="">Choose ownership type</option>'+(typeResult.data||[]).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.type_name)+' ('+esc(t.type_code)+')</option>').join("");
+        }
+        if(currencySelect){
+          if(currencyResult.error) currencySelect.innerHTML='<option value="">Currencies unavailable</option>';
+          else currencySelect.innerHTML='<option value="">Choose currency</option>'+(currencyResult.data||[]).map(x=>'<option value="'+esc(x.code)+'">'+esc(x.code)+'</option>').join("");
         }
       });
       db.rpc("list_customer_account_balance_reconciliation")
@@ -545,7 +653,7 @@ window.switchPage = function(pageName) {
         "DEVICE-COMPATIBLE ATTENDANCE",
         "Windows 10 / Windows 11",
         "Designed around common fingerprint terminals and USB readers. Actual compatibility depends on the exact model, firmware, vendor SDK and connection method.",
-        `<div class="notice-box"><strong>Important:</strong> no fingerprint device is connected yet. This setup page does not scan fingerprints or create official attendance records. A secure Windows connector or supported terminal API must be installed and tested first.</div>
+        `<div class="notice-box"><strong>Fingerprint status:</strong> no fingerprint device is connected yet. The manual clock-in/clock-out panel below records self-service punches only; these are not fingerprint-verified. Biometric attendance requires a trusted Windows connector or supported terminal API, device authentication, and hardware testing.</div>
          <label for="attendance-device">Choose device family / connection method
            <select id="attendance-device" onchange="showAttendanceDeviceHelp()">
              <option value="zkteco">ZKTeco fingerprint terminals (LAN / ADMS / vendor SDK)</option>
@@ -568,6 +676,18 @@ window.switchPage = function(pageName) {
            <li>Store attendance events and device identifiers, not raw fingerprint images.</li>
            <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
          </ul>
+         <hr>
+         <h3 style="margin:18px 0 8px;">Staff clock-in / clock-out</h3>
+         <p class="muted">This records a manual punch for your signed-in staff account when the attendance migration is installed. It is not fingerprint verification; device-sourced punches must come through a trusted device connector.</p>
+         <div class="attendance-punch-panel">
+           <div id="staff-attendance-state" class="notice-box" role="status" aria-live="polite">Checking your attendance status…</div>
+           <div class="attendance-punch-actions">
+             <button id="staff-attendance-punch" type="button" class="primary" onclick="window.recordStaffAttendancePunch()">Clock in</button>
+             <button type="button" class="secondary" onclick="window.loadStaffAttendance()">Refresh punches</button>
+           </div>
+           <div id="staff-attendance-feedback" class="muted" aria-live="polite"></div>
+           <div id="staff-attendance-list" class="staff-attendance-list"></div>
+         </div>
          <hr>
          <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
          <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. The schedule can be saved only after the attendance_policies.sql database setup is installed. Saving requires an authorized manager and creates an audit event.</p>
@@ -612,7 +732,7 @@ window.switchPage = function(pageName) {
            <div class="metric-card"><strong>Absence & leave</strong><p class="muted">Track absent days, approved leave, public holidays, rest days and missing punches separately.</p></div>
            <div class="metric-card"><strong>Payroll export</strong><p class="muted">Approved timesheets can later feed payroll summaries, with overtime and deductions shown separately.</p></div>
          </div>
-         <p class="muted">Schedule saving is available after the SQL setup is installed. Fingerprint capture, official attendance event capture, manager correction workflow and payroll integration are separate steps and are not enabled yet.</p>
+         <p class="muted">Schedule saving is available after the SQL setup is installed. Manual punches are recorded when the attendance database migration is installed. Fingerprint capture, manager correction approvals and payroll integration are separate steps and are not enabled yet.</p>
          <h3 style="margin:18px 0 8px;">Recorded timesheets</h3>
          <div class="form-grid">
            <label>From date<input type="date" id="timesheet-from"></label>
@@ -626,6 +746,7 @@ window.switchPage = function(pageName) {
       )}
     `;
     window.showAttendanceDeviceHelp();
+    window.loadStaffAttendance();
     const timesheetToday = new Date();
     const timesheetToDate = timesheetToday.toISOString().slice(0,10);
     const timesheetFromDate = new Date(timesheetToday.getTime() - 30*24*60*60*1000).toISOString().slice(0,10);
@@ -644,15 +765,21 @@ window.loadAttendancePolicy();
       ${panel(
         "TEAM MESSAGES",
         "Internal staff communication",
-        "Messaging is not connected to a database yet; this page does not send or store messages.",
-        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
-         <label>Message preview
-           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
-         </label>
-         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
-         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
+        "Messages are available to authenticated active employees; sent messages are append-only.",
+        `<div class="staff-chat-toolbar">
+           <p class="muted">Use this channel for internal work information. Do not send passwords, PINs, customer account details, or confidential financial data.</p>
+           <button type="button" class="secondary" onclick="window.loadStaffChat()">Refresh messages</button>
+         </div>
+         <div id="staff-chat-feedback" class="muted" role="status" aria-live="polite">Loading staff messages…</div>
+         <div id="staff-chat-list" class="staff-chat-list" aria-live="polite"></div>
+         <form id="staff-chat-form" class="staff-chat-form" onsubmit="window.sendStaffMessage(event)">
+           <label for="staff-chat-input">Message to all active staff</label>
+           <textarea id="staff-chat-input" rows="3" maxlength="1000" required placeholder="Write a short work message…"></textarea>
+           <div class="staff-chat-submit"><span class="muted">Maximum 1,000 characters</span><button class="primary" type="submit">Send message</button></div>
+         </form>`
       )}
     `;
+    window.loadStaffChat();
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
@@ -868,11 +995,15 @@ window.loadAttendancePolicy();
              <input id="reports-branch-id" type="text" placeholder="Optional branch UUID">
            </label>
            <button type="button" class="secondary" onclick="loadFinancialReports()">Refresh reports</button>
+           <button type="button" class="secondary" id="reports-export-csv" onclick="window.exportFinancialReportsCsv()" disabled>Export trial balance CSV</button>
+           <button type="button" class="secondary" id="reports-export-statements-csv" onclick="window.exportFinancialStatementsCsv()" disabled>Export statement summary CSV</button>
          </div>
          <div id="reports-feedback" class="muted" aria-live="polite">Loading ledger report…</div>
          <div id="reports-summary"></div>
          <div id="reports-detail"></div>
-         <p class="muted">Income statement and balance sheet classifications require a reviewed chart of accounts. No estimates or demo figures are displayed.</p>`
+         <section class="panel"><h3>Cumulative income statement view</h3><div id="reports-income-statement"></div></section>
+         <section class="panel"><h3>Balance sheet view</h3><div id="reports-balance-sheet"></div></section>
+         <p class="muted">Statement views use the active ledger accounts returned by the posted-ledger RPC and are cumulative, not date-filtered. Inactive accounts with historical postings may be excluded. Verify account mappings, opening balances, closing entries, and reconciliation before formal financial reporting.</p>`
       )}
     `;
 
@@ -980,9 +1111,9 @@ window.loadTransactionMonitor = async function() {
     const status=String(r.status||"").toLowerCase();
     const type=String(r.transaction_type||"").toLowerCase();
     const isPosted=status==="posted";
-    const isDeposit=type==="deposit";
-    const receiptButton=(isPosted&&isDeposit)
-      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(r.transaction_type||"deposit")+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print deposit receipt</button>'
+    const isCashType=type==="deposit"||type==="withdrawal";
+    const receiptButton=(isPosted&&isCashType)
+      ? '<button type="button" class="secondary transaction-print-receipt" data-receipt-status="posted" data-receipt-print-count="0" data-receipt-reference="'+esc(r.transaction_reference||r.journal_id||"")+'" data-receipt-date="'+esc(r.transaction_date||"")+'" data-receipt-branch="'+esc(r.branch_name||"")+'" data-receipt-account="'+esc(r.account_number||"")+'" data-receipt-type="'+esc(type)+'" data-receipt-amount="'+esc(String(r.amount||0))+'" data-receipt-currency="'+esc(r.currency_code||"")+'">Print '+(type==="deposit"?"deposit":"withdrawal")+' receipt</button>'
       : "";
     return '<div class="list-item"><div><strong>'+esc(r.transaction_reference||r.journal_id)+'</strong><br><span class="muted">'+esc(r.transaction_date||"")+' · '+esc(r.branch_name||"Branch unavailable")+' · '+esc(r.account_number||"Account unavailable")+'</span><br><span>'+esc(r.transaction_type||"Journal")+' · '+esc(amount)+'</span></div><div class="transaction-status-actions"><span class="badge-role">'+esc(r.status||"unknown")+'</span>'+receiptButton+'</div></div>';
   }).join("");
@@ -1112,38 +1243,96 @@ window.handleFinancialActivitySubmit=async function(e){
  }catch(err){if(feedback)feedback.textContent="Entry not recorded: "+err.message;}finally{if(button)button.disabled=false;}
 };
 
-window.loadFinancialReports = async function() {
+window._financialReportRows = [];
+window.exportFinancialReportsCsv = function() {
   const feedback = document.getElementById("reports-feedback");
-  const summary = document.getElementById("reports-summary");
-  const detail = document.getElementById("reports-detail");
-  const branchInput = document.getElementById("reports-branch-id");
-  if (!feedback || !summary || !detail) return;
-  summary.innerHTML = "";
-  detail.innerHTML = "";
-  if (!db) {
-    feedback.textContent = "Database connection unavailable. No report figures are being shown.";
-    return;
-  }
-  const branchId = branchInput ? branchInput.value.trim() : "";
-  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
-    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
-    return;
-  }
-  feedback.textContent = "Loading posted ledger totals…";
-  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
-  if (error) {
-    feedback.textContent = "Reports could not load. Install the secure list_trial_balance SQL function in Supabase and check your accounting role. Details: " + error.message;
-    return;
-  }
-  const rows = data || [];
+  const button = document.getElementById("reports-export-csv");
+  const rows = Array.isArray(window._financialReportRows) ? window._financialReportRows : [];
   if (!rows.length) {
-    feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
+    if (feedback) feedback.textContent = "No loaded trial-balance rows to export. Refresh reports first.";
+    if (button) button.disabled = true;
     return;
   }
-  const currencies = {};
+  const columns = [
+    ["ledger_account_id", "ledger_account_id"],
+    ["account_code", "account_code"],
+    ["account_name", "account_name"],
+    ["ledger_type", "ledger_type"],
+    ["currency_code", "currency_code"],
+    ["debit_total", "debit_total"],
+    ["credit_total", "credit_total"]
+  ];
+  const csvCell = value => {
+    let text = value == null ? "" : String(value);
+    if (/^[-=+@\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
+  rows.forEach(row => lines.push(columns.map(([key]) => csvCell(row[key])).join(",")));
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n") + "\r\n"], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const date = new Date().toISOString().slice(0,10);
+  link.href = url;
+  link.download = "zivamuntuyo-trial-balance-" + date + ".csv";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (feedback) feedback.textContent = "Exported " + rows.length + " authorized trial-balance rows. Keep the file confidential.";
+};
+
+window.validateTrialBalanceRows = function(rows) {
+  if (!Array.isArray(rows)) return { ok: false, message: "The database returned an invalid report format." };
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index] || {};
+    if (!String(row.currency_code || "").trim()) return { ok: false, message: "A ledger row has no currency code. Report totals were withheld." };
+    for (const field of ["debit_total", "credit_total", "net_balance"]) {
+      if (row[field] === null || row[field] === undefined || String(row[field]).trim() === "" ||
+          !Number.isFinite(Number(row[field]))) {
+        return { ok: false, message: "A ledger row contains an invalid " + field + ". Report totals were withheld." };
+      }
+    }
+  }
+  return { ok: true, rows };
+};
+
+window.exportFinancialStatementsCsv = function() {
+  const feedback = document.getElementById("reports-feedback");
+  const button = document.getElementById("reports-export-statements-csv");
+  const rows = Array.isArray(window._financialStatementRows) ? window._financialStatementRows : [];
+  if (!rows.length) {
+    if (feedback) feedback.textContent = "No loaded statement rows to export. Refresh reports first.";
+    if (button) button.disabled = true;
+    return;
+  }
+  const csvCell = value => {
+    let text = value == null ? "" : String(value);
+    if (/^[-=+@\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const columns = [["statement", "statement"], ["currency_code", "currency_code"], ["line_item", "line_item"], ["amount", "amount"]];
+  const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
+  rows.forEach(row => lines.push(columns.map(([key]) => csvCell(row[key])).join(",")));
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n") + "\r\n"], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "zivamuntuyo-financial-statement-summary-" + new Date().toISOString().slice(0,10) + ".csv";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (feedback) feedback.textContent = "Exported " + rows.length + " statement summary rows. These are cumulative active-ledger balances, not date-filtered statutory statements.";
+};
+
+window.calculateFinancialReportGroups = function(rows) {
+  const currencies = Object.create(null);
   rows.forEach(row => {
-    const currency = String(row.currency_code || "UNKNOWN").trim();
-    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: {} };
+    const currency = String(row.currency_code).trim();
+    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: Object.create(null) };
     const group = currencies[currency];
     group.debit += Number(row.debit_total || 0);
     group.credit += Number(row.credit_total || 0);
@@ -1154,8 +1343,126 @@ window.loadFinancialReports = async function() {
     group.accounts[type].credit += Number(row.credit_total || 0);
     group.accounts[type].count++;
   });
+  const currencyEntries = Object.entries(currencies);
+  const unbalancedCurrencies = currencyEntries.filter(([, group]) => Math.abs(group.debit - group.credit) >= 0.005);
+  return { currencies, currencyEntries, unbalancedCurrencies };
+};
+
+window.calculateFinancialStatementAmounts = function(accounts) {
+  const amount = (type, side) => {
+    const totals = accounts[type];
+    if (!totals) return 0;
+    return side === "debit" ? totals.debit - totals.credit : totals.credit - totals.debit;
+  };
+  const income = amount("income", "credit");
+  const expenses = amount("expense", "debit");
+  const netResult = income - expenses;
+  const assets = amount("asset", "debit");
+  const liabilities = amount("liability", "credit");
+  const equity = amount("equity", "credit");
+  const totalClaims = liabilities + equity + netResult;
+  const difference = assets - totalClaims;
+  return { income, expenses, netResult, assets, liabilities, equity, totalClaims, difference };
+};
+
+window.loadFinancialReports = async function() {
+  const feedback = document.getElementById("reports-feedback");
+  const exportButton = document.getElementById("reports-export-csv");
+  const statementsExportButton = document.getElementById("reports-export-statements-csv");
+  const incomeEl = document.getElementById("reports-income-statement");
+  const balanceSheetEl = document.getElementById("reports-balance-sheet");
+  window._financialReportRows = [];
+  window._financialStatementRows = [];
+  if (exportButton) exportButton.disabled = true;
+  if (statementsExportButton) statementsExportButton.disabled = true;
+  const summary = document.getElementById("reports-summary");
+  const detail = document.getElementById("reports-detail");
+  const branchInput = document.getElementById("reports-branch-id");
+  if (!feedback || !summary || !detail) return;
+  summary.innerHTML = "";
+  detail.innerHTML = "";
+  if (incomeEl) incomeEl.innerHTML = "";
+  if (balanceSheetEl) balanceSheetEl.innerHTML = "";
+  if (!db) {
+    feedback.textContent = "Database connection unavailable. No report figures are being shown.";
+    return;
+  }
+  const branchId = branchInput ? branchInput.value.trim() : "";
+  if (branchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId)) {
+    feedback.textContent = "Enter a valid branch UUID or leave the field blank.";
+    return;
+  }
+  feedback.textContent = "Loading posted ledger totals…";
+  let response;
+  try {
+    response = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  } catch (error) {
+    feedback.textContent = "Reports could not be loaded. Check accounting permissions and connection, then retry.";
+    return;
+  }
+  const { data, error } = response || {};
+  if (error) {
+    feedback.textContent = "Reports could not load. Check accounting permissions and connection, then retry. " + (error.message || "");
+    return;
+  }
+  const rows = Array.isArray(data) ? data : [];
+  const validation = window.validateTrialBalanceRows(rows);
+  if (!validation.ok) {
+    feedback.textContent = validation.message;
+    return;
+  }
+  window._financialReportRows = rows;
+  if (exportButton) exportButton.disabled = rows.length === 0;
+  if (!rows.length) {
+    feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
+    return;
+  }
+  const { currencies, currencyEntries, unbalancedCurrencies } = window.calculateFinancialReportGroups(rows);
   const money = (n, currency) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
-  summary.innerHTML = Object.entries(currencies).map(([currency, g]) =>
+  const statementRows = [];
+  const incomeMarkup = [];
+  const balanceMarkup = [];
+  currencyEntries.forEach(([currency, group]) => {
+    const accounts = group.accounts;
+    const { income, expenses, netResult, assets, liabilities, equity, totalClaims, difference } =
+      window.calculateFinancialStatementAmounts(accounts);
+    const push = (statement, line, value) => statementRows.push({
+      statement, currency_code: currency, line_item: line, amount: Number(value.toFixed(2))
+    });
+    push("income_statement", "Income", income);
+    push("income_statement", "Expenses", expenses);
+    push("income_statement", "Net surplus / (deficit)", netResult);
+    push("balance_sheet", "Assets", assets);
+    push("balance_sheet", "Liabilities", liabilities);
+    push("balance_sheet", "Equity", equity);
+    push("balance_sheet", "Unclosed earnings (income less expenses)", netResult);
+    push("balance_sheet", "Liabilities + equity + unclosed earnings", totalClaims);
+    push("balance_sheet", "Balance sheet difference (assets less claims)", difference);
+    incomeMarkup.push(
+      '<h4>' + esc(currency) + '</h4>' +
+      '<div class="list-item"><span>Income</span><strong>' + esc(money(income, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Expenses</span><strong>' + esc(money(expenses, currency)) + '</strong></div>' +
+      '<div class="list-item"><strong>Net surplus / (deficit)</strong><strong>' + esc(money(netResult, currency)) + '</strong></div>'
+    );
+    const balanceStatus = Math.abs(difference) < 0.005
+      ? '<div class="list-item" role="status">Assets match liabilities, equity, and unclosed earnings for this currency. Independent reconciliation is still required.</div>'
+      : '<div class="list-item" role="alert"><strong>Balance sheet difference:</strong> ' + esc(money(difference, currency)) + '. Stop and reconcile this currency before relying on the statement.</div>';
+    balanceMarkup.push(
+      '<h4>' + esc(currency) + '</h4>' +
+      '<div class="list-item"><span>Assets</span><strong>' + esc(money(assets, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Liabilities</span><strong>' + esc(money(liabilities, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Equity</span><strong>' + esc(money(equity, currency)) + '</strong></div>' +
+      '<div class="list-item"><span>Unclosed earnings</span><strong>' + esc(money(netResult, currency)) + '</strong></div>' +
+      '<div class="list-item"><strong>Liabilities + equity + unclosed earnings</strong><strong>' + esc(money(totalClaims, currency)) + '</strong></div>' +
+      balanceStatus
+    );
+  });
+  const integrityNotice = unbalancedCurrencies.length
+    ? '<div class="list-item" role="alert"><strong>STOP: trial balance is out of balance.</strong> ' +
+      unbalancedCurrencies.map(([currency, group]) => esc(currency) + " difference: " + esc(money(group.debit - group.credit, currency))).join("; ") +
+      '. Do not treat this report as reconciled until the difference is investigated.</div>'
+    : '<div class="list-item" role="status"><strong>Debit and credit totals match</strong> for each currency returned. Independent reconciliation is still required.</div>';
+  summary.innerHTML = integrityNotice + currencyEntries.map(([currency, g]) =>
     '<div class="metric-card"><div class="metric-sub">Posted ledger • ' + esc(currency) + '</div>' +
     '<div class="metric-val" style="font-size:17px;">Debits: ' + esc(money(g.debit, currency)) + '</div>' +
     '<div class="metric-val" style="font-size:17px;">Credits: ' + esc(money(g.credit, currency)) + '</div>' +
@@ -1169,7 +1476,11 @@ window.loadFinancialReports = async function() {
       ' | Net debit: ' + esc(money(t.debit - t.credit, currency)) + '</span></div></div>'
     ).join("")
   ).join("");
-  feedback.textContent = "Report loaded from " + rows.length + " active ledger accounts and posted journal entries. Currency totals are not combined.";
+  if (incomeEl) incomeEl.innerHTML = incomeMarkup.join("");
+  if (balanceSheetEl) balanceSheetEl.innerHTML = balanceMarkup.join("");
+  window._financialStatementRows = statementRows;
+  if (statementsExportButton) statementsExportButton.disabled = statementRows.length === 0;
+  feedback.textContent = "Report loaded from " + rows.length + " active ledger accounts and posted journal entries. Currency totals are not combined; statement views are cumulative and need reconciliation.";
 };
 
 window.loadTrialBalance = async function() {
@@ -1190,17 +1501,29 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loading posted journal entries…";
   list.innerHTML = "";
   totalsEl.innerHTML = "";
-  const { data, error } = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
-  if (error) {
-    feedback.textContent = "Trial balance could not be loaded. The secure list_trial_balance database function must be installed and your employee role must have accounting access. Details: " + error.message;
+  let response;
+  try {
+    response = await db.rpc("list_trial_balance", { p_branch_id: branchId || null });
+  } catch (error) {
+    feedback.textContent = "Trial balance could not be loaded. Check accounting permissions and connection, then retry.";
     return;
   }
-  const rows = data || [];
+  const { data, error } = response || {};
+  if (error) {
+    feedback.textContent = "Trial balance could not be loaded. Check accounting permissions and connection, then retry. " + (error.message || "");
+    return;
+  }
+  const rows = Array.isArray(data) ? data : [];
   if (!rows.length) {
     feedback.textContent = "No active ledger accounts were found for your authorized branch scope. This is not a confirmation that the books are balanced.";
     return;
   }
-  const grouped = {};
+  const validation = window.validateTrialBalanceRows(rows);
+  if (!validation.ok) {
+    feedback.textContent = validation.message;
+    return;
+  }
+  const grouped = Object.create(null);
   rows.forEach(row => {
     const currency = String(row.currency_code || "UNKNOWN").trim();
     if (!grouped[currency]) grouped[currency] = { debit: 0, credit: 0, rows: [] };
@@ -1231,30 +1554,121 @@ window.loadTrialBalance = async function() {
   feedback.textContent = "Loaded " + rows.length + " active ledger account(s) using posted journals only. Figures are grouped by currency.";
 };
 
+window.loadCustomerRegistrationOptions = async function() {
+  const select = document.getElementById("customer-branch-id");
+  const feedback = document.getElementById("cust-feedback");
+  if (!select) return;
+  if (!db) {
+    select.innerHTML = '<option value="">Database unavailable</option>';
+    select.disabled = true;
+    if (feedback) feedback.textContent = "Customer registration is unavailable until the database connection is restored.";
+    return;
+  }
+  select.disabled = true;
+  try {
+    const [branchResult, systemAdminResult, bankAdminResult] = await Promise.all([
+      db.from("branches").select("id,branch_name,branch_code").eq("is_active", true).order("branch_name"),
+      db.rpc("is_active_system_admin"),
+      db.rpc("is_active_bank_admin")
+    ]);
+    if (branchResult.error) throw branchResult.error;
+    if (systemAdminResult.error) throw systemAdminResult.error;
+    if (bankAdminResult.error) throw bankAdminResult.error;
+    const branches = Array.isArray(branchResult.data) ? branchResult.data : [];
+    const isSystemAdmin = systemAdminResult.data === true;
+    const isBankAdmin = bankAdminResult.data === true;
+    const authorizedBranches = [];
+    for (const branch of branches) {
+      if (isSystemAdmin) {
+        authorizedBranches.push(branch);
+        continue;
+      }
+      const [accessResult, managerResult] = await Promise.all([
+        isBankAdmin
+          ? db.rpc("current_employee_has_branch_access", { target_branch_id: branch.id })
+          : Promise.resolve({ data: false, error: null }),
+        db.rpc("is_active_branch_manager_for", { target_branch_id: branch.id })
+      ]);
+      if (accessResult.error) throw accessResult.error;
+      if (managerResult.error) throw managerResult.error;
+      if ((isBankAdmin && accessResult.data === true) || managerResult.data === true) {
+        authorizedBranches.push(branch);
+      }
+    }
+    if (!authorizedBranches.length) {
+      select.innerHTML = '<option value="">No branch is authorized for customer registration</option>';
+      if (feedback) feedback.textContent = "No branch is authorized for customer registration under your current role. Contact an administrator if this is unexpected.";
+      return;
+    }
+    select.innerHTML = '<option value="">Choose responsible branch</option>' +
+      authorizedBranches.map(branch => '<option value="' + esc(branch.id) + '">' +
+        esc(branch.branch_name) + ' (' + esc(branch.branch_code) + ')</option>').join("");
+    select.disabled = false;
+  } catch (error) {
+    select.innerHTML = '<option value="">Branch authorization unavailable</option>';
+    if (feedback) feedback.textContent = "Branch permissions could not be verified. Customer registration is paused; retry after checking permissions and connection.";
+  }
+};
+
 window.handleCustomerSubmit = async function(e) {
   e.preventDefault();
   const form = e.target;
   const feedback = document.getElementById("cust-feedback");
-  if (feedback) feedback.textContent = "Registering customer KYC profile...";
-
+  const button = form.querySelector('button[type="submit"]');
+  if (!db) {
+    if (feedback) feedback.textContent = "Database connection unavailable. No customer record was submitted.";
+    return;
+  }
+  if (!form.reportValidity()) return;
   const formData = new FormData(form);
-  const payload = {
-    customer_number: "CUST-" + Math.floor(100000 + Math.random() * 900000),
-    full_name: formData.get("full_name"),
-    nin_or_passport: formData.get("nin_or_passport"),
-    phone_number: formData.get("phone_number"),
-    email: formData.get("email"),
-    address: formData.get("address"),
-    status: "active"
-  };
-
-  const { error } = await db.from("customers").insert([payload]);
-  if (error) {
-    if (feedback) feedback.textContent = "Registration failed: " + error.message;
-  } else {
-    if (feedback) feedback.textContent = "Customer successfully registered!";
+  const branchId = String(formData.get("branch_id") || "").trim();
+  const customerType = String(formData.get("customer_type") || "").trim();
+  const identificationType = String(formData.get("identification_type") || "").trim();
+  const fullName = String(formData.get("full_name") || "").trim();
+  const identificationNumber = String(formData.get("identification_number") || "").trim();
+  const physicalAddress = String(formData.get("physical_address") || "").trim();
+  if (!branchId || !["individual", "business", "organization"].includes(customerType) ||
+      !["national_id", "passport", "business_registration", "other"].includes(identificationType) ||
+      !fullName || !identificationNumber || !physicalAddress) {
+    if (feedback) feedback.textContent = "Complete all required customer, identification, address, and branch fields.";
+    return;
+  }
+  const cryptoApi = window.crypto;
+  if (!cryptoApi || typeof cryptoApi.getRandomValues !== "function") {
+    if (feedback) feedback.textContent = "Secure customer-number generation is unavailable in this browser. Use the approved HTTPS browser and retry.";
+    return;
+  }
+  const randomBytes = new Uint8Array(16);
+  cryptoApi.getRandomValues(randomBytes);
+  const customerNumber = "CUST-" + Array.from(randomBytes, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+  if (button) button.disabled = true;
+  if (feedback) feedback.textContent = "Submitting customer details for KYC review…";
+  try {
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) throw new Error("Sign in with an authorized staff account before registering a customer.");
+    const payload = {
+      customer_number: customerNumber,
+      customer_type: customerType,
+      full_name: fullName,
+      identification_type: identificationType,
+      identification_number: identificationNumber,
+      phone_number: String(formData.get("phone_number") || "").trim(),
+      email: String(formData.get("email") || "").trim() || null,
+      physical_address: physicalAddress,
+      branch_id: branchId,
+      created_by: authData.user.id,
+      status: "pending_review"
+    };
+    const { error } = await db.from("customers").insert([payload]);
+    if (error) throw error;
+    if (feedback) feedback.textContent = "Customer submitted for KYC review. Reference: " + customerNumber + ". The customer remains pending review and cannot open an account until approved.";
     form.reset();
-    setTimeout(() => window.switchPage("Customers"), 1000);
+    await window.loadCustomerRegistrationOptions();
+    window.setTimeout(() => window.switchPage("Customers"), 1200);
+  } catch (error) {
+    if (feedback) feedback.textContent = "Customer registration was not confirmed. Check branch permissions and required fields before retrying. " + (error?.message || "Unexpected error");
+  } finally {
+    if (button) button.disabled = false;
   }
 };
 
@@ -1663,14 +2077,30 @@ window.loadCashApprovals = async function() {
   const pendingEl = document.getElementById("pending-cash-requests");
   const readyEl = document.getElementById("ready-posting-requests");
   const feedback = document.getElementById("approval-feedback");
-  if (!pendingEl || !readyEl || !db) return;
+  if (!pendingEl || !readyEl) return;
+  if (!db) {
+    pendingEl.textContent = "Database connection unavailable.";
+    readyEl.textContent = "Database connection unavailable.";
+    if (feedback) feedback.textContent = "Cash approvals were not loaded. No transaction state has been changed.";
+    return;
+  }
   pendingEl.textContent = "Loading pending requests…";
   readyEl.textContent = "Loading approved requests…";
-  const pending = await db.rpc("list_pending_cash_transaction_requests", { p_branch_id: null });
+  const safeRpc = async (name) => {
+    try {
+      return await db.rpc(name, { p_branch_id: null });
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+  const [pending, ready] = await Promise.all([
+    safeRpc("list_pending_cash_transaction_requests"),
+    safeRpc("list_cash_transactions_ready_to_post")
+  ]);
   if (pending.error) {
-    pendingEl.textContent = "Could not load requests: " + pending.error.message;
+    pendingEl.textContent = "Could not load requests: " + (pending.error.message || "Connection error");
   } else {
-    const rows = (pending.data || []).filter(r => !r.approved_by);
+    const rows = (Array.isArray(pending.data) ? pending.data : []).filter(r => !r.approved_by);
     pendingEl.innerHTML = rows.length ? rows.map(r =>
       '<div class="list-item"><div><strong>' + esc(r.journal_number) + '</strong> — ' + esc(r.transaction_type) +
       '<br><span class="muted">Account: ' + esc(r.account_number) + ' | Branch: ' + esc(r.branch_name) +
@@ -1679,17 +2109,16 @@ window.loadCashApprovals = async function() {
       '">Approve request</button></div>'
     ).join("") : '<p class="muted">No pending requests available for your access.</p>';
   }
-  const ready = await db.rpc("list_cash_transactions_ready_to_post", { p_branch_id: null });
   if (ready.error) {
-    readyEl.textContent = "Could not load approved requests: " + ready.error.message;
+    readyEl.textContent = "Could not load approved requests: " + (ready.error.message || "Connection error");
   } else {
-    const rows = ready.data || [];
+    const rows = Array.isArray(ready.data) ? ready.data : [];
     readyEl.innerHTML = rows.length ? rows.map(r =>
       '<div class="list-item"><div><strong>' + esc(r.journal_number) + '</strong> — ' + esc(r.transaction_type) +
       '<br><span class="muted">Account: ' + esc(r.account_number) + ' | Branch: ' + esc(r.branch_name) +
       '</span><br><strong>' + Number(r.amount).toLocaleString() + ' ' + esc(r.currency_code) +
       '</strong></div><div><label>Cash ledger UUID<input data-cash-ledger="' + esc(r.journal_id) +
-      '" type="text" placeholder="Active asset ledger UUID"></label><button type="button" class="primary" data-post-journal="' +
+      '" type="text" inputmode="text" autocomplete="off" placeholder="Active asset ledger UUID"></label><button type="button" class="primary" data-post-journal="' +
       esc(r.journal_id) + '" data-receipt-reference="' + esc(r.journal_number||r.journal_id||"") +
       '" data-receipt-date="' + esc(r.transaction_date||new Date().toLocaleDateString("en-CA",{timeZone:"Africa/Kampala"})) +
       '" data-receipt-branch="' + esc(r.branch_name||"") + '" data-receipt-account="' + esc(r.account_number||"") +
@@ -1697,66 +2126,131 @@ window.loadCashApprovals = async function() {
       '" data-receipt-currency="' + esc(r.currency_code||"") + '">Post to ledger</button></div></div>'
     ).join("") : '<p class="muted">No approved requests are ready for posting. Requester and approver cannot post the same transaction.</p>';
   }
-  if (feedback) feedback.textContent = "Lists refreshed. Money moves only after successful ledger posting.";
+  if (feedback) {
+    feedback.textContent = pending.error || ready.error
+      ? "One or more cash approval lists could not be refreshed. Review the individual list errors and retry."
+      : "Lists refreshed. Money moves only after successful ledger posting.";
+  }
 };
 
-window.approveCashRequest = async function(journalId) {
-  if (!db || !journalId) return;
-  if (!confirm("Approve this request? You cannot approve a request you created. Posting is a separate step.")) return;
+window.approveCashRequest = async function(journalId, button) {
+  if (!db || !journalId || (button && button.disabled)) return;
+  if (button) button.disabled = true;
+  if (!confirm("Approve this request? You cannot approve a request you created. Posting is a separate step.")) {
+    if (button) button.disabled = false;
+    return;
+  }
   const feedback = document.getElementById("approval-feedback");
   if (feedback) feedback.textContent = "Submitting approval…";
-  const result = await db.rpc("approve_cash_transaction_request", { p_journal_id: journalId });
-  if (result.error) {
-    if (feedback) feedback.textContent = "Approval failed: " + result.error.message;
-    return;
+  try {
+    const result = await db.rpc("approve_cash_transaction_request", { p_journal_id: journalId });
+    if (result.error) throw result.error;
+    if (feedback) feedback.textContent = "Approved. It still requires ledger posting by another eligible employee.";
+    await window.loadCashApprovals();
+  } catch (error) {
+    if (feedback) feedback.textContent = "Approval failed: " + (error?.message || "Connection error") + ". Refresh the approvals list before retrying.";
+  } finally {
+    if (button) button.disabled = false;
   }
-  if (feedback) feedback.textContent = "Approved. It still requires ledger posting by another eligible employee.";
-  await window.loadCashApprovals();
 };
 
-window.postApprovedCashRequest = async function(journalId) {
-  if (!db || !journalId) return;
-  const input = document.querySelector('[data-cash-ledger="' + journalId + '"]');
-  const cashLedgerId = input ? input.value.trim() : "";
-  if (!cashLedgerId) { alert("Enter the active cash ledger UUID first."); return; }
-  if (!confirm("Post this approved transaction? Verify account, amount, currency, branch and ledger before continuing.")) return;
-  const feedback = document.getElementById("approval-feedback");
-  if (feedback) feedback.textContent = "Posting transaction…";
-  const result = await db.rpc("post_approved_cash_transaction", {
-    p_journal_id: journalId,
-    p_cash_ledger_account_id: cashLedgerId
-  });
-  if (result.error) {
-    if (feedback) feedback.textContent = "Posting blocked: " + result.error.message;
+window.postApprovedCashRequest = async function(journalId, button) {
+  if (!db || !journalId || (button && button.disabled)) return;
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidPattern.test(journalId)) {
+    alert("The transaction reference is invalid. Refresh the approvals list.");
     return;
   }
-  if (feedback) feedback.textContent = "Ledger posting completed successfully. If this was a deposit, the receipt is ready to print.";
-  const receiptDataButton=document.querySelector('[data-post-journal="' + journalId + '"]');
-  if(receiptDataButton && String(receiptDataButton.dataset.receiptType||"").toLowerCase()==="deposit"){
-    window.printTransactionReceipt(receiptDataButton);
+  const input = document.querySelector('[data-cash-ledger="' + journalId + '"]');
+  const cashLedgerId = input ? input.value.trim() : "";
+  if (!uuidPattern.test(cashLedgerId)) { alert("Enter a valid active cash ledger UUID first."); return; }
+  if (button) button.disabled = true;
+  if (!confirm("Post this approved transaction? Verify account, amount, currency, branch and ledger before continuing.")) {
+    if (button) button.disabled = false;
+    return;
   }
-  await window.loadCashApprovals();
+  const feedback = document.getElementById("approval-feedback");
+  if (feedback) feedback.textContent = "Posting transaction…";
+  try {
+    const result = await db.rpc("post_approved_cash_transaction", {
+      p_journal_id: journalId,
+      p_cash_ledger_account_id: cashLedgerId
+    });
+    if (result.error) throw result.error;
+    if (feedback) feedback.textContent = "Ledger posting completed successfully. The receipt is ready to print.";
+    const receiptDataButton = button || document.querySelector('[data-post-journal="' + journalId + '"]');
+    if (receiptDataButton && ["deposit","withdrawal"].includes(String(receiptDataButton.dataset.receiptType||"").toLowerCase())) {
+      // Only mark the receipt eligible after the posting RPC has succeeded.
+      receiptDataButton.dataset.receiptStatus = "posted";
+      if (!receiptDataButton.dataset.receiptPrintCount) receiptDataButton.dataset.receiptPrintCount = "0";
+      window.printTransactionReceipt(receiptDataButton);
+    }
+    await window.loadCashApprovals();
+  } catch (error) {
+    if (feedback) feedback.textContent = "Posting could not be confirmed: " + (error?.message || "Connection error") + ". Refresh the approvals list and reconcile the transaction before retrying.";
+  } finally {
+    if (button) button.disabled = false;
+  }
 };
 
 document.addEventListener("click", function(event) {
   const approveButton = event.target.closest("[data-approve-journal]");
-  if (approveButton) window.approveCashRequest(approveButton.getAttribute("data-approve-journal"));
+  if (approveButton) window.approveCashRequest(approveButton.getAttribute("data-approve-journal"), approveButton);
   const postButton = event.target.closest("[data-post-journal]");
-  if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
+  if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"), postButton);
 });
 
-window.previewStaffMessage = function() {
-  const input = document.getElementById("chat-preview");
-  const output = document.getElementById("chat-preview-result");
-  if (!input || !output) return;
-  output.textContent = input.value.trim()
-    ? "Draft preview only: " + input.value.trim()
-    : "Enter a message to preview. Nothing has been sent or saved.";
+window.loadStaffChat = async function() {
+  const feedback=document.getElementById("staff-chat-feedback");
+  const list=document.getElementById("staff-chat-list");
+  if(!feedback||!list) return;
+  if(!db){feedback.textContent="Chat is unavailable because the database client is not configured.";return;}
+  feedback.textContent="Loading messages…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user) throw new Error("Sign in with your staff account to view messages.");
+    const {data,error}=await db.from("staff_chat_messages")
+      .select("id,sender_user_id,message_body,created_at")
+      .order("created_at",{ascending:false}).limit(100);
+    if(error) throw error;
+    if(!data?.length){list.innerHTML='<p class="muted">No messages yet. Send the first staff update.</p>';feedback.textContent="Showing the latest 100 messages.";return;}
+    list.innerHTML=data.map(m=>{
+      const own=m.sender_user_id===userData.user.id;
+      const sender=own?"You":"Staff "+String(m.sender_user_id||"").slice(0,8);
+      const when=m.created_at?new Date(m.created_at).toLocaleString():"Time unavailable";
+      return '<article class="staff-chat-message'+(own?' own':'')+'"><div class="staff-chat-message-meta"><strong>'+esc(sender)+'</strong><time>'+esc(when)+'</time></div><p>'+esc(m.message_body)+'</p></article>';
+    }).join("");
+    feedback.textContent="Loaded "+data.length+" message"+(data.length===1?"":"s")+". Newest first.";
+  }catch(err){feedback.textContent="Could not load messages: "+(err?.message||"Unexpected error");list.innerHTML="";}
+};
+
+window.sendStaffMessage = async function(event) {
+  if(event) event.preventDefault();
+  const form=document.getElementById("staff-chat-form");
+  const input=document.getElementById("staff-chat-input");
+  const feedback=document.getElementById("staff-chat-feedback");
+  if(!form||!input||!feedback||!db) return;
+  const message=input.value.trim();
+  if(!message){feedback.textContent="Type a message before sending.";return;}
+  if(message.length>1000){feedback.textContent="Messages are limited to 1,000 characters.";return;}
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
+  feedback.textContent="Sending message…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user) throw new Error("Your staff session has expired. Sign in again.");
+    const {error}=await db.from("staff_chat_messages").insert({sender_user_id:userData.user.id,message_body:message});
+    if(error) throw error;
+    input.value="";
+    await window.loadStaffChat();
+  }catch(err){feedback.textContent="Message was not sent: "+(err?.message||"Unexpected error");}
+  finally{if(submit)submit.disabled=false;}
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
   if(!button || !button.dataset) return;
   const status=document.getElementById("transaction-receipt-status");
+  const receiptStatus=String(button.dataset.receiptStatus||"").toLowerCase();
   const reference=button.dataset.receiptReference||"";
   const transactionDate=button.dataset.receiptDate||"";
   const branch=button.dataset.receiptBranch||"";
@@ -1764,18 +2258,21 @@ window.printTransactionReceipt = function(button, skipConfirmation) {
   const type=String(button.dataset.receiptType||"").toLowerCase();
   const amount=Number(button.dataset.receiptAmount);
   const currency=button.dataset.receiptCurrency||"";
-  if(type!=="deposit"||!reference||!Number.isFinite(amount)||amount<=0){
-    if(status)status.textContent="Receipt unavailable: this record is not a valid posted deposit.";
+  const previousPrintCount=Number(button.dataset.receiptPrintCount||"0");
+  const copyLabel=previousPrintCount>0?"REPRINT COPY — NOT A NEW TRANSACTION":"ORIGINAL RECEIPT";
+  if(receiptStatus!=="posted"||(type!=="deposit"&&type!=="withdrawal")||!reference||!Number.isFinite(amount)||amount<=0){
+    if(status)status.textContent="Receipt unavailable: the record is not confirmed as a valid posted deposit or withdrawal.";
     return;
   }
-  if(!skipConfirmation && !confirm("Print the receipt for posted deposit "+reference+"? Verify the transaction reference and amount."))return;
+  if(!skipConfirmation && !confirm("Print the receipt for posted "+type+" "+reference+"? Verify the transaction reference and amount."))return;
   const printWindow=window.open("","_blank","width=420,height=700");
   if(!printWindow){if(status)status.textContent="Allow pop-ups for this site, then select Print deposit receipt again.";return;}
   const safe=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   const money=amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+" "+currency;
-  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deposit Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER DEPOSIT RECEIPT</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>DEPOSIT</span></div><hr class="line"><p class="label">AMOUNT RECEIVED</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(type.toUpperCase())} Receipt ${safe(reference)}</title><style>@page{size:80mm auto;margin:4mm}body{font:12px/1.45 monospace;color:#000;width:72mm;margin:0 auto}h2,p{text-align:center}h2{font-size:14px;margin:0 0 5px}.muted{text-align:center;font-size:10px}.line{border:0;border-top:1px dashed #000;margin:10px 0}.row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}.amount{font-size:16px;font-weight:bold;text-align:center;margin:12px 0}.label{font-weight:bold}</style></head><body><h2>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h2><p class="muted">CUSTOMER ${safe(type.toUpperCase())} RECEIPT</p><p class="muted">${safe(copyLabel)}</p><hr class="line"><div class="row"><span>Receipt reference</span><span>${safe(reference)}</span></div><div class="row"><span>Date</span><span>${safe(transactionDate||"Not provided")}</span></div><div class="row"><span>Branch</span><span>${safe(branch||"Not provided")}</span></div><div class="row"><span>Account</span><span>${safe(account||"Not provided")}</span></div><div class="row"><span>Transaction</span><span>${safe(type.toUpperCase())}</span></div><hr class="line"><p class="label">${type==="deposit"?"AMOUNT RECEIVED":"AMOUNT PAID OUT"}</p><p class="amount">${safe(money)}</p><hr class="line"><p>Thank you for banking with us.</p><p class="muted">This receipt is for a ledger-posted transaction.</p><script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>`);
   printWindow.document.close();
-  if(status)status.textContent="Receipt opened for printing for posted deposit "+reference+".";
+  button.dataset.receiptPrintCount=String(previousPrintCount+1);
+  if(status)status.textContent=(previousPrintCount>0?"Reprint copy opened":"Receipt opened")+" for posted "+type+" "+reference+".";
 };
 document.addEventListener("click",function(event){
   const receiptButton=event.target.closest(".transaction-print-receipt");
@@ -2342,6 +2839,19 @@ async function handleStaffLogin(event) {
     }
     if (feedback) feedback.textContent = "";
   } catch (error) {
+    // A branch login is not complete until the database confirms branch access.
+    // If that check fails, clear any newly-created session so a page reload cannot
+    // resume in a bank-wide workspace without repeating the branch authorization.
+    if (pendingBranchOpen) {
+      activeBranchContext = null;
+      try {
+        const { data: sessionData } = await db.auth.getSession();
+        if (sessionData?.session) await db.auth.signOut();
+      } catch (_) {
+        // Keep the original sign-in/access error visible; server-side authorization
+        // remains authoritative even if client-side session cleanup itself fails.
+      }
+    }
     if (feedback) feedback.textContent = "Sign-in failed. Check your email and password, or contact your bank administrator. " + (error?.message || "");
   } finally {
     if (button) { button.disabled = false; button.textContent = "Sign in securely"; }
@@ -2428,4 +2938,64 @@ window.attachInstitutionPayrollEvidence = async function(){
   if(error)throw error;
   if(feedback)feedback.textContent="Both signed scans are archived privately with payroll batch "+batchId+". Signers recorded: "+(data?.signer_count||signers.length)+". Access is restricted by branch permissions.";
  }catch(err){if(feedback)feedback.textContent="Evidence was not fully archived: "+(err?.message||"Unexpected error")+". If one scan uploaded, retrying is safe; the same object paths are reused."}
+};
+
+
+// Staff self-service manual attendance. Browser submissions cannot impersonate trusted biometric events.
+window.loadStaffAttendance = async function() {
+  const state=document.getElementById("staff-attendance-state");
+  const list=document.getElementById("staff-attendance-list");
+  const feedback=document.getElementById("staff-attendance-feedback");
+  const button=document.getElementById("staff-attendance-punch");
+  if(!state||!list||!button)return;
+  if(!db){state.textContent="Attendance is unavailable: database client is not configured.";button.disabled=true;return;}
+  state.textContent="Loading your attendance…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user)throw new Error("Sign in with your staff account first.");
+    const {data,error}=await db.from("staff_attendance_events")
+      .select("id,event_type,event_source,occurred_at,created_at,device_identifier")
+      .eq("employee_user_id",userData.user.id)
+      .order("created_at",{ascending:false}).limit(30);
+    if(error)throw error;
+    const rows=data||[];
+    const latest=rows[0];
+    const shouldClockOut=latest?.event_type==="clock_in";
+    button.textContent=shouldClockOut?"Clock out":"Clock in";
+    button.disabled=false;
+    state.textContent=latest
+      ? "Latest punch: "+(latest.event_type==="clock_in"?"Clocked in":"Clocked out")+" at "+new Date(latest.occurred_at).toLocaleString()+"."
+      : "No punches recorded yet. Clock in to start your attendance record.";
+    list.innerHTML=rows.length?rows.map(row=>'<article class="staff-attendance-event"><strong>'+esc(row.event_type==="clock_in"?"Clock in":"Clock out")+'</strong><span>'+esc(new Date(row.occurred_at).toLocaleString())+'</span><span class="muted">'+esc(row.event_source==="device"?"Verified device event":"Manual punch")+'</span></article>').join(""):'<p class="muted">No attendance events yet.</p>';
+    if(feedback)feedback.textContent="Showing up to 30 of your latest punches.";
+  }catch(err){state.textContent="Could not load attendance: "+(err?.message||"Unexpected error");button.disabled=true;}
+};
+
+window.recordStaffAttendancePunch = async function() {
+  const button=document.getElementById("staff-attendance-punch");
+  const feedback=document.getElementById("staff-attendance-feedback");
+  if(!button||!db)return;
+  button.disabled=true;
+  if(feedback)feedback.textContent="Recording punch…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user)throw new Error("Your staff session has expired. Sign in again.");
+    // Derive this employee's next punch only from their own latest event.
+    // RLS remains authoritative; the explicit filter also avoids toggling based on
+    // another employee's event if the viewer has broader read permissions.
+    const {data:latestRows,error:latestError}=await db.from("staff_attendance_events")
+      .select("event_type,occurred_at,created_at")
+      .eq("employee_user_id",userData.user.id)
+      .order("occurred_at",{ascending:false}).order("created_at",{ascending:false}).limit(1);
+    if(latestError)throw latestError;
+    const latest=latestRows?.[0];
+    const eventType=latest?.event_type==="clock_in"?"clock_out":"clock_in";
+    const key=(window.crypto?.randomUUID?.()||("punch-"+Date.now()+"-"+Math.random().toString(36).slice(2)));
+    const {error}=await db.from("staff_attendance_events").insert({
+      employee_user_id:userData.user.id,event_type:eventType,event_source:"manual",idempotency_key:key
+    });
+    if(error)throw error;
+    if(feedback)feedback.textContent=(eventType==="clock_in"?"Clock-in":"Clock-out")+" recorded by the database.";
+    await window.loadStaffAttendance();
+  }catch(err){if(feedback)feedback.textContent="Punch not recorded: "+(err?.message||"Unexpected error");button.disabled=false;}
 };

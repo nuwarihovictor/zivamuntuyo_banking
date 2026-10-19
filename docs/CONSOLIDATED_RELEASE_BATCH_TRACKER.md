@@ -1,0 +1,163 @@
+# Zivamuntuyo Banking System — consolidated release batch tracker
+
+**Purpose:** execute the remaining work as one coordinated release batch, with code, automated tests, staging evidence, and hardware acceptance tracked together. A checklist or passing unit test is not proof of production readiness.
+
+## Current source-control checkpoint
+
+- Repository: nuwarihovictor/zivamuntuyo_banking
+- Working branch: fix/account-eligibility-guards-2026-10-19
+- Pull request: [Draft PR #15](https://github.com/nuwarihovictor/zivamuntuyo_banking/pull/15)
+- Production changes: **none authorised or performed by this batch**
+- Latest combined code/test batch before this tracker refresh: `23ff9cf5505a4422dd995d7dd299482a7b6ad34f` (customer schema alignment, report integrity checks, audited KYC review RPC and PostgreSQL assertions).
+- The cash-integrity code/test head `6a241283323acd5bc20c73edd761fb947c131ba8` passed exact-head CI [run #39235211318](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39235211318): 89 Python tests, JavaScript syntax checks, all seven draft migrations parsed and executed on disposable PostgreSQL 17, and all six SQL assertion scripts passed. Any later source/test change requires a fresh exact-head run.
+- Release state: **NO-GO until all applicable gates below are evidenced and an authorised release owner approves**
+
+## Consolidated work matrix
+
+| Workstream | Code / automated work | Required evidence before release | State |
+|---|---|---|---|
+| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, seven draft migrations, and six PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Earlier code-focused batch passed; the current KYC-enabled batch must pass on its exact final SHA |
+| Banking workflows | Verify account eligibility, individual/joint holder rules, deposits, withdrawals, approval separation, posting idempotency, ledger legs, audit atomicity, branch/currency boundaries | Production-shaped staging tests with synthetic data; debit/credit reconciliation and rollback evidence | Staging not confirmed |
+| Reports and accounting | Trial balance summary and CSV export use the authorized `list_trial_balance` RPC and group totals by currency; CSV escaping and formula-injection protections have regression tests | Reconciled report outputs for each test currency and branch in staging | Code/test coverage exists; accounting reconciliation in staging remains unverified |
+| Database security | Compare each replaced function with current schema; inspect owner, SECURITY DEFINER search path, execute grants, table grants, RLS policies, and every caller | Approved staging migration run and role/branch negative tests | Not confirmed |
+| Customer privacy and onboarding | Minimise customer-directory fields; match the live schema; use secure references; require branch/creator; default new customers to pending review | Regression tests plus role-based staging verification | Draft code updated; exact-head CI and staging pending |
+| KYC review | Approve/reject only pending customers through audited SECURITY DEFINER RPC; require reason; enforce active reviewer and branch access; revoke anon customer-table grants | Disposable SQL assertions, then production-shaped staging tests with real role/branch fixtures | New migration and assertions added; exact-head CI pending |
+| Staff chat and attendance | Separate group chat from private messages; block inactive staff; manual punches remain clearly non-biometric | Authenticated multi-user staging tests and event transition/deduplication checks | Automated coverage; staging pending |
+| Receipts | UI only offers posted cash receipts; print handler now requires explicit posted status, valid cash type/reference/positive finite amount, and labels repeated print actions in the current transaction list | Real printer make/model, driver, paper width, deposit/withdrawal print evidence on Windows 10 and 11; durable reprint audit across reloads if required | Code guard and regression tests passed; physical printer testing and durable reprint audit remain pending |
+| Fingerprint attendance | Build only against vendor-supported device SDK/API; keep privileged keys server-side | Reader make/model, firmware, SDK/driver support and witnessed enrolment/matching tests | Blocked on device details |
+| Windows 10/11 | Browser, sign-in/session expiry, branch permissions, zoom, keyboard, reconnect, print workflows | Completed Windows 10/11 field acceptance checklist with machine/browser versions and results | Pending physical testing |
+| Deployment and recovery | Verify Vercel deployment uses reviewed SHA and correct environment; confirm no secrets in browser; check monitoring and auth recovery | Staging deployment URL, backup restore drill, recovery contact, security review, approved change window | Not confirmed |
+
+## Batch execution order
+
+1. Make the complete source/test changes on this working branch; avoid piecemeal release or production changes.
+2. Run syntax and all regression tests. Fix failures in source or tests only when expected behaviour is grounded in implementation and requirements.
+3. Run all migrations in disposable PostgreSQL; then run them in a dedicated production-shaped staging database only after schema/function/grant review.
+4. Exercise banking flows with synthetic users and data, including negative authorization cases, concurrency, duplicate submission, audit failure, and ledger reconciliation.
+5. Run Windows and printer acceptance; confirm exact fingerprint hardware before writing or enabling a device connector.
+6. Verify staging deployment, backup restoration, monitoring and incident/recovery steps.
+7. Freeze a reviewed commit SHA and collect evidence. Obtain explicit release approval before production migration, merge, or deployment.
+
+## Safety rules
+
+- Never use production customer data in test fixtures.
+- Never put Supabase service-role credentials or other secrets in browser JavaScript or a Windows client.
+- Do not treat a disposable PostgreSQL fixture as a full copy of production.
+- Do not represent manual attendance as fingerprint-verified.
+- Do not print a pending/failed transaction as a completed receipt.
+- Do not merge or deploy to production, apply production migrations, or write to production banking data without explicit release approval.
+- A missing hardware device or staging environment is a genuine blocker, not a checkbox to mark complete.
+
+## Release decision
+
+**Current decision: NO-GO.** Code work can continue in this batch, but real printer/fingerprint/Windows testing and production-shaped staging evidence cannot be honestly completed without the required environment and hardware. The finished release requires all applicable evidence and explicit approval.
+
+
+## Combined implementation batch — customer onboarding and accounting integrity
+
+- Read-only production schema inspection confirmed `customers.customer_type`, `identification_type`, `identification_number`, `physical_address`, `branch_id`, and `created_by` are the relevant columns; `customer_type` and `branch_id` are required by the schema / insert policy. The prior UI sent mismatched column names, omitted required fields, attempted to mark customers active immediately, and generated a six-digit customer reference. Draft UI now aligns its insert payload to the current schema, requires a visible active branch, records the authenticated creator, uses cryptographic randomness for the unique customer reference, and submits new customers as `pending_review`.
+- Trial balance/report UI now validates currency and numeric fields before calculation or export, handles rejected RPC calls, and displays an accessible stop warning if any currency's debit/credit totals differ. Currency totals remain separate; the notice does not replace independent reconciliation.
+- Added regression tests for customer schema alignment and financial-report integrity.
+- Production inspection was read-only. No production data, schema, migrations, merge, or deployment were changed by this batch. Exact-head CI and staging verification remain required.
+
+- Follow-up within the same combined batch: customer branch choices are now filtered against the database's system-admin, bank-admin branch-access, and branch-manager checks; the directory shows the customer's KYC status so pending customers are not mislabeled as active. This remains UI guidance only—the database RLS policy is authoritative.
+
+- KYC review is now a complete draft workflow: authorized reviewers can approve/reject only pending records, must provide a reason, and the database function records the decision in audit_events under an empty search_path. The new migration also revokes anonymous direct access to customer records. Disposable PostgreSQL assertions cover approve/reject, repeat-decision denial, cross-branch denial, unauthorized-role denial, audit rows, and anon grants.
+
+- The active Supabase project list currently shows the separate candidate project as inactive, so production-shaped staging has not been performed. No attempt was made to activate or modify it.
+
+
+## Financial statements added to the combined batch
+
+- The live ledger schema constrains `ledger_type` to asset, liability, equity, income, and expense. The report page now builds per-currency cumulative income-statement and balance-sheet views from the same validated posted-ledger RPC rows, displays reconciliation warnings, and provides a formula-safe CSV summary export.
+- These are cumulative posted balances, not date-filtered statutory statements. Review account mappings, opening balances, closing entries, and reconciliations in production-shaped staging before treating them as formal financial statements.
+
+- Reporting limitation explicitly shown in the UI and CSV export: the current `list_trial_balance` RPC returns active ledger accounts and has no date-range parameters. Inactive ledger accounts with historical postings may be excluded; the new statements are provisional cumulative views until the RPC/report scope and account mapping are verified in staging.
+
+
+## Preview / production configuration isolation
+
+- Added a Vercel build step that generates `app-config.js` from public Supabase environment variables. Preview/local builds refuse the live production Supabase URL and reject secret/service-role keys; when no staging config is supplied, the preview stays disconnected instead of writing to production.
+- The canonical production hostname retains the existing public-key fallback so this draft change does not require a production env-var mutation. The build script and environment isolation have dedicated regression tests.
+- The Vercel project currently has no environment variables configured, and its separate candidate Supabase project `suopsvncczxlnyjhtfdy` is `INACTIVE`. The production Supabase project is `ACTIVE_HEALTHY`; do not point the preview at production. A functional staging preview remains blocked until a separate active staging project and Preview environment variables are approved/configured.
+
+
+## Coordinated implementation batch — receipts, staff chat and attendance
+
+- Added receipt-printing regression tests covering posted cash transaction eligibility, invalid/non-positive amounts, escaped receipt fields, blocked pop-ups, and reprint labeling. The disposable PostgreSQL workflow completed successfully on commit `4b088eda4118b22ee396c50a694f86657d195cc3` (run [#39233515546](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39233515546)).
+- Reviewed manual attendance transition logic and corrected the latest-event query to explicitly filter by the authenticated employee ID and order by the event occurrence time. This prevents the browser UI from choosing a clock-in/clock-out transition based on another employee's event if the signed-in role has broader read access.
+- Added regression tests for staff chat authentication, message length limits, safe message rendering, and attendance employee scoping / manual-source labeling.
+- Latest code/test commit: `fda7c9d8afa6b9c829290ef0c881b3065dcbd1fa`. The later correction commit `0105b41e3793b6d8f613050869e86dc52db5629a` passed exact-head CI: 86 Python regression tests, JavaScript syntax checks, all seven draft migrations on disposable PostgreSQL 17, and all six SQL assertion scripts. See run [#39234320707](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39234320707). Staging and device acceptance remain unverified.
+- These are code and regression-test improvements only. Staff attendance remains manual, chat permissions still depend on database RLS, physical receipt printing remains untested, and staging/Windows/hardware acceptance remains outstanding.
+
+
+## CI failure diagnosis and next verification checkpoint — 2026-10-19
+
+- The exact-head disposable PostgreSQL workflow for commit `33a3431d55d413e1afb685cc4c0ffe41c6728ac4` failed in the Python regression stage, before the database migration assertions ran. The failure was two test-boundary lookups that incorrectly expected the receipt-print function to appear after the attendance function; the application defines the receipt handler earlier in the file. This is a regression-test slicing defect, not evidence of a failed SQL migration.
+- Corrective batch: use the attendance function's own closing boundary and explicitly scope attendance-history reads to the authenticated employee, not only to RLS. A new regression assertion checks this UI-level employee filter.
+- Correction verification is complete: commit `0105b41e3793b6d8f613050869e86dc52db5629a` passed run [#39234320707](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39234320707) with 86 Python tests, JS syntax checks, seven draft migrations, and six SQL assertion scripts. No production deployment or production database change is authorised by this batch.
+
+
+## Vercel preview status — 2026-10-19
+
+- Preview build for code/test commit `0105b41e3793b6d8f613050869e86dc52db5629a` is `READY`: [open preview](https://zivamuntuyobanking-744r2l5je-infonuwarihovictor-1047s-projects.vercel.app).
+- The Vercel project has SSO protection enabled for non-custom-domain deployments. A prompt before the app loads may be Vercel/team authentication, not the banking application's own sign-in. Do not disable this protection as a workaround.
+- This is a branch preview (`target: null`), not a production deployment. A dedicated banking staging database is still not provisioned; do not use production or any unrelated Supabase project for banking tests.
+
+
+## Banking integrity and production-schema review — 2026-10-19
+
+- Added a cash-request audit event in the same transaction as request creation. If the audit insert fails, the request transaction also fails atomically.
+- Hardened `approve_cash_transaction_request`: requires active staff, valid active account and request details, branch access, configured approval limit, and a still-unapproved pending request. The row is locked; `approved_by` / `approved_at` must be null, preventing a second reviewer from overwriting the first approval. The approval decision is audited in the same transaction.
+- Expanded disposable SQL coverage for request audit completeness, re-approval denial, preserving the first approver, no duplicate approval audit event, wrong-currency cash ledger rejection, no partial ledger entries/balance update, posting idempotency, double-entry balance, and audit-failure rollback.
+- Read-only review of the current production definitions found the live cash-request and posting functions do not yet enforce the active-employee check; the live posting function lacks the posting audit event; and the live approval function does not reject an already populated `approved_by`. The reviewed draft migration corrects these gaps but has **not** been applied to production.
+- Read-only security advisor review reports 22 RLS-enabled tables without policies, one SECURITY DEFINER view finding for `branch_directory_public`, and 68 authenticated-executable SECURITY DEFINER function warnings. A separate grant query found direct anon/authenticated table privileges on `general_ledger_accounts` and `ledger_journal_entries` despite RLS being enabled with no policies; the draft migration targets those two tables and the branch view specifically. Do not blanket-revoke other grants without caller-by-caller review.
+- Current accounting RPC review confirms `list_trial_balance` returns active ledger accounts only and is not date-filtered; formal reconciliation still needs test fixtures for each currency/branch and accounting sign conventions.
+- An earlier staging candidate `suopsvncczxlnyjhtfdy` was inspected and found to contain a Cornhill school-management schema (`school_settings`, `students`, `classes`, and attendance tables), not the banking schema. It must not be used for banking tests. The two branch-scoped Vercel variables that pointed to that unrelated project were changed to inert placeholder values immediately; they no longer point at that database.
+- The banking Vercel preview therefore currently has no valid Supabase connection. Do not deploy it as a functional preview or run financial workflows until a dedicated banking staging database exists and the correct branch-scoped URL/publishable key are configured.
+- A production-shaped Supabase development branch can apply production migration history to a fresh database without copying production data, but creating it can incur hourly charges. The Supabase cost-estimate tool requires the owner to identify/confirm the organization before it can provide a quote; do not create the branch before the organization and cost are confirmed.
+- No production migrations, production data writes, or production deployment were performed.
+
+
+## Accounting math verification and staging isolation correction — 2026-10-19
+
+- Extracted financial report grouping and statement arithmetic into deterministic helpers and added `tests/test_financial_report_math.js`, wired into release preflight.
+- Added sample reconciled balances in UGX and USD and verified per-currency debit/credit totals, income/expense/net result, balance-sheet claims and zero differences. Added an intentionally unbalanced UGX fixture and verified the report detects the difference rather than hiding it.
+- Exact branch-head CI for `1fd75809675cbea5630598305af6ef647664dfe2` passed run [#39235605037](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39235605037): 89 Python tests, JavaScript syntax checks, financial math tests, all seven draft migrations on disposable PostgreSQL 17, and all six SQL assertion scripts. No production database changes were made.
+- **Staging isolation correction:** inspection showed the previously selected Supabase project was the school-management database, not a banking staging project. The Vercel Preview variables for the banking branch have been neutralized to inert placeholder values. No banking schema migrations were applied to the school database and no financial test data was inserted.
+- Next staging step is to create a separate Supabase development branch/database from the banking production schema history, after the owner identifies the correct Supabase organization and approves the displayed cost estimate. Then configure the Vercel Preview URL and publishable key for that isolated branch and test only synthetic banking data.
+
+
+## No-additional-cost continuation — 2026-10-19
+
+- Do not create or start a paid Supabase development branch. Continue with no-additional-cost checks until a separate banking staging database is available without new spend.
+- Expanded the disposable PostgreSQL assertion suite with negative tests for cross-branch cash request creation and approval. A teller or approver scoped to branch B must be denied access to a branch A account/request; denied operations must not leave an approval or success-audit event.
+- These CI tests use synthetic fixture data and a disposable PostgreSQL 17 database. They do not substitute for a production-shaped staging deployment.
+- The Vercel preview variables remain inert because the prior candidate was an unrelated school database. Do not route the preview to production or another application's database.
+
+
+## Follow-up requested 2026-10-19 — security, accounting, and local printing
+
+- Added [security/accounting blocker review](SECURITY_ACCOUNTING_REVIEW_BLOCKERS.md) to consolidate known access-control findings, financial reconciliation requirements, and release no-go conditions. This is a review record, not evidence that production has been changed or that findings are fixed.
+- Added [offline local receipt-printer test page](../tools/local-receipt-printer-test.html). It uses synthetic values only, has an unmistakable TEST ONLY mark, offers 58 mm, 80 mm, and A4 layout options, and does not connect to any database or cloud service. Use it to test the Windows browser-to-printer path without payment.
+- Added [local printer test instructions](LOCAL_RECEIPT_PRINTER_TEST.md) including the limit that this does not verify the live transaction workflow.
+- Receipt print count remains in page memory only; durable reprint audit is not yet implemented/verified. Real posted deposit/withdrawal receipts, payroll, account-opening, and dormant-reactivation receipts still need accounting-owner and physical printer acceptance.
+- Security review remains read-only for production. No production schema, permissions, data, migration, or deployment changes were made.
+- Zero-cost constraint remains binding: do not upgrade Vercel, create chargeable Supabase staging, buy a domain/device/SDK, or enable a paid service. Preview and live release remain blocked until safe staging and exact-head evidence exist.
+
+- Added `tests/test_local_printer_page.py` to the standard Python unittest discovery suite. It asserts that the local printer page is visibly test-only, offers common paper widths and both cash transaction labels, contains no remote/database dependency, and uses the browser print dialog. This automated test is committed; exact-head CI result is still pending and must be checked before claiming it passed.
+
+- **Disposable PostgreSQL check:** workflow run [39237459340](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39237459340) completed successfully for commit `e8ca38c3ae11028e85875fec1a5b612b3477f213`. The run executed the consolidated preflight against disposable PostgreSQL. It predates the subsequent local-printer test correction, so it is not exact-head evidence for the current branch head.
+- **Current-head CI caveat:** Vercel status on the later test commit `a4c98e37ca7368eb650d6691efd020ff086c35ed` is a build-rate-limit failure. This is not a reason to upgrade; do not pay. A matching GitHub Actions result for that exact head was not returned by the available commit-run lookup, so latest test success must not be claimed.
+- **Receipt flow issue found during source review:** the cash-posting button does not initially carry `data-receipt-status="posted"`, while `printTransactionReceipt` refuses to print unless that status is set. The post-success handler currently calls the receipt function using that button, so the guard can reject the receipt. Also, the transaction-monitor receipt print count resets to zero when the list is re-rendered, so it cannot establish a durable original/reprint history. Fix and test this in the draft branch; do not infer that a printed receipt is evidence of posting.
+
+- **Latest checked branch head:** `6cce49d572667aa379205dddd9e5fc89eeb66599`. Its reported Vercel check is still the Hobby build-rate-limit failure. The GitHub Actions run that passed is the earlier `e8ca38c3ae11028e85875fec1a5b612b3477f213` commit; exact-head test evidence is still not confirmed. Keep the no-payment rule and do not upgrade to clear the Vercel check.
+
+
+## Deployment-preparation checkpoint — 2026-10-19
+
+- Latest draft branch head: `19527c4f931d1f749de33b7212bbe20a7eb27089` — fixes receipt eligibility so a cash receipt is marked posted only after the cash-posting RPC succeeds, and adds a regression test for the order of operations.
+- Exact-head disposable PostgreSQL preflight passed in [GitHub Actions run #39238893502](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39238893502). The job completed successfully, including the consolidated release preflight against disposable PostgreSQL 17. This is fixture/CI evidence only, not staging or production acceptance.
+- Vercel check on this head remains a Hobby build-rate-limit failure. No upgrade or payment was made. Wait for the quota window to clear before retrying; do not repeatedly trigger builds.
+- Build configuration currently emits a clean `public/` output directory and refuses mismatched or privileged browser configuration. Before the next preview attempt, confirm the Preview environment has only inert/non-production configuration; do not restore production Supabase credentials to Preview.
+- Deployment is **prepared for a safe preview retry, not approved for live release**. Remaining no-go items include production-shaped staging, per-function security/grant review, accounting reconciliation, backup/restore and recovery evidence, Windows 10/11 acceptance, physical printer testing, and fingerprint-device validation. Keep the PR draft and production untouched until the release owner explicitly approves.

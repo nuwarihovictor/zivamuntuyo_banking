@@ -2,20 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZIVAMUNTUYO FINANCIAL SERVICES LTD</title>
   <meta name="theme-color" content="#073b2b">
+  <meta name="robots" content="noindex, nofollow, noarchive">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&family=Lato:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Nunito+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=PT+Sans:wght@400;500;600;700&family=Ubuntu:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Merriweather:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Roboto+Slab:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Cabin:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="app-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header class="header">
     <div class="logo-container">
-      <div class="logo-icon" aria-label="Zivamuntuyo logo"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><path d="M10 12h44v8L25 44h29v8H10v-8l29-24H10z" fill="currentColor"/><path d="M8 8h48v48H8z" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/><path d="M13 56h38" stroke="#cba85a" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <img class="brand-logo" src="logo.svg" alt="Zivamuntuyo Financial Services Ltd logo">
       <div class="logo-text">
         <h1>ZIVAMUNTUYO FINANCIAL SERVICES LTD</h1>
         <p>COMMERCIAL CORE BANKING</p>
@@ -26,7 +28,7 @@
 
   <section id="login-screen" class="login-screen" aria-labelledby="login-title" hidden>
     <div id="branch-entry-directory" class="login-card branch-entry-directory" hidden>
-      <div class="login-brand-mark">Z</div>
+      <img class="login-brand-logo" src="logo.svg" alt="Zivamuntuyo Financial Services Ltd logo">
       <p class="login-eyebrow">ZIVAMUNTUYO BRANCH NETWORK</p>
       <h2>Select a branch</h2>
       <p class="login-description">Choose a branch and select Open. You will then sign in with your own staff email and password. Only authorised staff can enter a branch.</p>
@@ -36,7 +38,7 @@
     </div>
     <div id="staff-login-card" class="login-card" hidden>
       <button id="back-to-branch-directory" type="button" class="secondary">← Back to branch list</button>
-      <div class="login-brand-mark">Z</div>
+      <img class="login-brand-logo" src="logo.svg" alt="Zivamuntuyo Financial Services Ltd logo">
       <p class="login-eyebrow">SECURE STAFF ACCESS</p>
       <h2 id="login-title">Sign in to Zivamuntuyo</h2>
       <p class="login-description">Use the staff email and password issued by your system administrator. Public registration is disabled.</p>
