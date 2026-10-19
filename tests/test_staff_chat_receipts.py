@@ -152,6 +152,9 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn("could not be confirmed", create_fn)
         self.assertIn("could not be confirmed", update_fn)
         self.assertIn("could not be confirmed", active_fn)
+        self.assertIn("setBranchActive('${esc(b.id)}',${!b.is_active},this)", self.app)
+        self.assertIn("if(button)button.disabled=true", active_fn)
+        self.assertIn("if(button)button.disabled=false", active_fn)
 
 
 if __name__ == "__main__":
