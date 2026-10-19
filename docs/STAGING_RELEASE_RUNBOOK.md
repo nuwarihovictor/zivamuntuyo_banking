@@ -29,6 +29,7 @@ Review the following files in order, along with every function they replace and 
 4. `supabase/migrations/20261019070000_require_active_employee_for_cash_rpcs.sql`
 5. `supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql`
 6. `supabase/migrations/20261019090000_staff_attendance_event_rls.sql`
+7. `supabase/migrations/20261019100000_customer_kyc_review_rpc.sql`
 
 Before applying each migration, capture relevant function definitions, ownership, execute grants, table privileges, policies, and dependencies. Confirm that revoking direct access does not break a legitimate browser RPC path. Apply only to the staging project through the approved database change process.
 
@@ -37,7 +38,8 @@ Before applying each migration, capture relevant function definitions, ownership
 - [ ] Sign in with active and inactive staff profiles. Inactive users must be denied by the database, not merely hidden by the UI.
 - [ ] Verify teller, accountant, branch manager, bank administrator, and system administrator permissions separately.
 - [ ] Verify branch A users cannot read or mutate branch B records without explicit cross-branch authorization.
-- [ ] Open an account for an active customer using an enabled currency; reject inactive customers, inactive branches, inactive currencies, and unsupported products.
+- [ ] Test customer onboarding, pending-review status, audited approve/reject decisions, required reason, inactive-reviewer denial, and cross-branch review denial.
+- [ ] Open an account for an active customer using an enabled currency; reject pending/rejected customers, inactive branches, inactive currencies, and unsupported products.
 - [ ] Test individual-account duplicate prevention under two concurrent requests.
 - [ ] Create a joint account, add a second distinct active holder, then approve. Approval must fail while fewer than two eligible holders exist.
 - [ ] Test deposit and withdrawal request, independent approval, posting, and receipt printing.

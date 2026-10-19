@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Execute after fixture and both draft migrations are applied.
+-- Execute after the fixture and all draft migrations are applied.
 DO $test$
 DECLARE
   v_account uuid;

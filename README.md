@@ -9,6 +9,7 @@ This repository contains the responsive banking application interface, Supabase 
 - Staff chat UI and draft row-level-security migration.
 - Manual staff attendance punches and draft row-level-security/sequence guards.
 - Receipt printing UI for posted cash transactions.
+- Customer onboarding aligned with the customer table schema, plus audited branch-scoped KYC approval/rejection.
 - Disposable PostgreSQL 17 tests and source-level regression tests.
 - Baseline Vercel browser security headers.
 

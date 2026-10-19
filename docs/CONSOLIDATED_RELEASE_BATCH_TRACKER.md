@@ -8,19 +8,20 @@
 - Working branch: fix/account-eligibility-guards-2026-10-19
 - Pull request: [Draft PR #15](https://github.com/nuwarihovictor/zivamuntuyo_banking/pull/15)
 - Production changes: **none authorised or performed by this batch**
-- Latest code-focused batch commit: `04ecda310de5a8801bb22e50ecc667532f75daa1` (receipt posted-status gate and reprint labels).
-- Full disposable PostgreSQL preflight passed for that code commit: [run #39224606015](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39224606015). This tracker update itself requires a fresh exact-head CI run before release.
+- Latest combined code/test batch before this tracker refresh: `23ff9cf5505a4422dd995d7dd299482a7b6ad34f` (customer schema alignment, report integrity checks, audited KYC review RPC and PostgreSQL assertions).
+- Earlier baseline passed at [run #39226940646](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39226940646), before the KYC review migration was added. The KYC-enabled exact-head preflight is still being verified; any subsequent source or test change requires a fresh run.
 - Release state: **NO-GO until all applicable gates below are evidenced and an authorised release owner approves**
 
 ## Consolidated work matrix
 
 | Workstream | Code / automated work | Required evidence before release | State |
 |---|---|---|---|
-| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, six draft migrations, and five PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Code-focused batch passed on `04ecda310de5a8801bb22e50ecc667532f75daa1` in run #39224606015; a fresh run is required for the tracker-update commit |
+| Code and CI | Consolidated `python scripts/release_preflight.py` runs JavaScript syntax, all Python regressions, SQL parsing, fixture setup, seven draft migrations, and six PostgreSQL assertion scripts; database phase requires explicit disposable opt-in + loopback + `banking_test` | Green workflow for exact final SHA, test logs retained | Earlier code-focused batch passed; the current KYC-enabled batch must pass on its exact final SHA |
 | Banking workflows | Verify account eligibility, individual/joint holder rules, deposits, withdrawals, approval separation, posting idempotency, ledger legs, audit atomicity, branch/currency boundaries | Production-shaped staging tests with synthetic data; debit/credit reconciliation and rollback evidence | Staging not confirmed |
 | Reports and accounting | Trial balance summary and CSV export use the authorized `list_trial_balance` RPC and group totals by currency; CSV escaping and formula-injection protections have regression tests | Reconciled report outputs for each test currency and branch in staging | Code/test coverage exists; accounting reconciliation in staging remains unverified |
 | Database security | Compare each replaced function with current schema; inspect owner, SECURITY DEFINER search path, execute grants, table grants, RLS policies, and every caller | Approved staging migration run and role/branch negative tests | Not confirmed |
-| Customer privacy | Minimise customer-directory fields; avoid displaying full national ID/passport values; preserve honest loading/error/empty states | Regression tests plus role-based staging verification | Code updated; tests need green run |
+| Customer privacy and onboarding | Minimise customer-directory fields; match the live schema; use secure references; require branch/creator; default new customers to pending review | Regression tests plus role-based staging verification | Draft code updated; exact-head CI and staging pending |
+| KYC review | Approve/reject only pending customers through audited SECURITY DEFINER RPC; require reason; enforce active reviewer and branch access; revoke anon customer-table grants | Disposable SQL assertions, then production-shaped staging tests with real role/branch fixtures | New migration and assertions added; exact-head CI pending |
 | Staff chat and attendance | Separate group chat from private messages; block inactive staff; manual punches remain clearly non-biometric | Authenticated multi-user staging tests and event transition/deduplication checks | Automated coverage; staging pending |
 | Receipts | UI only offers posted cash receipts; print handler now requires explicit posted status, valid cash type/reference/positive finite amount, and labels repeated print actions in the current transaction list | Real printer make/model, driver, paper width, deposit/withdrawal print evidence on Windows 10 and 11; durable reprint audit across reloads if required | Code guard and regression tests passed; physical printer testing and durable reprint audit remain pending |
 | Fingerprint attendance | Build only against vendor-supported device SDK/API; keep privileged keys server-side | Reader make/model, firmware, SDK/driver support and witnessed enrolment/matching tests | Blocked on device details |
@@ -62,3 +63,5 @@
 - Follow-up within the same combined batch: customer branch choices are now filtered against the database's system-admin, bank-admin branch-access, and branch-manager checks; the directory shows the customer's KYC status so pending customers are not mislabeled as active. This remains UI guidance only—the database RLS policy is authoritative.
 
 - KYC review is now a complete draft workflow: authorized reviewers can approve/reject only pending records, must provide a reason, and the database function records the decision in audit_events under an empty search_path. The new migration also revokes anonymous direct access to customer records. Disposable PostgreSQL assertions cover approve/reject, repeat-decision denial, cross-branch denial, unauthorized-role denial, audit rows, and anon grants.
+
+- The active Supabase project list currently shows the separate candidate project as inactive, so production-shaped staging has not been performed. No attempt was made to activate or modify it.

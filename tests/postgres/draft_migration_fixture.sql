@@ -1,4 +1,4 @@
--- Minimal isolated PostgreSQL fixture for executing the two draft migrations.
+-- Minimal isolated PostgreSQL fixture for executing the draft migration batch.
 -- This is not a production schema dump; tests cover migration execution and selected guards.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE ROLE anon NOLOGIN;
