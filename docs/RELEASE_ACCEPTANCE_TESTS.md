@@ -66,7 +66,8 @@ This checklist is a test plan, not a claim that the tests have already passed. U
 
 ## 6. Attendance and biometric connector
 
-- [ ] Manual clock-in/out and supervisor corrections are explicitly labeled by method.
+- [ ] Manual web clock-in/out use server time, record method='web', prevent duplicate daily punches, and create audit events.
+- [ ] Supervisor corrections are separately authorized and audit logged.
 - [ ] Device events map through a configured device user ID to an active employee; names from a device are not trusted.
 - [ ] Duplicate device events, replayed payloads, offline buffering, clock drift and service restart are tested.
 - [ ] Connector rejects unauthenticated requests and binds to loopback or an approved restricted interface.
