@@ -644,15 +644,21 @@ window.loadAttendancePolicy();
       ${panel(
         "TEAM MESSAGES",
         "Internal staff communication",
-        "Messaging is not connected to a database yet; this page does not send or store messages.",
-        `<div class="notice-box">To enable real staff chat safely, the project needs a messages table, authenticated-user identity, staff-only row-level security policies, and optionally Supabase Realtime.</div>
-         <label>Message preview
-           <textarea id="chat-preview" rows="3" maxlength="500" placeholder="Type a draft message to preview it (not sent or saved)..."></textarea>
-         </label>
-         <button type="button" class="secondary" onclick="previewStaffMessage()">Preview draft</button>
-         <div id="chat-preview-result" class="muted" aria-live="polite">Drafts stay in this page only.</div>`
+        "Messages are available to authenticated active employees; sent messages are append-only.",
+        `<div class="staff-chat-toolbar">
+           <p class="muted">Use this channel for internal work information. Do not send passwords, PINs, customer account details, or confidential financial data.</p>
+           <button type="button" class="secondary" onclick="window.loadStaffChat()">Refresh messages</button>
+         </div>
+         <div id="staff-chat-feedback" class="muted" role="status" aria-live="polite">Loading staff messages…</div>
+         <div id="staff-chat-list" class="staff-chat-list" aria-live="polite"></div>
+         <form id="staff-chat-form" class="staff-chat-form" onsubmit="window.sendStaffMessage(event)">
+           <label for="staff-chat-input">Message to all active staff</label>
+           <textarea id="staff-chat-input" rows="3" maxlength="1000" required placeholder="Write a short work message…"></textarea>
+           <div class="staff-chat-submit"><span class="muted">Maximum 1,000 characters</span><button class="primary" type="submit">Send message</button></div>
+         </form>`
       )}
     `;
+    window.loadStaffChat();
   }
   else if (pageName === "Shares") {
     c.innerHTML = '<h2 class="page-heading">Shares & Charges</h2><p class="page-intro">Account opening: UGX 30,000. Includes one cheque book, one transaction log book and the account-opening form. UGX 10,000 buys one share, UGX 8,500 is a restricted security reserve, and UGX 11,500 covers bundled opening costs. Replacement cheque book: UGX 2,500. Replacement log book: UGX 1,500. Loan-processing form: UGX 10,000.</p>' +
@@ -1745,13 +1751,51 @@ document.addEventListener("click", function(event) {
   if (postButton) window.postApprovedCashRequest(postButton.getAttribute("data-post-journal"));
 });
 
-window.previewStaffMessage = function() {
-  const input = document.getElementById("chat-preview");
-  const output = document.getElementById("chat-preview-result");
-  if (!input || !output) return;
-  output.textContent = input.value.trim()
-    ? "Draft preview only: " + input.value.trim()
-    : "Enter a message to preview. Nothing has been sent or saved.";
+window.loadStaffChat = async function() {
+  const feedback=document.getElementById("staff-chat-feedback");
+  const list=document.getElementById("staff-chat-list");
+  if(!feedback||!list) return;
+  if(!db){feedback.textContent="Chat is unavailable because the database client is not configured.";return;}
+  feedback.textContent="Loading messages…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user) throw new Error("Sign in with your staff account to view messages.");
+    const {data,error}=await db.from("staff_messages")
+      .select("id,sender_user_id,message_body,created_at")
+      .order("created_at",{ascending:false}).limit(100);
+    if(error) throw error;
+    if(!data?.length){list.innerHTML='<p class="muted">No messages yet. Send the first staff update.</p>';feedback.textContent="Showing the latest 100 messages.";return;}
+    list.innerHTML=data.map(m=>{
+      const own=m.sender_user_id===userData.user.id;
+      const sender=own?"You":"Staff "+String(m.sender_user_id||"").slice(0,8);
+      const when=m.created_at?new Date(m.created_at).toLocaleString():"Time unavailable";
+      return '<article class="staff-chat-message'+(own?' own':'')+'"><div class="staff-chat-message-meta"><strong>'+esc(sender)+'</strong><time>'+esc(when)+'</time></div><p>'+esc(m.message_body)+'</p></article>';
+    }).join("");
+    feedback.textContent="Loaded "+data.length+" message"+(data.length===1?"":"s")+". Newest first.";
+  }catch(err){feedback.textContent="Could not load messages: "+(err?.message||"Unexpected error");list.innerHTML="";}
+};
+
+window.sendStaffMessage = async function(event) {
+  if(event) event.preventDefault();
+  const form=document.getElementById("staff-chat-form");
+  const input=document.getElementById("staff-chat-input");
+  const feedback=document.getElementById("staff-chat-feedback");
+  if(!form||!input||!feedback||!db) return;
+  const message=input.value.trim();
+  if(!message){feedback.textContent="Type a message before sending.";return;}
+  if(message.length>1000){feedback.textContent="Messages are limited to 1,000 characters.";return;}
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
+  feedback.textContent="Sending message…";
+  try{
+    const {data:userData,error:userError}=await db.auth.getUser();
+    if(userError||!userData?.user) throw new Error("Your staff session has expired. Sign in again.");
+    const {error}=await db.from("staff_messages").insert({sender_user_id:userData.user.id,message_body:message});
+    if(error) throw error;
+    input.value="";
+    await window.loadStaffChat();
+  }catch(err){feedback.textContent="Message was not sent: "+(err?.message||"Unexpected error");}
+  finally{if(submit)submit.disabled=false;}
 };
 
 window.printTransactionReceipt = function(button, skipConfirmation) {
