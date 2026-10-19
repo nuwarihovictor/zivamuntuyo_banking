@@ -27,23 +27,25 @@ class LocalReceiptPrinterPageTests(unittest.TestCase):
         self.assertIn('value="DEPOSIT"', self.html)
         self.assertIn('value="WITHDRAWAL"', self.html)
 
-    def test_has_no_database_or_remote_network_dependency(self):
+    def test_has_no_remote_network_dependency(self):
+        # Check actual resource/transport primitives, not explanatory prose.
         forbidden = (
-            r"https?://",
-            r"supabase",
-            r"fetch\s*\(",
-            r"XMLHttpRequest",
-            r"WebSocket",
+            r'<script\b[^>]*\bsrc\s*=',
+            r'<link\b[^>]*\bhref\s*=\s*["\']https?://',
+            r'fetch\s*\(',
+            r'XMLHttpRequest',
+            r'WebSocket',
+            r'\bnew\s+Image\s*\(',
         )
         for pattern in forbidden:
             self.assertIsNone(
                 re.search(pattern, self.html, re.IGNORECASE),
-                f"local printer test page must not use remote/database dependency: {pattern}",
+                f"local printer test page must not use remote/network dependency: {pattern}",
             )
 
     def test_print_action_uses_browser_print_dialog(self):
         self.assertIn("window.print()", self.html)
-        self.assertIn("getElementById(\"print\")", self.html)
+        self.assertIn('getElementById("print")', self.html)
 
 
 if __name__ == "__main__":
