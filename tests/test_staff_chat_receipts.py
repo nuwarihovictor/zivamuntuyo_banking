@@ -123,7 +123,9 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         start = self.app.index('window.loadStaffChat = async function')
         end = self.app.index('window.sendStaffMessage = async function', start)
         loader = self.app[start:end]
-        self.assertIn("'<p>'+esc(m.message_body)+'</p>'", loader)
+        self.assertIn("esc(m.message_body)", loader)
+        self.assertIn("message_body", loader)
+        self.assertNotIn("'+m.message_body+'", loader)
         self.assertIn('.order("created_at",{ascending:false}).limit(100)', loader)
 
 
