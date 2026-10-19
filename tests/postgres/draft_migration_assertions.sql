@@ -227,6 +227,16 @@ BEGIN
     RAISE EXCEPTION 'FAIL: posted deposit journal is not balanced';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_posted'
+      AND entity_type='ledger_journal'
+      AND entity_id=v_deposit::text
+      AND outcome='success'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: successful cash posting has no audit event';
+  END IF;
+
   -- Duplicate posting must fail and leave the two original entries unchanged.
   v_failed := false;
   BEGIN
