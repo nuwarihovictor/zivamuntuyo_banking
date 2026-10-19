@@ -52,6 +52,12 @@ assert.ok(existsSync("supabase/tests/financial_integrity_diagnostics.sql"), "Rea
 const diagnostics = readFileSync("supabase/tests/financial_integrity_diagnostics.sql", "utf8");
 assert.match(diagnostics, /posted_journal_unbalanced/, "Financial diagnostics must check posted journal balance");
 assert.match(diagnostics, /stored_account_balance_differs_from_ledger/, "Financial diagnostics must compare stored and ledger balances");
+assert.match(app, /window\.clockInMyAttendance/, "Attendance page must expose manual web clock-in");
+assert.match(app, /window\.clockOutMyAttendance/, "Attendance page must expose manual web clock-out");
+assert.ok(existsSync("supabase/sql/staff_attendance_clock_rpc_draft.sql"), "Secure manual attendance RPC draft must be present");
+const attendanceSql = readFileSync("supabase/sql/staff_attendance_clock_rpc_draft.sql", "utf8");
+assert.match(attendanceSql, /clock_in_method,\s*status/, "Manual attendance records must record method and status");
+assert.match(attendanceSql, /REVOKE ALL ON FUNCTION public\.clock_in_my_attendance/, "Attendance RPCs must revoke default public execution");
 
 
 const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
@@ -61,6 +67,8 @@ const receiptCode = app.slice(receiptStart, receiptEnd);
 assert.match(receiptCode, /r\.receipt_number/, "Account-opening receipt must use the server-returned receipt number");
 assert.match(receiptCode, /r\.collection_status!==\"received\"/, "Account-opening receipt must reject missing server-confirmed collection status");
 assert.doesNotMatch(receiptCode, /TOTAL RECEIVED: UGX 30,000/, "Receipt must not hard-code the paid amount");
+assert.match(receiptCode, /Math\.abs\(Number\(r\.amount\)-\(Number\(r\.share_amount\|\|0\)\+Number\(r\.security_reserve\|\|0\)\+Number\(r\.bundled_opening_costs\|\|0\)\)\)>=0\.01/, "Receipt printer must block unbalanced allocation totals");
+assert.match(app, /control\.disabled=code!==\"JNT\"/, "Joint-holder fields must be disabled for non-joint accounts");
 assert.ok(existsSync("supabase/sql/joint_account_holders_and_approval_guard.sql"), "Joint account database safeguards must be checked into the repository");
 const jointSql = readFileSync("supabase/sql/joint_account_holders_and_approval_guard.sql", "utf8");
 assert.match(jointSql, /distinct_holder_count|v_joint_holder_count/, "Joint account approval must verify distinct holders");

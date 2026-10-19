@@ -559,3 +559,9 @@ button.primary:hover,button.secondary:hover { transform:translateY(-1px);box-sha
 .loan-due-today .loan-servicing-status{background:#e5efff;color:#174d91}
 .loan-due-upcoming .loan-servicing-status{background:#e3f5e9;color:#17643a}
 .loan-due-settled .loan-servicing-status{background:#edf0ee;color:#4b5550}
+
+.attendance-clock-card{margin:18px 0;padding:18px;border:1px solid var(--line,#dce5dd);border-radius:14px;background:var(--surface,#fff)}
+.attendance-clock-card h3{margin:0 0 8px}
+.attendance-clock-card>label{display:block;max-width:520px;margin:12px 0}
+.attendance-clock-actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.attendance-clock-actions button:disabled{opacity:.55;cursor:not-allowed}

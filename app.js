@@ -559,6 +559,18 @@ window.switchPage = function(pageName) {
            <li>Store attendance events and device identifiers, not raw fingerprint images.</li>
            <li>Require authenticated staff mapping, duplicate-event protection, audit logs and restricted database policies.</li>
          </ul>
+         <section class="attendance-clock-card" aria-labelledby="attendance-clock-title">
+           <h3 id="attendance-clock-title">Manual web attendance — fallback</h3>
+           <p class="muted">This records a web clock-in/out with an audit trail. It is not a fingerprint scan. Use the device workflow only after the exact fingerprint terminal or reader has been connected and tested.</p>
+           <label>Attendance branch<select id="attendance-clock-branch"><option value="">My home branch</option></select></label>
+           <div class="attendance-clock-actions">
+             <button type="button" class="primary" id="attendance-clock-in" onclick="window.clockInMyAttendance()">Clock in</button>
+             <button type="button" class="secondary" id="attendance-clock-out" onclick="window.clockOutMyAttendance()" disabled>Clock out</button>
+             <button type="button" class="secondary" onclick="window.loadMyAttendanceStatus()">Refresh status</button>
+           </div>
+           <p id="my-attendance-feedback" class="muted" role="status" aria-live="polite">Checking today's attendance…</p>
+           <div id="my-attendance-status"></div>
+         </section>
          <hr>
          <h3 style="margin:18px 0 8px;">Work schedule & attendance rules</h3>
          <p class="muted">Default schedule: clock in at 08:30 and clock out at 17:00 (Africa/Kampala). Managers should be able to adjust these settings to match branch policy. The schedule can be saved only after the attendance_policies.sql database setup is installed. Saving requires an authorized manager and creates an audit event.</p>
@@ -626,6 +638,7 @@ window.switchPage = function(pageName) {
     if (timesheetToInput && !timesheetToInput.value) timesheetToInput.value = timesheetToDate;
 
 window.loadAttendancePolicy();
+    window.loadMyAttendanceStatus();
   }
   else if (pageName === "StaffChat") {
     c.innerHTML = `
@@ -1453,6 +1466,7 @@ window.toggleJointHolderFields = function() {
   const code=String(select.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
   fieldset.hidden=code!=="JNT";
   if(code==="JNT"&&!document.querySelector("#joint-holder-fields .joint-holder-row"))window.addJointAccountHolderField();
+  fieldset.querySelectorAll("input,button").forEach(control=>{control.disabled=code!=="JNT";if(control.matches("input"))control.required=code==="JNT";});
   const feedback=document.getElementById("joint-holder-feedback");
   if(feedback)feedback.textContent=code==="JNT"?"Add at least one additional active customer. The account cannot be approved until two or more distinct holders are recorded.":"";
 };
@@ -1578,7 +1592,7 @@ window.handleAccountSubmit = async function(e) {
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
     const receipt=window.lastAccountOpeningReceipt;
-    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received";
+    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received"&&Math.abs(Number(receipt.amount)-(Number(receipt.share_amount||0)+Number(receipt.security_reserve||0)+Number(receipt.bundled_opening_costs||0)))<0.01;
     const holderSummary=typeCode==="JNT"?" · Joint holders recorded: "+(new Set([customerId,...jointHolderIds]).size):"";
     if(feedback)feedback.textContent="Account request submitted. Reference: "+String(result.account_number||"created")+" · Status: "+String(result.account_status||"pending_approval")+holderSummary+documentStatus+(hasReceipt?" · Opening package collection confirmed by the server.":" · No paid receipt was returned by the server; do not print a payment receipt.");
     if(hasReceipt)feedback.insertAdjacentHTML("beforeend",' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print receipt '+esc(receipt.receipt_number)+'</button>');
@@ -2496,6 +2510,55 @@ window.saveAttendancePolicy = async function() {
   if(error){feedback.textContent="Policy was not confirmed saved. Ensure attendance_policies.sql is installed and your account has manager permissions. Details: "+error.message;return;}
   feedback.textContent="Policy saved successfully (ID: "+String(data||"") +"). Changes were audit-logged. Official clock events and timesheets still require their separate implementation.";
 };
+window.loadMyAttendanceStatus=async function(){
+  const feedback=document.getElementById("my-attendance-feedback"),host=document.getElementById("my-attendance-status"),branchSelect=document.getElementById("attendance-clock-branch"),clockIn=document.getElementById("attendance-clock-in"),clockOut=document.getElementById("attendance-clock-out");
+  if(!feedback||!host)return;
+  if(!db){feedback.textContent="Database connection unavailable. No attendance action was recorded.";return;}
+  try{
+    if(branchSelect&&branchSelect.options.length<=1){
+      const branches=await db.from("branches").select("id,branch_name,branch_code").eq("is_active",true).order("branch_name");
+      if(!branches.error)branchSelect.innerHTML='<option value="">My home branch</option>'+(branches.data||[]).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.branch_name)+' ('+esc(b.branch_code)+')</option>').join("");
+    }
+    const {data,error}=await db.rpc("get_my_attendance_status",{p_branch_id:branchSelect?.value||null});
+    if(error){feedback.textContent="Attendance clock RPC is not installed or access was denied. Review staff_attendance_clock_rpc_draft.sql in a non-production database first. "+error.message;host.innerHTML="";return;}
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row){
+      feedback.textContent="No attendance record returned for today. Clock in when you begin work.";
+      host.innerHTML='<div class="notice-box">Status: Not clocked in today. Method: not recorded.</div>';
+      if(clockIn)clockIn.disabled=false;if(clockOut)clockOut.disabled=true;return;
+    }
+    const method=value=>String(value||"not recorded").replaceAll("_"," ");
+    host.innerHTML='<div class="notice-box"><strong>'+esc(row.attendance_status||"recorded")+'</strong><br>Branch: '+esc(row.branch_name||"")+'<br>Date: '+esc(row.work_date||"")+'<br>Clock in: '+esc(row.clock_in_at?new Date(row.clock_in_at).toLocaleString():"Missing")+' ('+esc(method(row.clock_in_method))+')<br>Clock out: '+esc(row.clock_out_at?new Date(row.clock_out_at).toLocaleString():"Not yet recorded")+(row.clock_out_method?' ('+esc(method(row.clock_out_method))+')':"")+'</div>';
+    if(row.clock_out_at){feedback.textContent="Today's attendance is closed. Ask an authorized supervisor to correct an error.";if(clockIn)clockIn.disabled=true;if(clockOut)clockOut.disabled=true;}
+    else{feedback.textContent="Clock-in is recorded. Clock out when your shift ends.";if(clockIn)clockIn.disabled=true;if(clockOut)clockOut.disabled=false;}
+  }catch(_){feedback.textContent="A connection error prevented attendance status from loading.";}
+};
+window.clockInMyAttendance=async function(){
+  const feedback=document.getElementById("my-attendance-feedback"),branchId=document.getElementById("attendance-clock-branch")?.value||null;
+  if(!db||!feedback)return;
+  const button=document.getElementById("attendance-clock-in");if(button)button.disabled=true;
+  feedback.textContent="Recording web clock-in…";
+  try{
+    const {data,error}=await db.rpc("clock_in_my_attendance",{p_branch_id:branchId});
+    if(error)throw error;
+    const row=Array.isArray(data)?data[0]:data;
+    feedback.textContent="Clock-in recorded by the database at "+(row?.clock_in_at?new Date(row.clock_in_at).toLocaleString():"the server time")+". Method: web, not fingerprint.";
+    await window.loadMyAttendanceStatus();
+  }catch(error){feedback.textContent="Clock-in was not recorded: "+(error?.message||"connection error");if(button)button.disabled=false;}
+};
+window.clockOutMyAttendance=async function(){
+  const feedback=document.getElementById("my-attendance-feedback");if(!db||!feedback)return;
+  const button=document.getElementById("attendance-clock-out");if(button)button.disabled=true;
+  feedback.textContent="Recording web clock-out…";
+  try{
+    const {data,error}=await db.rpc("clock_out_my_attendance");
+    if(error)throw error;
+    const row=Array.isArray(data)?data[0]:data;
+    feedback.textContent="Clock-out recorded by the database at "+(row?.clock_out_at?new Date(row.clock_out_at).toLocaleString():"the server time")+". Method: web, not fingerprint.";
+    await window.loadMyAttendanceStatus();
+  }catch(error){feedback.textContent="Clock-out was not recorded: "+(error?.message||"connection error");if(button)button.disabled=false;}
+};
+
 window.previewAttendancePolicy = function(event) {
   if (event && event.preventDefault) event.preventDefault();
   const read = id => document.getElementById(id);
@@ -2711,8 +2774,8 @@ window.printInstitutionPayrollReceipt = function(){
 
 window.printAccountOpeningReceipt = function(){
   const r=window.lastAccountOpeningReceipt;
-  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)){
-    alert("No server-confirmed account-opening payment receipt is available. Do not print a paid receipt without a recorded collection.");
+  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)||Math.abs(Number(r.amount)-(Number(r.share_amount||0)+Number(r.security_reserve||0)+Number(r.bundled_opening_costs||0)))>=0.01){
+    alert("No reconciled server-confirmed account-opening receipt is available. A missing or unbalanced collection allocation must be resolved before printing.");
     return;
   }
   const money=value=>"UGX "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
