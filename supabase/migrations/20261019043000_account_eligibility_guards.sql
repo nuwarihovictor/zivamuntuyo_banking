@@ -233,7 +233,19 @@ BEGIN
     RAISE EXCEPTION 'This customer already has an individual account; choose a joint account type if another holder is intended';
   END IF;
   v_currency := upper(trim(coalesce(p_currency_code,'UGX')));
-  IF length(v_currency)<>3 OR v_currency !~ '^[A-Z]{3}
+  IF length(v_currency)<>3 OR v_currency !~ '^[A-Z]{3}$' THEN
+    RAISE EXCEPTION 'Currency must be a three-letter currency code';
+  END IF;
+  -- Match the canonical entry point: only currencies enabled in the catalogue
+  -- may be used, including through this legacy RPC.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.currencies c
+    WHERE upper(c.code)=v_currency AND c.is_active=true
+  ) THEN
+    RAISE EXCEPTION 'Unsupported or inactive currency';
+  END IF;
+  v_account_number := 'ZVF' || to_char(clock_timestamp(),'YYMMDDHH24MISS')
+    || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
   INSERT INTO public.bank_accounts(account_number,account_type_id,currency_code,branch_id,status,created_by)
   VALUES(v_account_number,p_account_type_id,v_currency,p_branch_id,'pending_approval',auth.uid())
   RETURNING id INTO v_account_id;
