@@ -67,6 +67,8 @@ const receiptCode = app.slice(receiptStart, receiptEnd);
 assert.match(receiptCode, /r\.receipt_number/, "Account-opening receipt must use the server-returned receipt number");
 assert.match(receiptCode, /r\.collection_status!==\"received\"/, "Account-opening receipt must reject missing server-confirmed collection status");
 assert.doesNotMatch(receiptCode, /TOTAL RECEIVED: UGX 30,000/, "Receipt must not hard-code the paid amount");
+assert.match(receiptCode, /Math\.abs\(Number\(r\.amount\)-\(Number\(r\.share_amount\|\|0\)\+Number\(r\.security_reserve\|\|0\)\+Number\(r\.bundled_opening_costs\|\|0\)\)\)>=0\.01/, "Receipt printer must block unbalanced allocation totals");
+assert.match(app, /control\.disabled=code!==\"JNT\"/, "Joint-holder fields must be disabled for non-joint accounts");
 assert.ok(existsSync("supabase/sql/joint_account_holders_and_approval_guard.sql"), "Joint account database safeguards must be checked into the repository");
 const jointSql = readFileSync("supabase/sql/joint_account_holders_and_approval_guard.sql", "utf8");
 assert.match(jointSql, /distinct_holder_count|v_joint_holder_count/, "Joint account approval must verify distinct holders");
