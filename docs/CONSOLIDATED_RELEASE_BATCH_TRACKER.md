@@ -126,3 +126,11 @@
 - Exact branch-head CI for `1fd75809675cbea5630598305af6ef647664dfe2` passed run [#39235605037](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39235605037): 89 Python tests, JavaScript syntax checks, financial math tests, all seven draft migrations on disposable PostgreSQL 17, and all six SQL assertion scripts. No production database changes were made.
 - **Staging isolation correction:** inspection showed the previously selected Supabase project was the school-management database, not a banking staging project. The Vercel Preview variables for the banking branch have been neutralized to inert placeholder values. No banking schema migrations were applied to the school database and no financial test data was inserted.
 - Next staging step is to create a separate Supabase development branch/database from the banking production schema history, after the owner identifies the correct Supabase organization and approves the displayed cost estimate. Then configure the Vercel Preview URL and publishable key for that isolated branch and test only synthetic banking data.
+
+
+## No-additional-cost continuation — 2026-10-19
+
+- Do not create or start a paid Supabase development branch. Continue with no-additional-cost checks until a separate banking staging database is available without new spend.
+- Expanded the disposable PostgreSQL assertion suite with negative tests for cross-branch cash request creation and approval. A teller or approver scoped to branch B must be denied access to a branch A account/request; denied operations must not leave an approval or success-audit event.
+- These CI tests use synthetic fixture data and a disposable PostgreSQL 17 database. They do not substitute for a production-shaped staging deployment.
+- The Vercel preview variables remain inert because the prior candidate was an unrelated school database. Do not route the preview to production or another application's database.
