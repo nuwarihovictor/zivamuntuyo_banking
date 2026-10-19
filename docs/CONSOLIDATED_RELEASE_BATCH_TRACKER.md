@@ -9,7 +9,7 @@
 - Pull request: [Draft PR #15](https://github.com/nuwarihovictor/zivamuntuyo_banking/pull/15)
 - Production changes: **none authorised or performed by this batch**
 - Latest combined code/test batch before this tracker refresh: `23ff9cf5505a4422dd995d7dd299482a7b6ad34f` (customer schema alignment, report integrity checks, audited KYC review RPC and PostgreSQL assertions).
-- Earlier baseline passed at [run #39226940646](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39226940646), before the KYC review migration was added. The KYC-enabled exact-head preflight is still being verified; any subsequent source or test change requires a fresh run.
+- The cash-integrity code/test head `6a241283323acd5bc20c73edd761fb947c131ba8` passed exact-head CI [run #39235211318](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39235211318): 89 Python tests, JavaScript syntax checks, all seven draft migrations parsed and executed on disposable PostgreSQL 17, and all six SQL assertion scripts passed. Any later source/test change requires a fresh exact-head run.
 - Release state: **NO-GO until all applicable gates below are evidenced and an authorised release owner approves**
 
 ## Consolidated work matrix
@@ -103,3 +103,16 @@
 - Preview build for code/test commit `0105b41e3793b6d8f613050869e86dc52db5629a` is `READY`: [open preview](https://zivamuntuyobanking-744r2l5je-infonuwarihovictor-1047s-projects.vercel.app).
 - The Vercel project has SSO protection enabled for non-custom-domain deployments. A prompt before the app loads may be Vercel/team authentication, not the banking application's own sign-in. Do not disable this protection as a workaround.
 - This is a branch preview (`target: null)), not a production deployment. The preview has not been proven to connect to staging because no Vercel environment variables are configured and the separate staging Supabase project is inactive.
+
+
+## Banking integrity and production-schema review — 2026-10-19
+
+- Added a cash-request audit event in the same transaction as request creation. If the audit insert fails, the request transaction also fails atomically.
+- Hardened `approve_cash_transaction_request`: requires active staff, valid active account and request details, branch access, configured approval limit, and a still-unapproved pending request. The row is locked; `approved_by` / `approved_at` must be null, preventing a second reviewer from overwriting the first approval. The approval decision is audited in the same transaction.
+- Expanded disposable SQL coverage for request audit completeness, re-approval denial, preserving the first approver, no duplicate approval audit event, wrong-currency cash ledger rejection, no partial ledger entries/balance update, posting idempotency, double-entry balance, and audit-failure rollback.
+- Read-only review of the current production definitions found the live cash-request and posting functions do not yet enforce the active-employee check; the live posting function lacks the posting audit event; and the live approval function does not reject an already populated `approved_by`. The reviewed draft migration corrects these gaps but has **not** been applied to production.
+- Read-only security advisor review reports 22 RLS-enabled tables without policies, one SECURITY DEFINER view finding for `branch_directory_public`, and 68 authenticated-executable SECURITY DEFINER function warnings. A separate grant query found direct anon/authenticated table privileges on `general_ledger_accounts` and `ledger_journal_entries` despite RLS being enabled with no policies; the draft migration targets those two tables and the branch view specifically. Do not blanket-revoke other grants without caller-by-caller review.
+- Current accounting RPC review confirms `list_trial_balance` returns active ledger accounts only and is not date-filtered; formal reconciliation still needs test fixtures for each currency/branch and accounting sign conventions.
+- Restored separate Supabase project `suopsvncczxlnyjhtfdy`; it is still starting and currently reports no public tables and no recorded migrations. Preview-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` have been configured for the release branch, scoped to that branch. Do not test financial flows against this empty database.
+- A production-shaped branch from the production project can apply the existing migration history into a fresh database without copying production data, but branch creation may incur hourly charges. Do not create it until the owner confirms the organization and the applicable quoted cost.
+- No production migrations, production data writes, or production deployment were performed.
