@@ -27,8 +27,11 @@ Features depending on a draft migration are not active in a database until that 
 Run the source-level regression suite from the repository root:
 
 ```bash
+node --check app.js
 python -m unittest discover -s tests -p 'test_*.py' -v
 ```
+
+For Windows field testing, use the [Windows 10/11 acceptance checklist](docs/WINDOWS_10_11_FIELD_ACCEPTANCE.md). The checklist records required evidence; it does not mean hardware tests have already passed.
 
 The GitHub Actions workflow creates an isolated PostgreSQL 17 service, parses and applies draft migrations, and runs fixture-level assertions. Fixture tests are not a full copy of production and do not replace staging integration tests.
 
