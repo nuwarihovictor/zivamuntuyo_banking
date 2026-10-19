@@ -12,6 +12,7 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         cls.chat_migration = (
             ROOT / "supabase/migrations/20261019080000_staff_chat_active_employee_rls.sql"
         ).read_text(encoding="utf-8")
+        cls.vercel_config = (ROOT / "vercel.json").read_text(encoding="utf-8")
         cls.attendance_migration = (
             ROOT / "supabase/migrations/20261019090000_staff_attendance_event_rls.sql"
         ).read_text(encoding="utf-8")
@@ -35,6 +36,13 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         self.assertIn('type!=="withdrawal"', self.app)
         self.assertIn("AMOUNT PAID OUT", self.app)
         self.assertIn("window.printTransactionReceipt", self.app)
+
+    def test_deployment_has_baseline_browser_security_headers(self):
+        self.assertIn("X-Content-Type-Options", self.vercel_config)
+        self.assertIn("nosniff", self.vercel_config)
+        self.assertIn("X-Frame-Options", self.vercel_config)
+        self.assertIn("DENY", self.vercel_config)
+        self.assertIn("strict-origin-when-cross-origin", self.vercel_config)
 
     def test_attendance_ui_and_database_transition_guards(self):
         self.assertIn("window.recordStaffAttendancePunch", self.app)
