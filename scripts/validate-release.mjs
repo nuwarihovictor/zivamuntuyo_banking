@@ -59,6 +59,17 @@ const attendanceSql = readFileSync("supabase/sql/staff_attendance_clock_rpc_draf
 assert.match(attendanceSql, /clock_in_method,\s*status/, "Manual attendance records must record method and status");
 assert.match(attendanceSql, /REVOKE ALL ON FUNCTION public\.clock_in_my_attendance/, "Attendance RPCs must revoke default public execution");
 
+assert.ok(existsSync("supabase/sql/attendance_device_connector_schema_draft.sql"), "Fingerprint device ingestion schema draft must be present");
+const deviceSql = readFileSync("supabase/sql/attendance_device_connector_schema_draft.sql", "utf8");
+assert.match(deviceSql, /CREATE TABLE IF NOT EXISTS public\.attendance_devices/, "Attendance devices must be registered server-side");
+assert.match(deviceSql, /CREATE TABLE IF NOT EXISTS public\.attendance_device_employee_map/, "Device users must map to employee identities");
+assert.match(deviceSql, /UNIQUE \(device_id, external_event_id\)/, "Device events must be idempotent");
+assert.match(deviceSql, /GRANT EXECUTE ON FUNCTION public\.ingest_staff_attendance_device_event.*service_role/, "Only trusted service role may ingest device attendance");
+assert.match(deviceSql, /REVOKE ALL ON FUNCTION public\.ingest_staff_attendance_device_event.*authenticated/, "Browser users must not ingest fingerprint events directly");
+assert.doesNotMatch(deviceSql, /fingerprint_template|fingerprint_image|biometric_template/, "Attendance event schema must not store biometric templates/images");
+assert.ok(existsSync("docs/ATTENDANCE_DEVICE_CONNECTOR_DRAFT.md"), "Fingerprint connector rollout and security requirements must be documented");
+
+
 
 const receiptStart = app.indexOf("window.printAccountOpeningReceipt = function(){");
 const receiptEnd = app.indexOf("window.printDormantReactivationReceipt", receiptStart);
