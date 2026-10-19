@@ -62,7 +62,7 @@ jobs:
               parse_sql(path.read_text(encoding="utf-8"))
               print(f"SQL syntax parsed: {path}")
           PY
-      - name: Execute both draft migrations in disposable PostgreSQL 17
+      - name: Execute all draft migrations in disposable PostgreSQL 17
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019043000_account_eligibility_guards.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261019050000_harden_public_branch_directory_and_ledger_grants.sql
