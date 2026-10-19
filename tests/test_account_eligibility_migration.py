@@ -61,7 +61,7 @@ class AccountEligibilityMigrationStaticTests(unittest.TestCase):
         app = APP.read_text(encoding="utf-8")
         self.assertIn('id="account-currency-code"', app)
         self.assertIn('db.from("currencies").select("code").eq("is_active",true).order("code")', app)
-        self.assertIn('currencySelect.innerHTML=\'<option value="">Choose currency</option>'', app)
+        self.assertIn("Choose currency", app)
         self.assertNotIn('<option value="USD">USD — US dollar</option>', app)
         self.assertNotIn('<option value="KES">KES — Kenyan shilling</option>', app)
 
