@@ -1328,6 +1328,43 @@ window.exportFinancialStatementsCsv = function() {
   if (feedback) feedback.textContent = "Exported " + rows.length + " statement summary rows. These are cumulative active-ledger balances, not date-filtered statutory statements.";
 };
 
+window.calculateFinancialReportGroups = function(rows) {
+  const currencies = Object.create(null);
+  rows.forEach(row => {
+    const currency = String(row.currency_code).trim();
+    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: Object.create(null) };
+    const group = currencies[currency];
+    group.debit += Number(row.debit_total || 0);
+    group.credit += Number(row.credit_total || 0);
+    group.count++;
+    const type = String(row.ledger_type || "Unclassified");
+    if (!group.accounts[type]) group.accounts[type] = { debit: 0, credit: 0, count: 0 };
+    group.accounts[type].debit += Number(row.debit_total || 0);
+    group.accounts[type].credit += Number(row.credit_total || 0);
+    group.accounts[type].count++;
+  });
+  const currencyEntries = Object.entries(currencies);
+  const unbalancedCurrencies = currencyEntries.filter(([, group]) => Math.abs(group.debit - group.credit) >= 0.005);
+  return { currencies, currencyEntries, unbalancedCurrencies };
+};
+
+window.calculateFinancialStatementAmounts = function(accounts) {
+  const amount = (type, side) => {
+    const totals = accounts[type];
+    if (!totals) return 0;
+    return side === "debit" ? totals.debit - totals.credit : totals.credit - totals.debit;
+  };
+  const income = amount("income", "credit");
+  const expenses = amount("expense", "debit");
+  const netResult = income - expenses;
+  const assets = amount("asset", "debit");
+  const liabilities = amount("liability", "credit");
+  const equity = amount("equity", "credit");
+  const totalClaims = liabilities + equity + netResult;
+  const difference = assets - totalClaims;
+  return { income, expenses, netResult, assets, liabilities, equity, totalClaims, difference };
+};
+
 window.loadFinancialReports = async function() {
   const feedback = document.getElementById("reports-feedback");
   const exportButton = document.getElementById("reports-export-csv");
@@ -1380,41 +1417,15 @@ window.loadFinancialReports = async function() {
     feedback.textContent = "No active ledger accounts were returned for your authorized branch scope. No financial totals can be calculated.";
     return;
   }
-  const currencies = Object.create(null);
-  rows.forEach(row => {
-    const currency = String(row.currency_code).trim();
-    if (!currencies[currency]) currencies[currency] = { debit: 0, credit: 0, count: 0, accounts: Object.create(null) };
-    const group = currencies[currency];
-    group.debit += Number(row.debit_total || 0);
-    group.credit += Number(row.credit_total || 0);
-    group.count++;
-    const type = String(row.ledger_type || "Unclassified");
-    if (!group.accounts[type]) group.accounts[type] = { debit: 0, credit: 0, count: 0 };
-    group.accounts[type].debit += Number(row.debit_total || 0);
-    group.accounts[type].credit += Number(row.credit_total || 0);
-    group.accounts[type].count++;
-  });
+  const { currencies, currencyEntries, unbalancedCurrencies } = window.calculateFinancialReportGroups(rows);
   const money = (n, currency) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
-  const currencyEntries = Object.entries(currencies);
-  const unbalancedCurrencies = currencyEntries.filter(([, group]) => Math.abs(group.debit - group.credit) >= 0.005);
   const statementRows = [];
   const incomeMarkup = [];
   const balanceMarkup = [];
   currencyEntries.forEach(([currency, group]) => {
     const accounts = group.accounts;
-    const amount = (type, side) => {
-      const totals = accounts[type];
-      if (!totals) return 0;
-      return side === "debit" ? totals.debit - totals.credit : totals.credit - totals.debit;
-    };
-    const income = amount("income", "credit");
-    const expenses = amount("expense", "debit");
-    const netResult = income - expenses;
-    const assets = amount("asset", "debit");
-    const liabilities = amount("liability", "credit");
-    const equity = amount("equity", "credit");
-    const totalClaims = liabilities + equity + netResult;
-    const difference = assets - totalClaims;
+    const { income, expenses, netResult, assets, liabilities, equity, totalClaims, difference } =
+      window.calculateFinancialStatementAmounts(accounts);
     const push = (statement, line, value) => statementRows.push({
       statement, currency_code: currency, line_item: line, amount: Number(value.toFixed(2))
     });
