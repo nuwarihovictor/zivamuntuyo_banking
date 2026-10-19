@@ -27,8 +27,9 @@ class FinancialReportExportTests(unittest.TestCase):
     def test_csv_export_escapes_quotes_and_spreadsheet_formulas(self):
         handler = self.app.split("window.exportFinancialReportsCsv = function()", 1)[1].split("window.loadFinancialReports = async function()", 1)[0]
         self.assertIn('text.replace(/"/g, \'""\')', handler)
-        self.assertIn('/^[=+@\\-\\t\\r]/.test(text)', handler)
+        self.assertIn('/^[-=+@\\t\\r]/.test(text)', handler)
         self.assertIn('type:"text/csv;charset=utf-8;"', handler)
+        self.assertIn('new Blob(["\\uFEFF" + lines.join("\\r\\n") + "\\r\\n"]', handler)
         self.assertIn("URL.revokeObjectURL(url)", handler)
 
     def test_no_report_data_cannot_be_exported_as_a_valid_report(self):

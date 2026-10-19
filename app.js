@@ -1191,7 +1191,7 @@ window.exportFinancialReportsCsv = function() {
   ];
   const csvCell = value => {
     let text = value == null ? "" : String(value);
-    if (/^[=+\\-@\t\r]/.test(text)) text = "'" + text;
+    if (/^[-=+@\t\r]/.test(text)) text = "'" + text;
     return '"' + text.replace(/"/g, '""') + '"';
   };
   const lines = [columns.map(([, heading]) => csvCell(heading)).join(",")];
