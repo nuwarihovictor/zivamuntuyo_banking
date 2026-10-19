@@ -30,7 +30,10 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
                 self.assertNotIn(f"db.from('{table}').select('*')", self.app)
 
     def test_customer_directory_uses_an_explicit_minimal_field_list(self):
-        self.assertIn('db.from("customers").select("id,full_name,customer_number,phone_number,created_at")', self.app)
+        self.assertRegex(
+            self.app,
+            r'db\\.from\\("customers"\\)\\s*\\.select\\("id,full_name,customer_number,phone_number,created_at"\\)',
+        )
         self.assertNotIn('db.from("customers").select("*").order("created_at", { ascending: false })', self.app)
 
     def test_customer_directory_does_not_render_national_id_or_passport_number(self):
@@ -38,8 +41,11 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
         self.assertNotIn("NIN: " + chr(36) + "{esc(cust.nin_or_passport)}", self.app)
 
     def test_failed_directory_request_is_not_reported_as_an_empty_directory(self):
-        self.assertIn("Customer records could not be loaded because the request failed.", self.app)
-        self.assertNotIn("No customer records found yet.", self.app.split("catch(() => {", 1)[-1])
+        self.assertIn("Customer records could not be loaded. Check your connection and permissions, then retry.", self.app)
+        handler = self.app.split("window.loadCustomerDirectory = async function()", 1)[1].split("function transactionModuleTabs", 1)[0]
+        self.assertLess(handler.index("if (error) throw error;"), handler.index("No customer records found yet."))
+        self.assertIn("catch (error)", handler)
+        self.assertIn('onclick="window.loadCustomerDirectory()"', handler)
 
 
 if __name__ == "__main__":
