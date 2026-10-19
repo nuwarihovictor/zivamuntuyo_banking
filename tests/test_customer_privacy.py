@@ -36,7 +36,8 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
 
     def test_customer_directory_shows_kyc_status_for_pending_records(self):
         self.assertIn('.select("id,full_name,customer_number,phone_number,status,created_at")', self.app)
-        self.assertIn('esc(cust.status || "status unknown")', self.app)
+        self.assertIn('const status = String(cust.status || "status unknown")', self.app)
+        self.assertIn("esc(status)", self.app)
         self.assertIn('"Customer Directory & KYC Status"', self.app)
 
     def test_registration_branch_options_match_database_insert_authorization(self):
@@ -55,7 +56,7 @@ class CustomerDirectoryPrivacyTests(unittest.TestCase):
     def test_failed_directory_request_is_not_reported_as_an_empty_directory(self):
         self.assertIn("Customer records could not be loaded. Check your connection and permissions, then retry.", self.app)
         handler = self.app.split("window.loadCustomerDirectory = async function()", 1)[1].split("function transactionModuleTabs", 1)[0]
-        self.assertLess(handler.index("if (error) throw error;"), handler.index("No customer records found yet."))
+        self.assertLess(handler.index("if (customerResult.error) throw customerResult.error;"), handler.index("No customer records found yet."))
         self.assertIn("catch (error)", handler)
         self.assertIn('onclick="window.loadCustomerDirectory()"', handler)
 
