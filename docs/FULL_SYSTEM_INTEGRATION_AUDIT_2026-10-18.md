@@ -120,3 +120,19 @@ The live `staff_messages` table has sender, recipient, optional branch, message 
 - Fingerprint capture cannot be finished without the exact device model, SDK/API availability, license and Windows driver. The current selector is not a scanner and is not represented as one.
 - Live voice/video calls, browser-closed push delivery, actual printer acceptance, Windows/Android acceptance and Vercel deployment of this integration commit remain unverified.
 - No Supabase migration has been applied and no production deployment has been triggered by this pass.
+
+
+## Read-only ledger and account integrity spot-check — 19 October 2026
+
+A read-only aggregate query was run against the connected Supabase database. It found zero detected cases in the checked categories at the time of the query:
+
+- Posted journals with no ledger entries: 0
+- Posted journals with debit/credit imbalance above 0.005: 0
+- Posted journals with currency mismatch: 0
+- Posted journals missing posted-by / posted-at audit fields: 0
+- Active accounts whose stored balance differed from the posted liability-ledger sum by more than 0.01: 0
+- Nonzero active accounts without a posted liability ledger: 0
+- Customers with multiple non-closed/non-rejected IND accounts: 0
+- Non-closed/non-rejected JNT accounts with fewer than two distinct holders: 0
+
+This is a limited snapshot, not a full accounting audit, not proof that every transaction is correct, and not a replacement for recurring monitoring. The read-only diagnostic query is checked into \`supabase/tests/financial_integrity_diagnostics.sql\`. No production data was changed.
