@@ -9,7 +9,7 @@
 
 ## Verified disposable CI results
 
-Run 8 (commit `7703e1f7915ea76a8b013e27b476e9ef731dd369`) completed successfully:
+Run 9 (commit `7703e1f7915ea76a8b013e27b476e9ef731dd369`) completed successfully:
 - Python static regression tests passed.
 - PostgreSQL SQL parsing passed.
 - Both account/branch/ledger draft migrations executed successfully against the disposable fixture.
