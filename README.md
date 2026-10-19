@@ -16,6 +16,7 @@ See:
 - [Deployment readiness register](docs/DEPLOYMENT_READINESS_2026.md)
 - [Release acceptance tests](docs/RELEASE_ACCEPTANCE_TESTS.md)
 - [Read-only financial integrity diagnostics](supabase/tests/financial_integrity_diagnostics.sql)
+- [Supabase security review](docs/SUPABASE_SECURITY_REVIEW_2026-10-19.md)
 - [Loan servicing design](docs/LOAN_SERVICING_AND_ARREARS_DESIGN.md)
 - [Loan servicing schema draft](docs/LOAN_SERVICING_SCHEMA_DRAFT.md)
 - [Fingerprint attendance compatibility](docs/attendance-device-compatibility.md)
