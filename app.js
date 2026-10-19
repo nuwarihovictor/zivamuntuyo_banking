@@ -545,7 +545,7 @@ window.switchPage = function(pageName) {
         "DEVICE-COMPATIBLE ATTENDANCE",
         "Windows 10 / Windows 11",
         "Designed around common fingerprint terminals and USB readers. Actual compatibility depends on the exact model, firmware, vendor SDK and connection method.",
-        `<div class="notice-box"><strong>Important:</strong> no fingerprint device is connected yet. This setup page does not scan fingerprints or create official attendance records. A secure Windows connector or supported terminal API must be installed and tested first.</div>
+        `<div class="notice-box"><strong>Fingerprint status:</strong> no fingerprint device is connected yet. The manual clock-in/clock-out panel below records self-service punches only; these are not fingerprint-verified. Biometric attendance requires a trusted Windows connector or supported terminal API, device authentication, and hardware testing.</div>
          <label for="attendance-device">Choose device family / connection method
            <select id="attendance-device" onchange="showAttendanceDeviceHelp()">
              <option value="zkteco">ZKTeco fingerprint terminals (LAN / ADMS / vendor SDK)</option>
@@ -570,7 +570,7 @@ window.switchPage = function(pageName) {
          </ul>
          <hr>
          <h3 style="margin:18px 0 8px;">Staff clock-in / clock-out</h3>
-         <p class="muted">This records a manual punch for your signed-in staff account. It is not fingerprint verification; device-sourced punches must come through a trusted device connector.</p>
+         <p class="muted">This records a manual punch for your signed-in staff account when the attendance migration is installed. It is not fingerprint verification; device-sourced punches must come through a trusted device connector.</p>
          <div class="attendance-punch-panel">
            <div id="staff-attendance-state" class="notice-box" role="status" aria-live="polite">Checking your attendance status…</div>
            <div class="attendance-punch-actions">
