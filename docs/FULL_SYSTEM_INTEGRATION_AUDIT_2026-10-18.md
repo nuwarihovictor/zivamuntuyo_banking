@@ -93,3 +93,30 @@ A feature is complete only when the UI, trusted database operation, permissions,
 - The project alias `zivamuntuyobanking.vercel.app` is registered and verified in Vercel. It is a Vercel subdomain, not a separately purchased custom domain.
 - The Vercel status check on the integration PR commit reported a deployment rate-limit error (“retry in 24 hours”). The GitHub Actions static validation workflow itself completed successfully.
 - The integration PR commit has **not** been confirmed deployed. Do not confuse the existing feature-branch preview with this integration branch or with production.
+
+
+## Integration pass 2 — account, loan dashboard, and private messaging
+
+The integration branch now includes additional source-level work:
+
+- The account-opening UI accepts multiple additional holders for a JNT account, requires distinct selected customers client-side, and calls a trusted holder RPC for each. If a holder call fails after the account request was created, the form retains that request ID and retries the same request instead of silently creating a second account.
+- A draft SQL file adds `add_joint_account_holder_to_pending_request` and strengthens `approve_account_request`: joint approvals require at least two distinct holders, and IND approvals recheck for an existing individual account.
+- Account-opening receipts now use the amount, allocation and receipt number returned by the database function. The print action is blocked unless the server returned a positive amount and `collection_status='received'`; the old hard-coded paid receipt was removed.
+- VIC LINE now has a private direct-message mode in the UI, backed by draft `send_vic_line_direct_message` and read-receipt RPCs. Existing team/branch channels remain separate.
+- Loans now have a database-backed due-date dashboard and a draft RPC that derives unpaid instalments from approved schedule versions and posted repayment allocations.
+- A separate draft generator creates idempotent staff in-app due alerts. It does not send external messages and has not been scheduled.
+- Automated static checks now cover these new interfaces and SQL safeguards.
+
+### Live Supabase findings confirmed read-only on 19 October 2026
+
+The connected database was inspected without modifying it. The live `approve_account_request` currently does not check that JNT accounts have two distinct holders. The live `create_bank_account_request` definition also does not contain the serialized IND eligibility guard that exists in the repository draft. Therefore **the UI and SQL drafts are not yet an enforced live-database feature**. The two account-opening SQL files must be reviewed together and tested in a non-production project before any production migration.
+
+The live `staff_messages` table has sender, recipient, optional branch, message text, sent timestamp and read timestamp fields. The direct-message SQL matches that observed table shape, but it remains a draft until installed and permission-tested.
+
+### Remaining hard blockers
+
+- The loan schedule, installment, repayment, allocation and due-alert tables are still drafts; dashboard and generator RPCs cannot return authoritative data until that schema and trusted posting workflow are installed and tested.
+- The alert generator must be invoked by a trusted scheduler after the schema and allocation policy are approved. No cron schedule is active.
+- Fingerprint capture cannot be finished without the exact device model, SDK/API availability, license and Windows driver. The current selector is not a scanner and is not represented as one.
+- Live voice/video calls, browser-closed push delivery, actual printer acceptance, Windows/Android acceptance and Vercel deployment of this integration commit remain unverified.
+- No Supabase migration has been applied and no production deployment has been triggered by this pass.
