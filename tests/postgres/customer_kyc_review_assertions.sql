@@ -4,12 +4,30 @@
 INSERT INTO public.employee_profiles(user_id,is_active)
 VALUES
  ('40000000-0000-0000-0000-000000000011',true),
- ('40000000-0000-0000-0000-000000000012',true);
+ ('40000000-0000-0000-0000-000000000012',true),
+ ('40000000-0000-0000-0000-000000000013',false);
 INSERT INTO public.customers(id,status,branch_id)
 VALUES
  ('50000000-0000-0000-0000-000000000001','pending_review','10000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-000000000002','pending_review','10000000-0000-0000-0000-000000000001'),
- ('50000000-0000-0000-0000-000000000003','pending_review','10000000-0000-0000-0000-000000000001');
+ ('50000000-0000-0000-0000-000000000003','pending_review','10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000004','pending_review','10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000005','pending_review','10000000-0000-0000-0000-000000000001');
+
+CREATE OR REPLACE FUNCTION public.test_fail_customer_kyc_audit() RETURNS trigger
+LANGUAGE plpgsql AS $trigger$
+BEGIN
+  IF NEW.entity_type = 'customer'
+     AND NEW.entity_id = '50000000-0000-0000-0000-000000000005'
+     AND NEW.action = 'customer_kyc_approved' THEN
+    RAISE EXCEPTION 'injected KYC audit failure';
+  END IF;
+  RETURN NEW;
+END
+$trigger$;
+CREATE TRIGGER test_fail_customer_kyc_audit
+BEFORE INSERT ON public.audit_events
+FOR EACH ROW EXECUTE FUNCTION public.test_fail_customer_kyc_audit();
 
 SELECT set_config('test.user_id','40000000-0000-0000-0000-000000000011',false);
 SELECT set_config('test.role','branch_manager',false);
@@ -64,9 +82,37 @@ BEGIN
     IF SQLERRM LIKE '%Customer KYC review permission required%' THEN v_failed := true; ELSE RAISE; END IF;
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: unauthorized KYC reviewer was accepted'; END IF;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000013',false);
+  PERFORM set_config('test.role','branch_manager',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.review_customer_kyc(
+      '50000000-0000-0000-0000-000000000004','approve','Identity documents verified'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%Active employee profile required%' THEN v_failed := true; ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: inactive KYC reviewer was accepted'; END IF;
+
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000011',false);
+  PERFORM set_config('test.role','branch_manager',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.review_customer_kyc(
+      '50000000-0000-0000-0000-000000000005','approve','Identity documents verified'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%injected KYC audit failure%' THEN v_failed := true; ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: injected KYC audit failure did not abort approval'; END IF;
 END
 $test$;
 RESET ROLE;
+DROP TRIGGER test_fail_customer_kyc_audit ON public.audit_events;
+DROP FUNCTION public.test_fail_customer_kyc_audit();
 
 DO $test$
 BEGIN
@@ -78,6 +124,12 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.customers WHERE id='50000000-0000-0000-0000-000000000003' AND status='pending_review') THEN
     RAISE EXCEPTION 'FAIL: denied KYC attempts changed customer status';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.customers WHERE id='50000000-0000-0000-0000-000000000004' AND status='pending_review') THEN
+    RAISE EXCEPTION 'FAIL: inactive reviewer changed customer status';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.customers WHERE id='50000000-0000-0000-0000-000000000005' AND status='pending_review') THEN
+    RAISE EXCEPTION 'FAIL: audit failure did not roll back customer status';
   END IF;
   IF (SELECT count(*) FROM public.audit_events WHERE entity_type='customer' AND action IN ('customer_kyc_approved','customer_kyc_rejected')) <> 2 THEN
     RAISE EXCEPTION 'FAIL: KYC decision audit events missing or duplicated';

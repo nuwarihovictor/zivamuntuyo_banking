@@ -33,3 +33,11 @@ These observations describe the database at the time of review; re-check before 
 ## Current branch verification
 
 The disposable PostgreSQL workflow passed on commit `5977d073225dc1e39e3b29815c6eb17c1a9d9686`: [run #39214823761](https://github.com/nuwarihovictor/zivamuntuyo_banking/actions/runs/39214823761). This includes the search-path-safe UUID reference generator and an injected audit-insert failure test proving that ledger entries, account balance, and journal status roll back together. Any later code changes require a fresh passing run before being treated as verified.
+
+
+## Customer onboarding and KYC review — read-only schema inspection (2026-10-19)
+
+- The live `public.customers` table requires `customer_type` and `full_name`; it stores identification in `identification_type` / `identification_number`, address in `physical_address`, and links the responsible branch with `branch_id`. It also has `created_by` and `updated_at`. The status constraint permits `pending_review`, `active`, `restricted`, `closed`, and `rejected`.
+- The customer INSERT RLS policy requires an active system administrator, or a bank administrator with branch access, or a branch manager for the selected branch. It also requires `created_by` to be NULL or the authenticated user. The old browser form used mismatched `nin_or_passport` / `address` fields, omitted required `customer_type` / branch information, and attempted to set status to active immediately.
+- Read-only privilege inspection also showed direct table privileges granted to `anon` on `public.customers`, despite the customer policies targeting authenticated users. The draft KYC migration revokes anonymous table access and adds an audited, branch-scoped review RPC.
+- The new migration is draft only. It has not been applied to production. Its tests run only in disposable PostgreSQL; production-shaped staging and approved release review remain required.
