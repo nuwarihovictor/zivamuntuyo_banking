@@ -100,3 +100,73 @@ REVOKE ALL ON FUNCTION public.list_vic_line_staff_directory() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.list_vic_line_direct_messages(uuid, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.list_vic_line_staff_directory() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_vic_line_direct_messages(uuid, integer) TO authenticated;
+
+
+-- Send a private one-to-one message. Direct messages are not branch-channel posts.
+CREATE OR REPLACE FUNCTION public.send_vic_line_direct_message(
+  p_recipient_user_id uuid,
+  p_message_text text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_sender uuid := auth.uid();
+  v_message_id uuid;
+  v_message text := btrim(coalesce(p_message_text, ''));
+BEGIN
+  IF v_sender IS NULL THEN
+    RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep
+    WHERE ep.user_id = v_sender AND ep.is_active = true
+      AND ep.employment_status NOT IN ('suspended','terminated','inactive')
+  ) THEN
+    RAISE EXCEPTION 'Active employee profile required' USING ERRCODE = '42501';
+  END IF;
+  IF p_recipient_user_id IS NULL OR p_recipient_user_id = v_sender OR NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep
+    WHERE ep.user_id = p_recipient_user_id AND ep.is_active = true
+      AND ep.employment_status NOT IN ('suspended','terminated','inactive')
+  ) THEN
+    RAISE EXCEPTION 'Choose another active staff member' USING ERRCODE = '22023';
+  END IF;
+  IF length(v_message) < 1 OR length(v_message) > 4000 THEN
+    RAISE EXCEPTION 'Message must contain between 1 and 4000 characters' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.staff_messages(sender_user_id, recipient_user_id, branch_id, message_text)
+  VALUES (v_sender, p_recipient_user_id, NULL, v_message)
+  RETURNING id INTO v_message_id;
+  RETURN v_message_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.mark_vic_line_direct_message_read(p_message_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employee_profiles ep
+    WHERE ep.user_id = v_user_id AND ep.is_active = true
+  ) THEN RAISE EXCEPTION 'Active employee profile required' USING ERRCODE = '42501'; END IF;
+  UPDATE public.staff_messages
+  SET read_at = coalesce(read_at, now())
+  WHERE id = p_message_id AND recipient_user_id = v_user_id;
+  RETURN FOUND;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.send_vic_line_direct_message(uuid, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.mark_vic_line_direct_message_read(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.send_vic_line_direct_message(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.mark_vic_line_direct_message_read(uuid) TO authenticated;
