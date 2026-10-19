@@ -1466,6 +1466,7 @@ window.toggleJointHolderFields = function() {
   const code=String(select.selectedOptions?.[0]?.dataset?.typeCode||"").toUpperCase();
   fieldset.hidden=code!=="JNT";
   if(code==="JNT"&&!document.querySelector("#joint-holder-fields .joint-holder-row"))window.addJointAccountHolderField();
+  fieldset.querySelectorAll("input,button").forEach(control=>{control.disabled=code!=="JNT";if(control.matches("input"))control.required=code==="JNT";});
   const feedback=document.getElementById("joint-holder-feedback");
   if(feedback)feedback.textContent=code==="JNT"?"Add at least one additional active customer. The account cannot be approved until two or more distinct holders are recorded.":"";
 };
@@ -1591,7 +1592,7 @@ window.handleAccountSubmit = async function(e) {
       documentStatus=uploaded.ok?" · Documents uploaded: "+uploaded.count:" · WARNING: account request submitted, but document upload failed: "+uploaded.error;
     }
     const receipt=window.lastAccountOpeningReceipt;
-    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received";
+    const hasReceipt=receipt&&receipt.receipt_number&&Number.isFinite(receipt.amount)&&receipt.amount>0&&receipt.collection_status==="received"&&Math.abs(Number(receipt.amount)-(Number(receipt.share_amount||0)+Number(receipt.security_reserve||0)+Number(receipt.bundled_opening_costs||0)))<0.01;
     const holderSummary=typeCode==="JNT"?" · Joint holders recorded: "+(new Set([customerId,...jointHolderIds]).size):"";
     if(feedback)feedback.textContent="Account request submitted. Reference: "+String(result.account_number||"created")+" · Status: "+String(result.account_status||"pending_approval")+holderSummary+documentStatus+(hasReceipt?" · Opening package collection confirmed by the server.":" · No paid receipt was returned by the server; do not print a payment receipt.");
     if(hasReceipt)feedback.insertAdjacentHTML("beforeend",' <button type="button" class="secondary" onclick="printAccountOpeningReceipt()">Print receipt '+esc(receipt.receipt_number)+'</button>');
@@ -2773,8 +2774,8 @@ window.printInstitutionPayrollReceipt = function(){
 
 window.printAccountOpeningReceipt = function(){
   const r=window.lastAccountOpeningReceipt;
-  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)){
-    alert("No server-confirmed account-opening payment receipt is available. Do not print a paid receipt without a recorded collection.");
+  if(!r||!r.receipt_number||r.collection_status!=="received"||!(Number(r.amount)>0)||Math.abs(Number(r.amount)-(Number(r.share_amount||0)+Number(r.security_reserve||0)+Number(r.bundled_opening_costs||0)))>=0.01){
+    alert("No reconciled server-confirmed account-opening receipt is available. A missing or unbalanced collection allocation must be resolved before printing.");
     return;
   }
   const money=value=>"UGX "+Number(value||0).toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
