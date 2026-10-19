@@ -5,6 +5,7 @@
 GRANT SELECT ON public.employee_profiles TO authenticated;
 INSERT INTO public.employee_profiles(user_id,is_active)
 VALUES ('40000000-0000-0000-0000-000000000005',true),
+       ('40000000-0000-0000-0000-000000000007',true),
        ('40000000-0000-0000-0000-000000000006',false)
 ON CONFLICT (user_id) DO UPDATE SET is_active=EXCLUDED.is_active;
 
@@ -19,6 +20,17 @@ BEGIN
   END IF;
 END
 $active_can_read$;
+
+DO $cannot_impersonate_sender$
+BEGIN
+  BEGIN
+    INSERT INTO public.staff_messages(sender_user_id,message_body)
+    VALUES ('40000000-0000-0000-0000-000000000007','Spoofed sender must be denied');
+    RAISE EXCEPTION 'FAIL: active employee sent message as another employee';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$cannot_impersonate_sender$;
 
 SELECT set_config('test.user_id','40000000-0000-0000-0000-000000000006',false);
 DO $inactive_cannot_read$
