@@ -19,8 +19,8 @@ class StaffChatReceiptAttendanceRegressionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
     def test_html_escape_covers_quotes_for_attribute_values(self):
-        self.assertIn(\x27.replace(/"/g, "&quot;")\x27, self.app)
-        self.assertIn(\x27replace(/\\x27/g, "&#39;")\x27, self.app)
+        self.assertIn('.replace(/"/g, "&quot;")', self.app)
+        self.assertIn("replace(/'/g, \"&#39;\")", self.app)
 
     def test_staff_chat_uses_authenticated_supabase_user(self):
         self.assertIn("db.auth.getUser()", self.app)
