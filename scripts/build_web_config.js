@@ -64,7 +64,7 @@ if (supabaseUrl) {
 }
 
 const config = { supabaseUrl, supabaseAnonKey };
-const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\\n";
+const output = "window.ZIVAMUNTUYO_CONFIG = Object.freeze(" + JSON.stringify(config) + ");\n";
 const outputDirectory = path.join(process.cwd(), "public");
 const sourceRoot = path.resolve(__dirname, "..");
 const publicAssets = ["index.html", "app.js", "styles.css", "logo.svg"];
