@@ -37,6 +37,9 @@ The GitHub Actions workflow creates an isolated PostgreSQL 17 service, parses an
 
 ## Release gates — do not skip
 
+Follow the [staging and release runbook](docs/STAGING_RELEASE_RUNBOOK.md) for the controlled staging, acceptance, go/no-go, and rollback process.
+
+
 - Compare every draft function replacement with its live production definition and review all callers and grants.
 - Test authorization, branch boundaries, approval separation, duplicate posting, ledger balance, failure rollback, and idempotency against a production-shaped schema.
 - Complete the SECURITY DEFINER function and RLS/grant audit, then review Supabase security-advisor findings.
