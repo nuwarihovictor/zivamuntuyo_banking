@@ -88,18 +88,18 @@ CREATE TABLE public.ledger_entries (
 CREATE OR REPLACE FUNCTION public.current_employee_role_code() RETURNS text
 LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.role', true), '') $$;
 CREATE OR REPLACE FUNCTION public.current_employee_can_transact_in_branch(uuid) RETURNS boolean
-LANGUAGE sql STABLE AS $
+LANGUAGE sql STABLE AS $$
   SELECT nullif(current_setting('test.allowed_branch_id', true), '')::uuid = $1
-$;
+$$;
 CREATE OR REPLACE FUNCTION public.is_active_branch_manager_for(uuid) RETURNS boolean
-LANGUAGE sql STABLE AS $ SELECT true $;
+LANGUAGE sql STABLE AS $$ SELECT true $$;
 
 -- Representative routines used to exercise the search_path/ACL hardening migration.
 CREATE OR REPLACE FUNCTION public.approval_limit_allows(text,text,uuid,text,numeric)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER
-SET search_path = public, pg_temp AS $
+SET search_path = public, pg_temp AS $$
   SELECT coalesce(nullif(current_setting('test.approval_limit_allowed', true), ''), 'true')::boolean
-$;
+$$;
 GRANT EXECUTE ON FUNCTION public.approval_limit_allows(text,text,uuid,text,numeric)
 TO authenticated;
 CREATE OR REPLACE FUNCTION public.record_financial_activity(
