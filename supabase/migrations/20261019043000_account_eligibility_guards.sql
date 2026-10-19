@@ -225,7 +225,7 @@ BEGIN
     RAISE EXCEPTION 'Currency must be a three-letter currency code';
   END IF;
   v_account_number := 'ZVF' || to_char(clock_timestamp(),'YYMMDDHH24MISS')
-    || upper(substr(encode(gen_random_bytes(4),'hex'),1,6));
+    || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
   INSERT INTO public.bank_accounts(account_number,account_type_id,currency_code,branch_id,status,created_by)
   VALUES(v_account_number,p_account_type_id,v_currency,p_branch_id,'pending_approval',auth.uid())
   RETURNING id INTO v_account_id;
