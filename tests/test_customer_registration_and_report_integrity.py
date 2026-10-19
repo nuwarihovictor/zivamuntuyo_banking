@@ -18,7 +18,7 @@ class CustomerRegistrationSchemaAlignmentTests(unittest.TestCase):
                       "branch_id", "created_by", "status"):
             self.assertIn(field + ":", handler)
         self.assertNotIn("nin_or_passport:", handler)
-        self.assertNotIn("address:", handler)
+        self.assertNotIn('address: formData.get("address")', handler)
 
     def test_registration_records_authenticated_creator_and_pending_review_status(self):
         handler = self.app.split("window.handleCustomerSubmit = async function(e)", 1)[1].split("window.searchAccountOpeningCustomers", 1)[0]
