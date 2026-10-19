@@ -8,14 +8,32 @@ const productionUrl = "https://hwghiezvghdqxnhcnpwk.supabase.co";
 const target = String(process.env.VERCEL_ENV || "development").toLowerCase();
 let supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
 let publishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
-const legacyAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+let legacyAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
 
-// Explicit branch-scoped sentinel permits a static preview build without any backend.
-// Production never accepts this sentinel, and the generated browser config stays empty.
-if (target !== "production" && supabaseUrl === "DISABLED" && publishableKey === "DISABLED" && !legacyAnonKey) {
+// Preview builds may render the static interface without a backend. Never let malformed
+// or incomplete preview-only configuration leak into the browser bundle. Production remains strict.
+function disablePreviewBackend(reason) {
   supabaseUrl = "";
   publishableKey = "";
-  process.stdout.write("Preview backend explicitly disabled; generating an empty, fail-closed browser config.\\n");
+  legacyAnonKey = "";
+  process.stdout.write("Preview backend disabled (" + reason + "); generating an empty, fail-closed browser config.\\n");
+}
+if (target !== "production") {
+  if (supabaseUrl === "DISABLED" && publishableKey === "DISABLED" && !legacyAnonKey) {
+    disablePreviewBackend("explicit sentinel");
+  } else if (supabaseUrl && supabaseUrl !== productionUrl) {
+    let candidate;
+    try { candidate = new URL(supabaseUrl); } catch {}
+    const validPreviewOrigin = candidate &&
+      candidate.protocol === "https:" &&
+      candidate.hostname.endsWith(".supabase.co") &&
+      candidate.pathname === "/" && !candidate.search && !candidate.hash &&
+      !candidate.username && !candidate.password;
+    if (!validPreviewOrigin) disablePreviewBackend("invalid preview URL");
+  }
+  if (Boolean(supabaseUrl) !== Boolean(publishableKey || legacyAnonKey)) {
+    disablePreviewBackend("incomplete preview configuration");
+  }
 }
 
 function fail(message) {
