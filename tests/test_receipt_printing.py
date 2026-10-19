@@ -31,6 +31,17 @@ class ReceiptPrintingRegressionTests(unittest.TestCase):
         self.assertIn('amount<=0', handler)
         self.assertIn('Receipt unavailable:', handler)
 
+    def test_posting_success_marks_cash_receipt_posted_before_printing(self):
+        start = self.app.index('window.postApprovedCashRequest = async function(')
+        end = self.app.index('document.addEventListener("click", function(event)', start)
+        posting = self.app[start:end]
+        rpc_success = posting.index('if (result.error) throw result.error;')
+        status_mark = posting.index('receiptDataButton.dataset.receiptStatus = "posted";')
+        print_call = posting.index('window.printTransactionReceipt(receiptDataButton);')
+        self.assertLess(rpc_success, status_mark)
+        self.assertLess(status_mark, print_call)
+        self.assertIn('if (!receiptDataButton.dataset.receiptPrintCount) receiptDataButton.dataset.receiptPrintCount = "0";', posting)
+
     def test_receipt_html_escapes_dynamic_fields_before_writing_popup(self):
         start = self.app.index('window.printTransactionReceipt = function(button, skipConfirmation)')
         end = self.app.index('document.addEventListener("click",function(event)', start)

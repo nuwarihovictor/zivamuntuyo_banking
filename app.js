@@ -2180,6 +2180,9 @@ window.postApprovedCashRequest = async function(journalId, button) {
     if (feedback) feedback.textContent = "Ledger posting completed successfully. The receipt is ready to print.";
     const receiptDataButton = button || document.querySelector('[data-post-journal="' + journalId + '"]');
     if (receiptDataButton && ["deposit","withdrawal"].includes(String(receiptDataButton.dataset.receiptType||"").toLowerCase())) {
+      // Only mark the receipt eligible after the posting RPC has succeeded.
+      receiptDataButton.dataset.receiptStatus = "posted";
+      if (!receiptDataButton.dataset.receiptPrintCount) receiptDataButton.dataset.receiptPrintCount = "0";
       window.printTransactionReceipt(receiptDataButton);
     }
     await window.loadCashApprovals();
