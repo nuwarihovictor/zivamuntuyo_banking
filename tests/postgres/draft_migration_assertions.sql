@@ -538,6 +538,31 @@ BEGIN
   PERFORM set_config('test.approval_limit_allowed','true',false);
   PERFORM * FROM public.approve_cash_transaction_request(v_journal);
 
+  -- Even an independent accountant must be denied when scoped to another branch.
+  PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000003',false);
+  PERFORM set_config('test.role','accountant',false);
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000002',false);
+  v_failed := false;
+  BEGIN
+    PERFORM * FROM public.post_approved_cash_transaction(v_journal,v_cash);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%No transaction access to this branch%' THEN v_failed := true;
+    ELSE RAISE; END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FAIL: accountant posted branch A transaction while scoped to branch B'; END IF;
+  IF EXISTS (SELECT 1 FROM public.ledger_entries WHERE journal_id=v_journal) THEN
+    RAISE EXCEPTION 'FAIL: denied cross-branch posting left ledger entries';
+  END IF;
+  IF (SELECT status FROM public.ledger_journals WHERE id=v_journal)<>'pending_approval' THEN
+    RAISE EXCEPTION 'FAIL: denied cross-branch posting changed journal status';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.audit_events
+    WHERE action='cash_transaction_posted' AND entity_id=v_journal::text
+  ) THEN RAISE EXCEPTION 'FAIL: denied cross-branch posting left a success-audit event'; END IF;
+
+  PERFORM set_config('test.allowed_branch_id','10000000-0000-0000-0000-000000000001',false);
+
   -- The requester cannot post.
   PERFORM set_config('test.user_id','40000000-0000-0000-0000-000000000001',false);
   PERFORM set_config('test.role','accountant',false);
