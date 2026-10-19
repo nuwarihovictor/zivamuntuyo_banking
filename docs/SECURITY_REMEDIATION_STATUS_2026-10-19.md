@@ -81,3 +81,8 @@ The fixture now contains isolated test versions of the three inspected cash-tran
 ## Release decision
 
 Keep PR #15 in draft. Do not apply these migrations to production or enable live transaction processing until the latest CI run passes and the remaining release gates have evidence.
+
+
+## Latest draft CI result — 2026-10-19 06:08 UTC
+
+GitHub Actions run 151 on commit `b7e8f0ac28db90a4225b521f1e11ede9ea6bb423` completed successfully in the disposable PostgreSQL 17 workflow. The job passed the new `node --check app.js` step, Python regression tests, migration parsing and fixture application, account/branch/ledger assertions, opening-wrapper rollback assertions, staff-chat RLS tests, and staff-attendance transition/RLS tests. This validates the current disposable test harness only; it does not validate the draft functions against the production schema or prove Windows hardware readiness. Vercel still reports a build-rate-limit status, which is separate from this passing GitHub Actions run.
